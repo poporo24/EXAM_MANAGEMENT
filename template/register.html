@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCA Exam Management - Register</title>
+    <style>
+        :root {
+            --cca-green: #6a824e;
+            --cca-light-green: #94a87e;
+            --bg-gray: #f4f7f6;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-gray);
+        }
+
+        .header {
+            background-color: var(--cca-green);
+            color: white;
+            padding: 20px 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-titles h1 { margin: 0; font-size: 1.8rem; }
+        .header-titles p { margin: 0; font-size: 0.9rem; font-style: italic; opacity: 0.9; }
+
+        .main-content {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: calc(100vh - 100px);
+            padding: 20px;
+        }
+
+        .register-card {
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            width: 100%;
+            max-width: 450px;
+        }
+
+        .register-card h2 {
+            margin-top: 0;
+            color: #333;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .input-box { margin-bottom: 15px; }
+
+        input, select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #fafafa;
+            box-sizing: border-box;
+        }
+
+        .register-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--cca-green);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .register-btn:hover { background-color: var(--cca-light-green); }
+
+        .footer-links {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+
+        .footer-links a { color: var(--cca-green); text-decoration: none; }
+
+        .flash-msg {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+        .msg-danger { background-color: #ffebee; color: #c62828; }
+        .msg-success { background-color: #e8f5e9; color: #2e7d32; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="header-titles">
+            <h1>City College of Angeles</h1>
+            <p>Totalis Humanae</p>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="register-card">
+            <h2>Create Account</h2>
+
+            <!-- Display Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="flash-msg msg-{{ category }}">{{ message }}</div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+
+            <form action="/register" method="POST">
+                <div class="input-box">
+                    <input type="text" name="full_name" placeholder="Full Name" required>
+                </div>
+                <div class="input-box">
+                    <input type="email" name="email" placeholder="Institutional Email" required>
+                </div>
+                <div class="input-box">
+                    <input type="password" name="password" placeholder="Password" required>
+                </div>
+                <!-- Role is fixed to 'student' for public sign-up. -->
+                <!-- Proctor accounts are created by the admin. -->
+                <button type="submit" class="register-btn">Create Student Account</button>
+            </form>
+
+            <div class="footer-links">
+                Already have an account? <a href="/">Log in here</a>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

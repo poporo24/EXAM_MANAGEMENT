@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCA | Exam Timetable</title>
+    <meta name="description" content="City College of Angeles official exam timetable for students.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #f0f4ee; }
+        .no-scrollbar::-webkit-scrollbar { display:none; }
+        .no-scrollbar { -ms-overflow-style:none; scrollbar-width:none; }
+
+        @keyframes fadeUp {
+            from { opacity:0; transform:translateY(20px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+        .fade-up { animation: fadeUp .45s ease both; }
+        .d1 { animation-delay:.04s; }
+        .d2 { animation-delay:.10s; }
+        .d3 { animation-delay:.16s; }
+
+        /* Search highlight */
+        .highlight { background: #fef08a; border-radius: 3px; }
+
+        @media print {
+            .no-print { display:none !important; }
+            body { background: white; }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+<!-- Hero Header -->
+<header class="bg-gradient-to-br from-[#3d6b4f] to-[#668054] text-white shadow-2xl no-print">
+    <div class="max-w-5xl mx-auto px-6 py-10 text-center">
+        <p class="text-white/70 text-xs uppercase tracking-[0.25em] font-semibold mb-2">City College of Angeles</p>
+        <h1 class="text-4xl font-extrabold mb-2">Exam Timetable</h1>
+        <p class="text-white/80 text-sm">Official schedule of examinations — Academic Year 2025–2026</p>
+
+        <div class="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3 flex-wrap">
+            <!-- Live Search -->
+            <div class="relative w-full max-w-xs">
+                <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-white/50 text-sm"></i>
+                <input type="text" id="search-input"
+                       placeholder="Search subject, room, proctor…"
+                       class="w-full pl-10 pr-4 py-3 rounded-xl bg-white/15 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:bg-white/25 transition text-sm font-medium">
+            </div>
+            <!-- Section Text Search -->
+            <div class="relative w-full max-w-[160px]">
+                <i class="fas fa-layer-group absolute left-3 top-1/2 -translate-y-1/2 text-white/50 text-sm"></i>
+                <input type="text" id="section-search"
+                       placeholder="Section e.g. BSIT-2A"
+                       class="w-full pl-9 pr-3 py-3 rounded-xl bg-white/15 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:bg-white/25 transition text-sm font-medium uppercase">
+            </div>
+            <!-- Section Dropdown Filter -->
+            <div class="relative">
+                <i class="fas fa-users absolute left-3 top-1/2 -translate-y-1/2 text-white/50 text-sm"></i>
+                <select id="section-filter"
+                    class="pl-9 pr-4 py-3 rounded-xl bg-white/15 border border-white/20 text-white focus:outline-none focus:bg-white/25 transition text-sm font-medium appearance-none cursor-pointer">
+                    <option value="">All Sections</option>
+                    {% set sections = [] %}
+                    {% for _, exams in grouped %}
+                        {% for e in exams %}
+                            {% if e.section and e.section not in sections %}
+                                {% set _ = sections.append(e.section) %}
+                                <option value="{{ e.section }}">{{ e.section }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    {% endfor %}
+                </select>
+            </div>
+            <button onclick="window.print()"
+                class="flex items-center gap-2 px-5 py-3 rounded-xl bg-white/15 border border-white/20 hover:bg-white/25 transition text-sm font-semibold whitespace-nowrap">
+                <i class="fas fa-print"></i> Print
+            </button>
+            <a href="/logout"
+                class="flex items-center gap-2 px-5 py-3 rounded-xl bg-red-500/70 hover:bg-red-600/80 transition text-sm font-semibold whitespace-nowrap">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </div>
+</header>
+
+<!-- Summary Strip -->
+<div class="no-print bg-white border-b border-gray-200 shadow-sm">
+    <div class="max-w-5xl mx-auto px-6 py-4 flex items-center gap-6 text-sm flex-wrap">
+        <div class="flex items-center gap-2 text-gray-600">
+            <i class="fas fa-calendar-check text-[#3d6b4f]"></i>
+            <span><strong class="text-gray-900">{{ total }}</strong> scheduled exam{{ 's' if total != 1 else '' }}</span>
+        </div>
+        <div class="flex items-center gap-2 text-gray-600">
+            <i class="fas fa-info-circle text-blue-400"></i>
+            <span>View-only — contact admin for changes</span>
+        </div>
+        <div class="ml-auto text-gray-400 text-xs font-mono" id="live-count"></div>
+    </div>
+</div>
+
+<!-- Main Content -->
+<main class="max-w-5xl mx-auto px-6 py-8 no-scrollbar" id="timetable-body">
+
+    {% if grouped %}
+        {% for date_label, exams in grouped %}
+        <div class="fade-up d{{ loop.index % 3 + 1 }} mb-8 date-group">
+
+            <!-- Date Header -->
+            <div class="flex items-center gap-3 mb-3">
+                <div class="bg-[#3d6b4f] text-white rounded-lg px-4 py-2 text-xs font-black uppercase tracking-wider shadow-sm">
+                    <i class="fas fa-calendar-day mr-1"></i>{{ date_label }}
+                </div>
+                <div class="h-px flex-1 bg-gray-200"></div>
+                <span class="text-xs text-gray-400 font-medium">{{ exams|length }} exam{{ 's' if exams|length != 1 else '' }}</span>
+            </div>
+
+            <!-- Exam Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 exam-cards">
+                {% for exam in exams %}
+                <div class="exam-card bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md hover:border-[#668054]/30 transition-all duration-200"
+                     data-section="{{ exam.section | upper if exam.section else '' }}">
+
+                    <!-- Subject + Status -->
+                    <div class="flex items-start justify-between gap-2 mb-1">
+                        <h3 class="font-extrabold text-gray-900 text-base leading-snug subject-name">
+                            {{ exam.subject_name }}
+                        </h3>
+                        <span class="shrink-0 bg-green-100 text-green-700 border border-green-200 text-[10px] font-black uppercase px-2 py-0.5 rounded-full">
+                            ✓ Confirmed
+                        </span>
+                    </div>
+
+                    <!-- Section Badge -->
+                    {% if exam.section %}
+                    <span class="inline-block mb-1 bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black uppercase px-2 py-0.5 rounded section-tag">
+                        <i class="fas fa-users mr-1 text-indigo-400"></i>{{ exam.section }}
+                    </span>
+                    {% else %}
+                    <div class="mb-1"></div>
+                    {% endif %}
+
+                    <!-- Major/Minor Badge -->
+                    {% if exam.subject_type == 'Major' %}
+                    <span class="inline-block mb-3 bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-black uppercase px-2 py-0.5 rounded">
+                        📘 Major Subject
+                    </span>
+                    {% else %}
+                    <span class="inline-block mb-3 bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-black uppercase px-2 py-0.5 rounded">
+                        📗 Minor Subject
+                    </span>
+                    {% endif %}
+
+                    <!-- Details -->
+                    <div class="space-y-2 text-sm">
+                        <div class="flex items-center gap-2 text-gray-600">
+                            <i class="fas fa-clock w-4 text-[#3d6b4f] text-xs"></i>
+                            <span class="font-mono font-semibold">
+                                {% set dt = exam.exam_date_time %}
+                                {% if dt %}{{ dt.strftime('%I:%M %p') }}{% endif %}
+                            </span>
+                            <span class="text-gray-400 text-xs">·</span>
+                            <span class="text-gray-500 text-xs">{{ exam.duration_minutes }} min</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-gray-600">
+                            <i class="fas fa-map-marker-alt w-4 text-[#3d6b4f] text-xs"></i>
+                            <span class="font-semibold room-name">{{ exam.room_name if exam.room_name else 'TBD' }}</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-gray-600">
+                            <i class="fas fa-user-tie w-4 text-[#3d6b4f] text-xs"></i>
+                            <span class="proctor-name">{{ exam.proctor_name if exam.proctor_name else 'TBD' }}</span>
+                            {% if exam.department %}
+                            <span class="text-gray-400 text-xs">· {{ exam.department }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+
+    {% else %}
+        <div class="fade-up d1 mt-10 bg-white rounded-2xl border border-dashed border-gray-200 p-20 text-center">
+            <div class="text-7xl mb-5">📅</div>
+            <h2 class="text-2xl font-bold text-gray-600 mb-2">No Exams Scheduled Yet</h2>
+            <p class="text-gray-400">The exam schedule has not been generated yet.<br>Please check back soon.</p>
+        </div>
+    {% endif %}
+
+    <!-- No-results message (shown by JS when search finds nothing) -->
+    <div id="no-results" class="hidden mt-10 text-center py-16">
+        <div class="text-5xl mb-4">🔍</div>
+        <p class="text-gray-500 font-semibold">No exams match your search.</p>
+    </div>
+
+</main>
+
+<!-- Footer -->
+<footer class="mt-12 pb-8 text-center text-xs text-gray-400 no-print">
+    <p class="font-semibold text-gray-500">City College of Angeles · Exam Management System</p>
+    <p class="mt-1">This timetable is for information purposes only. Room assignments may change. Please confirm with your department.</p>
+</footer>
+
+<script>
+function filterExams() {
+    const q           = (document.getElementById('search-input').value  || '').toLowerCase().trim();
+    const sectionDrop = (document.getElementById('section-filter').value || '').toUpperCase().trim();
+    const sectionText = (document.getElementById('section-search').value || '').toUpperCase().trim();
+
+    let visibleCount = 0;
+
+    document.querySelectorAll('.exam-card').forEach(card => {
+        const subject = card.querySelector('.subject-name')?.textContent?.toLowerCase()  || '';
+        const room    = card.querySelector('.room-name')?.textContent?.toLowerCase()     || '';
+        const proctor = card.querySelector('.proctor-name')?.textContent?.toLowerCase()  || '';
+        // Always trim cardSec to avoid invisible-space mismatches
+        const cardSec = (card.dataset.section || '').toUpperCase().trim();
+        const text    = subject + ' ' + room + ' ' + proctor + ' ' + cardSec.toLowerCase();
+
+        const matchesSearch = !q || text.includes(q);
+
+        // Priority: dropdown (exact) → text box (partial contains) → show all
+        let matchesSection;
+        if (sectionDrop) {
+            matchesSection = cardSec === sectionDrop;
+        } else if (sectionText) {
+            matchesSection = cardSec.includes(sectionText);
+        } else {
+            matchesSection = true;
+        }
+
+        if (matchesSearch && matchesSection) {
+            card.style.display = '';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+
+    // Hide date-group headers with no visible cards
+    document.querySelectorAll('.date-group').forEach(group => {
+        const hasVisible = [...group.querySelectorAll('.exam-card')]
+            .some(c => c.style.display !== 'none');
+        group.style.display = hasVisible ? '' : 'none';
+    });
+
+    // No-results banner
+    const hasFilter = q || sectionDrop || sectionText;
+    document.getElementById('no-results').classList.toggle('hidden', visibleCount > 0 || !hasFilter);
+
+    // Live result count badge
+    const liveCount = document.getElementById('live-count');
+    if (liveCount) {
+        liveCount.textContent = hasFilter
+            ? `${visibleCount} result${visibleCount !== 1 ? 's' : ''}`
+            : '';
+    }
+}
+
+// Dropdown → clear text box, then filter
+document.getElementById('section-filter').addEventListener('change', () => {
+    document.getElementById('section-search').value = '';
+    filterExams();
+});
+
+// Text box → reset dropdown to "All Sections", then filter
+document.getElementById('section-search').addEventListener('input', () => {
+    document.getElementById('section-filter').value = '';
+    filterExams();
+});
+
+// Main search → just filter
+document.getElementById('search-input').addEventListener('input', filterExams);
+</script>
+</body>
+</html>

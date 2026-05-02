@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCA Portal | Login</title>
+    <style>
+        :root {
+            /* Moss and Sage colors consistent with CCA branding */
+            --cca-moss-green: #617345;  
+            --cca-sage-button: #99a784; 
+            --white: #ffffff;
+            --bg-light: #f4f6f9;
+        }
+
+        body, html {
+            height: 100%;
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background-color: var(--bg-light);
+            display: flex;
+        }
+
+        /* Side Banner - Matching the Institutional style */
+        .side-banner {
+            width: 40%;
+            background-color: var(--cca-moss-green);
+            color: var(--white);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 0 5%;
+            box-sizing: border-box;
+        }
+
+        .side-banner h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            border-bottom: 2px solid var(--white);
+            display: inline-block;
+            padding-bottom: 10px;
+        }
+
+        .side-banner p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        /* Login Section */
+        .login-section {
+            width: 60%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: var(--white);
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .login-card h2 { 
+            color: #444; 
+            font-weight: 400; 
+            margin-bottom: 30px; 
+            font-size: 1.8rem;
+        }
+
+        .form-group { margin-bottom: 20px; text-align: left; }
+        .form-group label { 
+            display: block; 
+            margin-bottom: 8px; 
+            font-weight: bold; 
+            font-size: 0.85rem; 
+            color: #555; 
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+
+        .login-btn {
+            width: 100%;
+            background-color: var(--cca-sage-button);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            margin-top: 15px;
+            transition: background 0.3s;
+        }
+
+        .login-btn:hover { background-color: var(--cca-moss-green); }
+
+        .footer-links { 
+            margin-top: 30px; 
+            font-size: 0.9rem; 
+            color: #777; 
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        
+        .footer-links a { 
+            color: var(--cca-moss-green); 
+            text-decoration: none; 
+            font-weight: bold; 
+        }
+        
+        .footer-links a:hover { text-decoration: underline; }
+
+        /* Responsive for mobile */
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .side-banner, .login-section { width: 100%; padding: 40px 20px; }
+            .side-banner { height: 30%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="side-banner">
+        <h1>City College of Angeles</h1>
+        <p>Totalis Humanae</p>
+        <p style="font-size: 0.9rem; margin-top: 20px;">Exam Management System supporting Quality Education.</p>
+    </div>
+
+    <div class="login-section">
+        <div class="login-card">
+            <h2>Log in</h2>
+
+            <form action="/login" method="POST">
+                <div class="form-group">
+                    <label>Institutional Email</label>
+                    <input type="email" name="email" placeholder="username@cca.edu.ph" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="password" placeholder="••••••••" required>
+                </div>
+
+                <button type="submit" class="login-btn">Sign In</button>
+            </form>
+
+            <div class="footer-links">
+                Don't have an account? <a href="/register">Create account</a>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

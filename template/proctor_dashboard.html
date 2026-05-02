@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCA | Proctor Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #f0f4f8; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @keyframes fadeUp {
+            from { opacity:0; transform:translateY(18px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+        .fade-up { animation: fadeUp .4s ease both; }
+        .d1 { animation-delay:.05s; }
+        .d2 { animation-delay:.12s; }
+        .d3 { animation-delay:.20s; }
+
+        .badge-scheduled {
+            background:#dcfce7; color:#15803d;
+            border:1px solid #bbf7d0;
+        }
+        .badge-pending {
+            background:#fef9c3; color:#a16207;
+            border:1px solid #fde68a;
+        }
+        @media print {
+            .no-print { display:none !important; }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+<!-- Top Nav Bar -->
+<header class="bg-[#3d6b4f] text-white shadow-lg no-print">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-lg font-bold">
+                {{ session.get('full_name', 'P')[0] | upper }}
+            </div>
+            <div>
+                <p class="font-bold text-lg leading-tight">{{ session.get('full_name', 'Proctor') }}</p>
+                <p class="text-white/70 text-xs uppercase tracking-widest">Proctor · City College of Angeles</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <button onclick="window.print()"
+                class="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition text-sm font-semibold">
+                <i class="fas fa-print"></i> Print Schedule
+            </button>
+            <a href="/logout"
+                class="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/80 hover:bg-red-600 transition text-sm font-semibold">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </div>
+</header>
+
+<!-- Main Content -->
+<main class="max-w-6xl mx-auto px-6 py-10">
+
+    <!-- Hero Banner -->
+    <div class="fade-up d1 mb-8 bg-gradient-to-br from-[#3d6b4f] to-[#668054] rounded-2xl p-8 text-white shadow-xl flex flex-col sm:flex-row items-center gap-6">
+        <div class="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-4xl font-black shrink-0">
+            {{ session.get('full_name', 'P')[0] | upper }}
+        </div>
+        <div>
+            <p class="text-white/70 text-sm font-semibold uppercase tracking-widest mb-1">Proctor Dashboard</p>
+            <h1 class="text-3xl font-extrabold">{{ session.get('full_name', 'Proctor') }}</h1>
+            <p class="text-white/80 mt-1">
+                You are assigned to proctor
+                <span class="font-bold text-white">{{ total }} exam{{ 's' if total != 1 else '' }}</span>.
+            </p>
+        </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="fade-up d2 grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 text-center">
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Total Assigned</p>
+            <p class="text-4xl font-black text-[#3d6b4f]">{{ total }}</p>
+        </div>
+        <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 text-center">
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Scheduled</p>
+            <p class="text-4xl font-black text-green-600">
+                {% set ns = namespace(count=0) %}
+                {% for _, exams in grouped %}{% for e in exams %}{% if e.status == 'Scheduled' %}{% set ns.count = ns.count + 1 %}{% endif %}{% endfor %}{% endfor %}
+                {{ ns.count }}
+            </p>
+        </div>
+        <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 text-center">
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Pending</p>
+            <p class="text-4xl font-black text-yellow-500">
+                {% set ns2 = namespace(count=0) %}
+                {% for _, exams in grouped %}{% for e in exams %}{% if e.status != 'Scheduled' %}{% set ns2.count = ns2.count + 1 %}{% endif %}{% endfor %}{% endfor %}
+                {{ ns2.count }}
+            </p>
+        </div>
+    </div>
+
+    <!-- Exam Schedule -->
+    {% if grouped %}
+        {% for date_label, exams in grouped %}
+        <div class="fade-up d3 mb-8">
+
+            <!-- Date Group Header -->
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-3 h-3 rounded-full bg-[#3d6b4f]"></div>
+                <h2 class="text-sm font-extrabold text-gray-700 uppercase tracking-wider">{{ date_label }}</h2>
+                <div class="h-px flex-1 bg-gray-200"></div>
+                <span class="text-xs text-gray-400 font-semibold">{{ exams|length }} exam{{ 's' if exams|length != 1 else '' }}</span>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-[#3d6b4f]/5 text-xs text-gray-500 uppercase font-bold tracking-wider">
+                        <tr>
+                            <th class="p-4">Subject</th>
+                            <th class="p-4">Type</th>
+                            <th class="p-4">Section</th>
+                            <th class="p-4">Start Time</th>
+                            <th class="p-4">Duration</th>
+                            <th class="p-4">Room</th>
+                            <th class="p-4">Capacity</th>
+                            <th class="p-4 text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        {% for exam in exams %}
+                        <tr class="hover:bg-[#3d6b4f]/5 transition">
+                            <td class="p-4 font-bold text-gray-800">
+                                <i class="fas fa-book-open text-[#3d6b4f] mr-2 opacity-60"></i>
+                                {{ exam.subject_name }}
+                            </td>
+                            <td class="p-4">
+                                {% if exam.subject_type == 'Major' %}
+                                <span class="bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-black uppercase px-2 py-0.5 rounded">📘 Major</span>
+                                {% else %}
+                                <span class="bg-green-50 text-green-700 border border-green-100 text-[10px] font-black uppercase px-2 py-0.5 rounded">📗 Minor</span>
+                                {% endif %}
+                            </td>
+                            <td class="p-4">
+                                {% if exam.section %}
+                                <span class="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black uppercase px-2 py-0.5 rounded">{{ exam.section }}</span>
+                                {% else %}<span class="text-gray-300 text-xs">—</span>{% endif %}
+                            </td>
+                            <td class="p-4 font-mono text-gray-600">
+                                {% set dt = exam.exam_date_time %}
+                                {% if dt %}{{ dt.strftime('%I:%M %p') }}{% endif %}
+                            </td>
+                            <td class="p-4 text-gray-500">
+                                {{ exam.duration_minutes }} min
+                                {% if exam.duration_minutes == 120 %}
+                                <span class="ml-1 text-[10px] bg-blue-50 text-blue-500 border border-blue-100 px-1.5 py-0.5 rounded">2hr</span>
+                                {% endif %}
+                            </td>
+                            <td class="p-4">
+                                <span class="bg-[#3d6b4f]/10 text-[#3d6b4f] font-semibold px-2.5 py-1 rounded-lg text-xs">
+                                    <i class="fas fa-map-marker-alt mr-1"></i>
+                                    {{ exam.room_name if exam.room_name else 'TBD' }}
+                                </span>
+                            </td>
+                            <td class="p-4 text-gray-500 text-sm">
+                                {{ exam.capacity ~ ' seats' if exam.capacity else '—' }}
+                            </td>
+                            <td class="p-4 text-center">
+                                {% if exam.status == 'Scheduled' %}
+                                    <span class="badge-scheduled text-[11px] font-black uppercase px-2.5 py-1 rounded-full">
+                                        ✓ Confirmed
+                                    </span>
+                                {% else %}
+                                    <span class="badge-pending text-[11px] font-black uppercase px-2.5 py-1 rounded-full">
+                                        ⏳ {{ exam.status }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+
+    {% else %}
+        <div class="fade-up d2 bg-white rounded-2xl border border-dashed border-gray-200 p-20 text-center">
+            <div class="text-6xl mb-4">📋</div>
+            <h3 class="text-gray-600 font-bold text-xl mb-2">No Exams Assigned Yet</h3>
+            <p class="text-gray-400 text-sm">The administrator has not yet assigned any exams to you.<br>Check back after the schedule is generated.</p>
+        </div>
+    {% endif %}
+
+    <!-- ── Proctor Availability ─────────────────────────────────────────── -->
+    <div class="fade-up d3 mt-12 no-print">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-3 h-3 rounded-full bg-amber-400"></div>
+            <h2 class="text-sm font-extrabold text-gray-700 uppercase tracking-wider">Set My Availability</h2>
+            <div class="h-px flex-1 bg-gray-200"></div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <p class="text-sm text-gray-500 mb-4">
+                <i class="fas fa-info-circle text-amber-400 mr-1"></i>
+                Check the dates you are <strong>available to proctor</strong> during the exam period.
+                If you leave all dates unchecked, the system assumes you're available every day.
+            </p>
+
+            {% if saved_dates %}
+            <div class="mb-4 bg-green-50 border border-green-200 text-green-700 text-xs px-4 py-2 rounded-lg">
+                <i class="fas fa-check-circle mr-1"></i>
+                Your availability is saved for: {{ saved_dates | join(', ') }}
+            </div>
+            {% endif %}
+
+            <form action="/proctor/availability" method="POST">
+                <!-- Proctor enters the exam period dates manually as checkboxes -->
+                <!-- They can also type specific dates -->
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-gray-500 mb-2">Add a date you are available:</label>
+                    <div class="flex gap-2 flex-wrap" id="date-list">
+                        {% for d in saved_dates %}
+                        <label class="flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-800 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer">
+                            <input type="checkbox" name="available_dates" value="{{ d }}" checked class="accent-green-600">
+                            {{ d }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="flex gap-2 mb-4">
+                    <input type="date" id="new-date-input" class="border rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+                    <button type="button" onclick="addDate()"
+                        class="bg-amber-400 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-amber-500 transition">
+                        + Add Date
+                    </button>
+                </div>
+                <div class="flex justify-end">
+                    <button type="submit"
+                        class="bg-[#3d6b4f] text-white px-6 py-2.5 rounded-lg font-bold hover:bg-[#2f5440] transition flex items-center gap-2">
+                        <i class="fas fa-save"></i> Save Availability
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer Note -->
+    <div class="mt-8 text-center text-xs text-gray-400 no-print">
+        <p>This schedule is generated automatically. Contact the admin for changes.</p>
+        <p class="mt-1">City College of Angeles · Exam Management System</p>
+    </div>
+
+</main>
+
+<script>
+function addDate() {
+    const input = document.getElementById('new-date-input');
+    const val = input.value;
+    if (!val) return;
+    const list = document.getElementById('date-list');
+    // Prevent duplicates
+    if ([...list.querySelectorAll('input')].some(i => i.value === val)) {
+        input.value = '';
+        return;
+    }
+    const label = document.createElement('label');
+    label.className = 'flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-800 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer';
+    label.innerHTML = `<input type="checkbox" name="available_dates" value="${val}" checked class="accent-green-600"> ${val}`;
+    list.appendChild(label);
+    input.value = '';
+}
+</script>
+</body>
+</html>
+

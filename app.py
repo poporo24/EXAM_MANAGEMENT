@@ -1506,6 +1506,7 @@ def settings_save():
         major_duration_hrs=get_float("major_duration_hrs", 2.0),
         minor_duration_hrs=get_float("minor_duration_hrs", 1.0)
     )
+    
     # Auto-update existing exams to match the new duration defaults
     major_min = int(get_float("major_duration_hrs", 2.0) * 60)
     minor_min = int(get_float("minor_duration_hrs", 1.0) * 60)
@@ -1514,21 +1515,16 @@ def settings_save():
     if db:
         try:
             cur = db.cursor()
-            hashed = _bcrypt.hashpw(new_password.encode('utf-8'), _bcrypt.gensalt()).decode('utf-8')
-            cur.execute("UPDATE users SET password=%s WHERE id=%s", (hashed, user_id))
+            cur.execute("UPDATE exams SET duration_minutes=%s WHERE subject_type='Major'", (major_min,))
+            cur.execute("UPDATE exams SET duration_minutes=%s WHERE subject_type='Minor'", (minor_min,))
             db.commit()
-            
-            # --- FIREBASE SYNC ---
-            try:
-                from firebase_admin import auth as fb_auth
-                fb_auth.update_user(str(user_id), password=new_password)
-            except Exception as e:
-                print(f"Failed to update Firebase password: {e}")
-            # ---------------------
+        except Exception as e:
+            print("Auto-update exams error:", e)
         finally:
             db.close()
+
     _configure_mail()
-    flash("Settings saved. All exam durations updated.", "success")
+    flash("Settings saved successfully.", "success")
     return redirect(url_for('settings_page'))
 
 @app.route("/settings/test_email", methods=["POST"])

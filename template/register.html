@@ -130,12 +130,12 @@
                 <div id="section_container">
                     <label for="section" class="block text-sm font-medium text-gray-700">Section</label>
                     <div class="mt-1 relative rounded-md shadow-sm">
-                        <input list="section_list" type="text" name="section" id="section" class="focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border" placeholder="Search or type section... e.g. BSCS-1A" autocomplete="off">
-                        <datalist id="section_list">
+                        <select name="section" id="section" required class="focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border">
+                            <option value="">Select...</option>
                             {% for sec in sections %}
-                                <option value="{{ sec }}"></option>
+                            <option value="{{ sec }}">{{ sec }}</option>
                             {% endfor %}
-                        </datalist>
+                        </select>
                     </div>
                 </div>
                 <div>

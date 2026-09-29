@@ -47,7 +47,12 @@
             <i class="fa-solid fa-chart-pie w-6 text-center text-lg"></i>
             <span class="ml-3 nav-text font-medium">Reports</span>
         </a>
-        
+
+        <a href="/settings" class="flex items-center px-4 py-3 group {% if active_page == 'settings' %}bg-green-50 text-[#668054] border-r-4 border-[#668054]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#668054]{% endif %}" title="Settings">
+            <i class="fa-solid fa-cog w-6 text-center text-lg"></i>
+            <span class="ml-3 nav-text font-medium">Settings</span>
+        </a>
+
         {% if session.get('is_super_admin') %}
         <div class="px-4 py-2 mt-2 text-xs font-semibold text-gray-400 uppercase tracking-wider nav-text">Super Admin</div>
         <a href="/super_admin" class="flex items-center px-4 py-3 group {% if active_page == 'super_admin' %}bg-green-50 text-[#668054] border-r-4 border-[#668054]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#668054]{% endif %}" title="User Management">
@@ -55,10 +60,6 @@
             <span class="ml-3 nav-text font-medium">User Management</span>
         </a>
         {% endif %}
-        <a href="/settings" class="flex items-center px-4 py-3 group {% if active_page == 'settings' %}bg-green-50 text-[#668054] border-r-4 border-[#668054]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#668054]{% endif %}" title="Settings">
-            <i class="fa-solid fa-cog w-6 text-center text-lg"></i>
-            <span class="ml-3 nav-text font-medium">Settings</span>
-        </a>
     </nav>
 
     <div class="border-t border-gray-200 p-4">

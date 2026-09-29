@@ -490,7 +490,8 @@ def get_all_instructors():
     try:
         cursor = db.cursor(dictionary=True)
         cursor.execute("""
-            SELECT i.*, u.email AS proctor_email, inst.name as institute_name
+            SELECT i.*, u.email AS proctor_email, inst.name as institute_name,
+                   (SELECT ROUND(COALESCE(SUM(duration_minutes)/60.0, 0), 1) FROM exams WHERE instructor_id = i.id AND status = 'Scheduled') as total_hours
             FROM instructors i
             LEFT JOIN users u ON u.instructor_id = i.id AND u.role = 'proctor'
             LEFT JOIN institutes inst ON i.institute_id = inst.id
@@ -1302,6 +1303,34 @@ def get_exam_period():
     finally:
         db.close()
 
+
+def save_exam_term(exam_term, exam_semester):
+    db = open_db()
+    if not db: return
+    try:
+        cursor = db.cursor()
+        cursor.execute("UPDATE exam_settings SET exam_term = %s, exam_semester = %s WHERE id = 1", (exam_term, exam_semester))
+        if cursor.rowcount == 0:
+            cursor.execute("INSERT INTO exam_settings (id, exam_term, exam_semester) VALUES (1, %s, %s)", (exam_term, exam_semester))
+        db.commit()
+    finally:
+        db.close()
+
+def get_exam_term():
+    db = open_db()
+    if not db: return ("Midterm", "1st Semester")
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT exam_term, exam_semester FROM exam_settings WHERE id = 1")
+        row = cursor.fetchone()
+        if row:
+            term = row.get('exam_term')
+            sem = row.get('exam_semester')
+            return (term if term else "Midterm", sem if sem else "1st Semester")
+        return ("Midterm", "1st Semester")
+    finally:
+        db.close()
+
 # ── PROCTOR AVAILABILITY ─────────────────────────────────────────────────────────────
 
 def save_proctor_availability(instructor_id, entries):
@@ -1432,18 +1461,35 @@ def remove_reliever(id):
 
 # ── EXAM COLLECTION ─────────────────────────────────────────────────────────────
 
-def get_exam_collection_status():
+def get_exam_collection_status(institute_id=None):
     db = open_db()
     if not db: return []
     try:
         cursor = db.cursor(dictionary=True)
-        cursor.execute("""
-            SELECT e.id as exam_id, e.subject_name, e.section, e.exam_date_time, c.collected_by_instructor_id, c.collected_at, c.returned_at, c.notes
-            FROM exams e
-            LEFT JOIN exam_collection c ON e.id = c.exam_id
-            WHERE e.status = 'Scheduled'
-            ORDER BY e.exam_date_time ASC
-        """)
+        if institute_id:
+            cursor.execute("""
+                SELECT e.id as exam_id, e.subject_name, e.section, e.exam_date_time,
+                       e.institute_id,
+                       c.collected_by_instructor_id, c.collected_at, c.returned_at, c.notes,
+                       inst.name as institute_name
+                FROM exams e
+                LEFT JOIN exam_collection c ON e.id = c.exam_id
+                LEFT JOIN institutes inst ON e.institute_id = inst.id
+                WHERE e.status = 'Scheduled' AND e.institute_id = %s
+                ORDER BY e.exam_date_time ASC
+            """, (institute_id,))
+        else:
+            cursor.execute("""
+                SELECT e.id as exam_id, e.subject_name, e.section, e.exam_date_time,
+                       e.institute_id,
+                       c.collected_by_instructor_id, c.collected_at, c.returned_at, c.notes,
+                       inst.name as institute_name
+                FROM exams e
+                LEFT JOIN exam_collection c ON e.id = c.exam_id
+                LEFT JOIN institutes inst ON e.institute_id = inst.id
+                WHERE e.status = 'Scheduled'
+                ORDER BY e.exam_date_time ASC
+            """)
         return cursor.fetchall()
     finally:
         db.close()
@@ -1472,17 +1518,33 @@ def mark_exam_returned(exam_id, notes=''):
     finally:
         db.close()
 
-def get_collection_stats():
+def get_collection_stats(institute_id=None):
     db = open_db()
     if not db: return {'total': 0, 'collected': 0, 'returned': 0, 'pending_collection': 0}
     try:
         cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT COUNT(*) as c FROM exams WHERE status='Scheduled'")
-        total = cursor.fetchone()['c']
-        cursor.execute("SELECT COUNT(*) as c FROM exam_collection WHERE collected_at IS NOT NULL")
-        collected = cursor.fetchone()['c']
-        cursor.execute("SELECT COUNT(*) as c FROM exam_collection WHERE returned_at IS NOT NULL")
-        returned = cursor.fetchone()['c']
+        if institute_id:
+            cursor.execute("SELECT COUNT(*) as c FROM exams WHERE status='Scheduled' AND institute_id=%s", (institute_id,))
+            total = cursor.fetchone()['c']
+            cursor.execute("""
+                SELECT COUNT(*) as c FROM exam_collection ec
+                JOIN exams e ON ec.exam_id = e.id
+                WHERE ec.collected_at IS NOT NULL AND e.institute_id=%s
+            """, (institute_id,))
+            collected = cursor.fetchone()['c']
+            cursor.execute("""
+                SELECT COUNT(*) as c FROM exam_collection ec
+                JOIN exams e ON ec.exam_id = e.id
+                WHERE ec.returned_at IS NOT NULL AND e.institute_id=%s
+            """, (institute_id,))
+            returned = cursor.fetchone()['c']
+        else:
+            cursor.execute("SELECT COUNT(*) as c FROM exams WHERE status='Scheduled'")
+            total = cursor.fetchone()['c']
+            cursor.execute("SELECT COUNT(*) as c FROM exam_collection WHERE collected_at IS NOT NULL")
+            collected = cursor.fetchone()['c']
+            cursor.execute("SELECT COUNT(*) as c FROM exam_collection WHERE returned_at IS NOT NULL")
+            returned = cursor.fetchone()['c']
         return {'total': total, 'collected': collected, 'returned': returned, 'pending_collection': total - collected}
     finally:
         db.close()
@@ -1700,9 +1762,38 @@ def get_available_resources(exam_id, datetime_str, duration_minutes):
                 if row['room_id']: busy_rooms.add(row['room_id'])
                 if row['instructor_id']: busy_insts.add(row['instructor_id'])
 
+        # ── Check proctor_availability table ──
+        proctor_avail = get_proctor_availability()
+        exam_date = new_start.date()
+        exam_start_time = new_start.time()
+        exam_end_time = new_end.time()
+
+        valid_insts = []
+        for i in all_insts:
+            iid = i['id']
+            if iid in busy_insts:
+                continue
+            
+            avail_entries = proctor_avail.get(iid)
+            is_avail = True
+            if avail_entries:
+                has_entry_for_date = False
+                time_match = False
+                for entry in avail_entries:
+                    if entry['date'] == exam_date:
+                        has_entry_for_date = True
+                        if exam_start_time >= entry['start_time'] and exam_end_time <= entry['end_time']:
+                            time_match = True
+                            break
+                if has_entry_for_date and not time_match:
+                    is_avail = False
+            
+            if is_avail:
+                valid_insts.append({'id': i['id'], 'name': i['name']})
+
         return {
             'rooms': [{'id': r['id'], 'name': f"{r['name']} (Cap: {r['capacity']})"} for r in all_rooms if r['id'] not in busy_rooms],
-            'instructors': [{'id': i['id'], 'name': i['name']} for i in all_insts if i['id'] not in busy_insts]
+            'instructors': valid_insts
         }
     finally:
         db.close()

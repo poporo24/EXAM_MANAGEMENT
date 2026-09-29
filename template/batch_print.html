@@ -24,12 +24,13 @@
         
         .timetable-wrapper { box-shadow: none; border: 1px solid #ddd; width: 100%; margin-top: 20px; }
         .timetable { table-layout: fixed; width: 100%; word-wrap: break-word; border-collapse: collapse; }
+        .timetable tr { page-break-inside: avoid; break-inside: avoid; }
         .timetable th, .timetable td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; font-size: 11px; overflow-wrap: break-word; }
         .timetable th { background-color: #668054 !important; color: white !important; font-weight: 600; text-align: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .timetable .time-col { width: 80px; }
         .timetable .time-cell { background-color: #f9f9f9 !important; font-weight: 600; text-align: center; vertical-align: middle; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         
-        .exam-card { font-size: 10px; padding: 4px; margin-bottom: 4px; }
+        .exam-card { font-size: 10px; padding: 4px; margin-bottom: 4px; page-break-inside: avoid; break-inside: avoid; }
         .exam-card .subject { font-size: 11px; font-weight: 700; white-space: normal; line-height: 1.2; margin-bottom: 3px; color: #111; }
         .exam-card .meta { font-size: 9px; white-space: normal; line-height: 1.2; color: #444; }
         .badge { padding: 2px 4px; font-size: 8px; font-weight: 700; border-radius: 4px; display: inline-block; margin-top: 3px; }

@@ -101,8 +101,9 @@
         @media print {
             @page { size: landscape; margin: 10mm; }
             .timetable { table-layout: fixed; width: 100%; word-wrap: break-word; }
+            .timetable tr { page-break-inside: avoid; break-inside: avoid; }
             .timetable th, .timetable td { overflow-wrap: break-word; font-size: 11px; padding: 4px !important; }
-            .exam-card { font-size: 10px !important; padding: 4px !important; margin-bottom: 2px !important; }
+            .exam-card { font-size: 10px !important; padding: 4px !important; margin-bottom: 2px !important; page-break-inside: avoid; break-inside: avoid; }
             .exam-card .subject { font-size: 11px !important; white-space: normal !important; line-height: 1.1; }
             .exam-card .meta { font-size: 9px !important; white-space: normal !important; line-height: 1.1; }
             .badge { padding: 1px 4px !important; font-size: 8px !important; }
@@ -134,62 +135,8 @@
 <body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
 
     <!-- Sidebar -->
-    <aside id="sidebar" class="no-print bg-white border-r border-gray-200 fixed h-full w-64 sidebar-transition z-20 flex flex-col">
-        <div class="h-16 flex items-center justify-between px-4 border-b border-gray-200">
-            <div class="flex items-center gap-3 overflow-hidden whitespace-nowrap">
-                <i class="fa-solid fa-graduation-cap text-2xl text-[#668054]"></i>
-                <span class="font-bold text-lg nav-text">CCA Exams</span>
-            </div>
-            <button onclick="toggleSidebar()" class="text-gray-500 hover:text-[#668054] focus:outline-none">
-                <i class="fa-solid fa-bars text-xl"></i>
-            </button>
-        </div>
-
-        <nav class="flex-1 overflow-y-auto py-4 space-y-1">
-            <a href="/dashboard" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group" title="Dashboard">
-                <i class="fa-solid fa-chart-line w-6 text-center text-lg"></i>
-                <span class="ml-3 nav-text font-medium">Dashboard</span>
-            </a>
-            <a href="/schedule" class="flex items-center px-4 py-3 bg-green-50 text-[#668054] border-r-4 border-[#668054] group" title="Schedule">
-                <i class="fa-solid fa-calendar-alt w-6 text-center text-lg"></i>
-                <span class="ml-3 nav-text font-medium">Schedule</span>
-            </a>
-            <a href="/dashboard#exams" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
-                <i class="fa-solid fa-file-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Exams</span>
-            </a>
-            <a href="/faculty" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
-                <i class="fa-solid fa-chalkboard-teacher w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Faculty</span>
-            </a>
-            <a href="/dashboard#rooms" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
-                <i class="fa-solid fa-door-open w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Rooms</span>
-            </a>
-            <a href="/subjects" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
-                <i class="fa-solid fa-book w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Subjects</span>
-            </a>
-            <a href="/institutes" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
-                <i class="fa-solid fa-building w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Institutes</span>
-            </a>
-            <a href="/reports" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
-                <i class="fa-solid fa-chart-pie w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Reports</span>
-            </a>
-            <a href="/settings" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
-                <i class="fa-solid fa-cog w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Settings</span>
-            </a>
-        </nav>
-
-        <div class="border-t border-gray-200 p-4">
-            <div class="flex items-center mb-4 overflow-hidden whitespace-nowrap">
-                <div class="w-8 h-8 rounded-full bg-[#829c74] text-white flex items-center justify-center font-bold">A</div>
-                <div class="ml-3 nav-text">
-                    <p class="text-sm font-medium text-gray-900">Admin User</p>
-                    <p class="text-xs text-gray-500">Administrator</p>
-                </div>
-            </div>
-            <a href="/logout" class="flex items-center text-gray-600 hover:text-red-600 group w-full">
-                <i class="fa-solid fa-sign-out-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Logout</span>
-            </a>
-        </div>
-    </aside>
+    {% set active_page = 'schedule' %}
+    {% include 'admin_sidebar.html' %}
 
     <!-- Main Content -->
     <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
@@ -409,8 +356,14 @@
                                 {% if cell_exams %}
                                     {% for exam in cell_exams %}
                                     <div class="exam-card {% if exam.id in conflict_ids %}conflict{% endif %}"
-                                         onclick="openEditScheduleModal('{{ exam.id }}','{{ exam.datetime_raw }}','{{ exam.room_id }}','{{ exam.instructor_id }}','{{ (exam.duration_minutes / 60) | round(1) }}')">
-                                        <div class="subject">{{ exam.subject_name }}</div>
+                                         onclick="openEditScheduleModal('{{ exam.id }}','{{ exam.datetime_raw }}','{{ exam.room_id }}','{{ exam.instructor_id }}','{{ (exam.duration_minutes / 60) | round(1) }}','{{ exam.subject_name | e }}','{{ exam.section | e }}')">
+                                        <div class="subject">
+                                            {{ exam.subject_name }}
+                                            <span class="float-right text-gray-400 hover:text-[#668054] ml-1" title="Click card to edit">
+                                                <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                            </span>
+                                        </div>
+
                                         <div class="meta">
                                             <span><i class="fa-solid fa-users fa-xs mr-1"></i>{{ exam.section or '—' }}</span>
                                         </div>
@@ -614,6 +567,7 @@
             <div class="fixed inset-0 bg-gray-900 bg-opacity-50 transition-opacity" onclick="closeModal('editScheduleModal')"></div>
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
             <div class="relative inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <!-- Header -->
                 <div class="bg-[#668054] px-6 py-4 flex items-center justify-between">
                     <h3 class="text-base font-semibold text-white flex items-center gap-2">
                         <i class="fa-solid fa-calendar-pen"></i> Edit Exam Schedule
@@ -623,7 +577,19 @@
                     </button>
                 </div>
 
-                <div id="conflictWarning" class="hidden bg-red-50 border-b-2 border-red-400 px-6 py-3">
+                <!-- Exam identity chip -->
+                <div class="px-6 pt-4 pb-0">
+                    <div class="flex items-center gap-2 bg-[#eef4ea] border border-[#c3d9b8] rounded-lg px-4 py-2.5">
+                        <i class="fa-solid fa-book-open text-[#668054]"></i>
+                        <div>
+                            <p id="edit_subject_label" class="text-sm font-semibold text-gray-800">—</p>
+                            <p id="edit_section_label" class="text-xs text-gray-500"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Conflict warning -->
+                <div id="conflictWarning" class="hidden bg-red-50 border-b-2 border-red-400 px-6 py-3 mt-3">
                     <div class="flex items-center gap-2 text-red-700 text-sm font-medium">
                         <i class="fa-solid fa-triangle-exclamation"></i>
                         <span id="conflictMessage">Conflict detected.</span>
@@ -658,13 +624,22 @@
                         </div>
                         <div class="col-span-2">
                             <label class="block text-xs font-semibold text-gray-600 mb-1">Proctor / Instructor</label>
-                            <select name="instructor_id" id="edit_proctor_id" required onchange="checkConflict()"
-                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                            <!-- Search box -->
+                            <div class="relative mb-1">
+                                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
+                                <input type="text" id="proctor_search"
+                                       placeholder="Search proctor name..."
+                                       oninput="filterProctorOptions()"
+                                       class="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#668054] bg-gray-50">
+                            </div>
+                            <select name="instructor_id" id="edit_proctor_id" required onchange="checkConflict()" size="5"
+                                    class="w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none overflow-y-auto">
                                 <option value="">Select Proctor</option>
                                 {% for inst in instructors %}
                                 <option value="{{ inst.id }}">{{ inst.name }}</option>
                                 {% endfor %}
                             </select>
+                            <p class="text-xs text-gray-400 mt-1"><i class="fa-solid fa-circle-info mr-1"></i>Type to search · Click a name to select</p>
                         </div>
                     </div>
 
@@ -682,7 +657,7 @@
                     </button>
                     <button type="submit" form="editScheduleForm"
                             class="px-5 py-2 rounded-lg bg-[#668054] text-white text-sm font-semibold hover:bg-[#4b5e3d] transition-colors shadow-sm">
-                        Save Schedule
+                        <i class="fa-solid fa-floppy-disk mr-1"></i> Save Changes
                     </button>
                 </div>
             </div>
@@ -741,6 +716,19 @@
             if (datetime && duration) {
                 fetchAvailableResources();
             }
+        }
+
+        /* ── Proctor live search filter ──────────────────────────── */
+        function filterProctorOptions() {
+            const query  = document.getElementById('proctor_search').value.toLowerCase().trim();
+            const select = document.getElementById('edit_proctor_id');
+            if (!select) return;
+            Array.from(select.options).forEach(function(opt) {
+                if (!opt.value) return;
+                const match = !query || opt.text.toLowerCase().includes(query);
+                opt.style.display = match ? '' : 'none';
+                opt.hidden = !match;
+            });
         }
 
         /* ── Conflict check (AJAX) ──────────────────────────────── */

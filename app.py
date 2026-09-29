@@ -39,7 +39,7 @@ from system.database import (
     # scheduling
     get_already_scheduled_slots, apply_schedule_results, reset_schedule, unschedule_exams,
     get_schedule_results, check_edit_conflicts, apply_exam_edit, get_available_resources,
-    save_exam_period, get_exam_period,
+    save_exam_period, save_exam_term, get_exam_term, get_exam_period, save_exam_term, get_exam_term,
     # proctor availability
     get_proctor_availability, get_proctor_availability_for, save_proctor_availability,
     get_proctor_exams,
@@ -173,8 +173,8 @@ def public_timetable():
                            section=section,
                            full_name="Irregular Student Viewer",
                            institute_name="City College of Angeles",
-                           exam_term=session.get('exam_term', 'Midterm/Final'),
-                           exam_semester=session.get('exam_semester', '1st Semester'))
+                           exam_term=get_exam_term()[0],
+                           exam_semester=get_exam_term()[1])
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -534,8 +534,7 @@ def generate_schedule():
     period_end_str   = request.form.get("period_end")
     exam_term = request.form.get("exam_term", "Midterm")
     exam_semester = request.form.get("exam_semester", "1st Semester")
-    session['exam_term'] = exam_term
-    session['exam_semester'] = exam_semester
+    save_exam_term(exam_term, exam_semester)
     try:
         period_start = date.fromisoformat(period_start_str)
         period_end   = date.fromisoformat(period_end_str)
@@ -810,8 +809,8 @@ def schedule_view():
                            unread_count=unread,
                            all_sections=all_sections,
                            filter_section=filter_section,
-                           exam_term=session.get('exam_term', 'Midterm/Final'),
-                           exam_semester=session.get('exam_semester', '1st Semester'))
+                           exam_term=get_exam_term()[0],
+                           exam_semester=get_exam_term()[1])
 
 @app.route("/api/available_resources", methods=["POST"])
 def available_resources():
@@ -1710,13 +1709,16 @@ def remove_reliever_route(id):
 def secretary_dashboard():
     guard = require_role('secretary', 'admin')
     if guard: return guard
-    exams       = get_exam_collection_status()
+    # Admins see all institutes; secretaries see only their own
+    inst_id     = None if session.get('role') == 'admin' else session.get('institute_id')
+    exams       = get_exam_collection_status(institute_id=inst_id)
     instructors = get_active_instructors()
-    stats       = get_collection_stats()
+    stats       = get_collection_stats(institute_id=inst_id)
     unread      = _get_unread(session['user_id'])
     return render_template("secretary.html",
                            exams=exams, instructors=instructors,
-                           stats=stats, unread_count=unread)
+                           stats=stats, unread_count=unread,
+                           institute_id=inst_id)
 
 @app.route("/secretary/collect/<int:exam_id>", methods=["POST"])
 def secretary_collect(exam_id):
@@ -1735,6 +1737,58 @@ def secretary_return(exam_id):
     notes = request.form.get("notes", "")
     mark_exam_returned(exam_id, notes)
     flash("Marked as returned.", "success")
+    return redirect(url_for('secretary_dashboard'))
+
+@app.route("/secretary/change_password", methods=["POST"])
+def secretary_change_password():
+    guard = require_role('secretary', 'admin')
+    if guard: return guard
+
+    current_password = request.form.get("current_password", "").strip()
+    new_password     = request.form.get("new_password", "").strip()
+    confirm_password = request.form.get("confirm_password", "").strip()
+
+    # Validation
+    if not current_password or not new_password or not confirm_password:
+        flash("All password fields are required.", "danger")
+        return redirect(url_for('secretary_dashboard'))
+    if len(new_password) < 6:
+        flash("New password must be at least 6 characters.", "danger")
+        return redirect(url_for('secretary_dashboard'))
+    if new_password != confirm_password:
+        flash("New passwords do not match.", "danger")
+        return redirect(url_for('secretary_dashboard'))
+
+    db = open_db()
+    if db:
+        try:
+            import bcrypt as _bcrypt
+            c = db.cursor(dictionary=True)
+            c.execute("SELECT id, full_name, password FROM users WHERE id = %s", (session['user_id'],))
+            user = c.fetchone()
+            if not user:
+                flash("User not found.", "danger")
+                return redirect(url_for('secretary_dashboard'))
+
+            # Verify current password
+            try:
+                current_ok = _bcrypt.checkpw(current_password.encode(), user['password'].encode())
+            except ValueError:
+                current_ok = (current_password == user['password'])
+
+            if not current_ok:
+                flash("Current password is incorrect.", "danger")
+                return redirect(url_for('secretary_dashboard'))
+
+            # Save new hashed password
+            new_hashed = _bcrypt.hashpw(new_password.encode(), _bcrypt.gensalt()).decode()
+            c.execute("UPDATE users SET password = %s WHERE id = %s", (new_hashed, session['user_id']))
+            db.commit()
+            flash("✅ Password changed successfully.", "success")
+        except Exception as e:
+            flash(f"Error: {e}", "danger")
+        finally:
+            db.close()
     return redirect(url_for('secretary_dashboard'))
 
 # ── PROCTOR ABSENCE (Admin view) ──────────────────────────────────────────────
@@ -1878,8 +1932,8 @@ def admin_batch_print_sections():
                            dates=dates_list,
                            times=times_list,
                            date_labels=date_labels,
-                           exam_term=session.get('exam_term', 'Midterm/Final'),
-                           exam_semester=session.get('exam_semester', '1st Semester'))
+                           exam_term=get_exam_term()[0],
+                           exam_semester=get_exam_term()[1])
 
 @app.route("/admin/print_section")
 def admin_print_section():
@@ -1909,8 +1963,8 @@ def admin_print_section():
                            section=section,
                            full_name="Admin Generated",
                            institute_name="City College of Angeles",
-                           exam_term=session.get('exam_term', 'Midterm/Final'),
-                           exam_semester=session.get('exam_semester', '1st Semester'))
+                           exam_term=get_exam_term()[0],
+                           exam_semester=get_exam_term()[1])
 
 @app.route("/timetable")
 def student_timetable():

@@ -55,13 +55,19 @@
     </nav>
 
     <div class="border-t border-gray-200 p-4">
-        <div class="flex items-center mb-4 overflow-hidden whitespace-nowrap">
-            <div class="w-8 h-8 rounded-full bg-[#829c74] text-white flex items-center justify-center font-bold">
-                A
+                <div class="flex items-center mb-4 overflow-hidden whitespace-nowrap">
+            <div class="w-8 h-8 rounded-full bg-[#829c74] text-white flex items-center justify-center font-bold uppercase">
+                {{ session.get('full_name', 'A')[:1] }}
             </div>
             <div class="ml-3 nav-text">
-                <p class="text-sm font-medium text-gray-900">Admin User</p>
-                <p class="text-xs text-gray-500">Administrator</p>
+                <p class="text-sm font-medium text-gray-900 truncate w-40" title="{{ session.get('full_name', 'Admin User') }}">{{ session.get('full_name', 'Admin User') }}</p>
+                <p class="text-xs text-gray-500">
+                    {% if session.get('is_super_admin') %}
+                    Super Administrator
+                    {% else %}
+                    Administrator
+                    {% endif %}
+                </p>
             </div>
         </div>
         <a href="/logout" class="flex items-center text-gray-600 hover:text-red-600 group w-full" title="Logout">

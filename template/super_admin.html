@@ -260,15 +260,17 @@
                                         {{ user.role|title }}
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {% if user.role == 'student' %}
-                                        Sec: {{ user.section }}<br>Inst: {{ user.institute_name }}
-                                    {% elif user.role == 'proctor' or user.role == 'secretary' %}
-                                        Inst: {{ user.institute_name }}
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
+                                                                  <td class="px-6 py-4 text-sm text-gray-500">
+                                      {% if user.role == 'student' %}
+                                          {% if user.section %}<span class="block"><span class="font-medium text-gray-600">Section:</span> {{ user.section }}</span>{% endif %}
+                                          {% if user.institute_name %}<span class="block"><span class="font-medium text-gray-600">Institute:</span> {{ user.institute_name }}</span>{% endif %}
+                                          {% if not user.section and not user.institute_name %}<span class="text-gray-400 italic">No details</span>{% endif %}
+                                      {% elif user.role == 'proctor' or user.role == 'secretary' %}
+                                          {% if user.institute_name %}<span class="block"><span class="font-medium text-gray-600">Institute:</span> {{ user.institute_name }}</span>{% else %}<span class="text-gray-400 italic">No institute assigned</span>{% endif %}
+                                      {% else %}
+                                          <span class="text-gray-400">-</span>
+                                      {% endif %}
+                                  </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     {% if user.is_super_admin %}
                                         <i class="fa-solid fa-check-circle text-purple-600 text-lg"></i>

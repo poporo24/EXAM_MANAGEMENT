@@ -10,7 +10,11 @@ from datetime import date, datetime, timedelta
 from collections import defaultdict
 import io, os
 
+import secrets
+from datetime import datetime, timedelta
+from system.mailer import send_reset_email
 from system.database import (
+    set_password_reset_token, get_user_by_reset_token, get_user_by_email, clear_reset_token_and_update_password,
     # settings
     get_system_settings, save_system_settings,
     # institutes
@@ -64,6 +68,16 @@ from system.scheduler import run_scheduler
 from system.logic import verify_login, is_super_admin, hash_password
 
 # ── FLASK APP ─────────────────────────────────────────────────────────────────
+
+
+import firebase_admin
+from firebase_admin import credentials, auth as fb_auth
+
+try:
+    cred = credentials.Certificate('firebase_credentials.json')
+    firebase_admin.initialize_app(cred)
+except ValueError:
+    pass # Already initialized
 
 app = Flask(__name__, template_folder='template')
 app.secret_key = "cca_exam_management_secret_key_v2"
@@ -176,11 +190,101 @@ def public_timetable():
                            exam_term=get_exam_term()[0],
                            exam_semester=get_exam_term()[1])
 
+
+@app.route("/forgot_password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        user = get_user_by_email(email)
+        if user:
+            token = secrets.token_urlsafe(32)
+            expiry = datetime.now() + timedelta(hours=1)
+            set_password_reset_token(email, token, expiry)
+            
+            reset_link = url_for('reset_password', token=token, _external=True)
+            success, msg = send_reset_email(email, reset_link)
+            
+            if success:
+                flash("Password reset link sent to your email.", "success")
+            else:
+                flash(f"Error sending email. (Check terminal for test link). Error: {msg}", "warning")
+        else:
+            # For security, don't reveal if email exists, just say we sent it
+            flash("If that email is registered, a reset link was sent.", "info")
+            
+        return redirect(url_for("login"))
+    return render_template("forgot_password.html")
+
+@app.route("/reset_password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    user = get_user_by_reset_token(token)
+    
+    if not user:
+        flash("Invalid or expired reset link.", "error")
+        return redirect(url_for("login"))
+        
+    # Check expiry
+    if user['reset_token_expiry'] and user['reset_token_expiry'] < datetime.now():
+        flash("Reset link has expired. Please request a new one.", "error")
+        return redirect(url_for("forgot_password"))
+        
+    if request.method == "POST":
+        new_password = request.form.get("password")
+        confirm = request.form.get("confirm_password")
+        
+        if not new_password or len(new_password) < 6:
+            flash("Password must be at least 6 characters.", "error")
+            return render_template("reset_password.html", token=token)
+            
+        if new_password != confirm:
+            flash("Passwords do not match.", "error")
+            return render_template("reset_password.html", token=token)
+            
+        from system.logic import hash_password
+        hashed = hash_password(new_password)
+        clear_reset_token_and_update_password(token, hashed)
+        
+        flash("Password successfully reset! You can now log in.", "success")
+        return redirect(url_for("login"))
+        
+    return render_template("reset_password.html", token=token)
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
         if 'user_id' in session and session.get('role'):
             return _redirect_by_role()
+        all_exams = get_schedule_results()
+        sections = sorted(list(set(e.get('section', '').strip() for e in all_exams if e.get('section', '').strip() and e.get('status') == 'Scheduled')))
+        return render_template("login.html", sections=sections)
+
+    
+    firebase_token = request.form.get("firebase_token")
+    if not firebase_token:
+        flash("Firebase authentication failed. Missing token.", "error")
+        return redirect(url_for('login'))
+        
+    try:
+        decoded_token = fb_auth.verify_id_token(firebase_token)
+        email = decoded_token.get('email')
+        
+        user = get_user_by_email(email)
+        if not user:
+            flash("User not found in system.", "error")
+            return redirect(url_for('login'))
+            
+        session['user_id'] = user['id']
+        session['role'] = user['role']
+        session['name'] = user['full_name']
+        session['email'] = user['email']
+        session['section'] = user['section']
+        session['institute_id'] = user['institute_id']
+        
+        return _redirect_by_role()
+    except Exception as e:
+        flash(f"Invalid login session: {str(e)}", "error")
+        return redirect(url_for('login'))
+
         all_exams = get_schedule_results()
         sections = sorted(list(set(e.get('section', '').strip() for e in all_exams if e.get('section', '').strip() and e.get('status') == 'Scheduled')))
         return render_template("login.html", sections=sections)
@@ -1351,9 +1455,17 @@ def settings_save():
     if db:
         try:
             cur = db.cursor()
-            cur.execute("UPDATE exams SET duration_minutes = %s WHERE subject_type IN ('Major', 'Lecture')", (major_min,))
-            cur.execute("UPDATE exams SET duration_minutes = %s WHERE subject_type IN ('Minor', 'Laboratory')", (minor_min,))
+            hashed = _bcrypt.hashpw(new_password.encode('utf-8'), _bcrypt.gensalt()).decode('utf-8')
+            cur.execute("UPDATE users SET password=%s WHERE id=%s", (hashed, user_id))
             db.commit()
+            
+            # --- FIREBASE SYNC ---
+            try:
+                from firebase_admin import auth as fb_auth
+                fb_auth.update_user(str(user_id), password=new_password)
+            except Exception as e:
+                print(f"Failed to update Firebase password: {e}")
+            # ---------------------
         finally:
             db.close()
     _configure_mail()

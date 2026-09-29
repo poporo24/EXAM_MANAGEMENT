@@ -2,18 +2,39 @@ import mysql.connector
 from datetime import datetime, timedelta
 
 def open_db():
-    try:
-        return mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="",
-            database="cca_exam_management_db"
-        )
-    except mysql.connector.Error as err:
-        print(f"Connection failed: {err}")
-        return None
-
-# ── SYSTEM SETTINGS ─────────────────────────────────────────────────────────────
+    import os
+    import mysql.connector
+    
+    # Check if we are on Render (using Aiven remote DB)
+    db_url = os.environ.get('DATABASE_URL')
+    
+    if db_url:
+        # Connect using the remote URL (mysql://user:pass@host:port/dbname)
+        import urllib.parse
+        url = urllib.parse.urlparse(db_url)
+        try:
+            return mysql.connector.connect(
+                host=url.hostname,
+                user=url.username,
+                password=url.password,
+                database=url.path[1:], # remove leading slash
+                port=url.port or 3306
+            )
+        except mysql.connector.Error as err:
+            print(f"Remote DB Error: {err}")
+            return None
+    else:
+        # Local XAMPP connection
+        try:
+            return mysql.connector.connect(
+                host="127.0.0.1",
+                user="root",
+                password="",
+                database="cca_exam_management_db"
+            )
+        except mysql.connector.Error as err:
+            print(f"Local DB Error: {err}")
+            return None
 
 def get_system_settings():
     db = open_db()
@@ -1795,5 +1816,49 @@ def get_available_resources(exam_id, datetime_str, duration_minutes):
             'rooms': [{'id': r['id'], 'name': f"{r['name']} (Cap: {r['capacity']})"} for r in all_rooms if r['id'] not in busy_rooms],
             'instructors': valid_insts
         }
+    finally:
+        db.close()
+
+
+def set_password_reset_token(email, token, expiry_dt):
+    db = open_db()
+    if not db: return False
+    try:
+        cursor = db.cursor()
+        cursor.execute("UPDATE users SET reset_token = %s, reset_token_expiry = %s WHERE email = %s", (token, expiry_dt, email))
+        db.commit()
+        return cursor.rowcount > 0
+    finally:
+        db.close()
+
+def get_user_by_reset_token(token):
+    db = open_db()
+    if not db: return None
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM users WHERE reset_token = %s", (token,))
+        return cursor.fetchone()
+    finally:
+        db.close()
+
+def clear_reset_token_and_update_password(token, new_hashed_password):
+    db = open_db()
+    if not db: return False
+    try:
+        cursor = db.cursor()
+        cursor.execute("UPDATE users SET password = %s, reset_token = NULL, reset_token_expiry = NULL WHERE reset_token = %s", (new_hashed_password, token))
+        db.commit()
+        return cursor.rowcount > 0
+    finally:
+        db.close()
+
+
+def get_user_by_email(email):
+    db = open_db()
+    if not db: return None
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+        return cursor.fetchone()
     finally:
         db.close()

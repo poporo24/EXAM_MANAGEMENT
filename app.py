@@ -273,12 +273,14 @@ def login():
             flash("User not found in system.", "error")
             return redirect(url_for('login'))
             
-        session['user_id'] = user['id']
-        session['role'] = user['role']
-        session['name'] = user['full_name']
-        session['email'] = user['email']
-        session['section'] = user['section']
-        session['institute_id'] = user['institute_id']
+        session['user_id']        = user['id']
+        session['full_name']      = user['full_name']
+        session['role']           = user.get('role', 'student')
+        session['email']          = user['email']
+        session['section']        = user.get('section', '')
+        session['institute_id']   = user.get('institute_id')
+        session['instructor_id']  = user.get('instructor_id')
+        session['is_super_admin'] = bool(user.get('is_super_admin', 0))
         
         return _redirect_by_role()
     except Exception as e:

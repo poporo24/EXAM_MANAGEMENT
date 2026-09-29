@@ -326,7 +326,16 @@ def register_page():
 
 @app.route("/register", methods=["POST"])
 def register_submit():
-    full_name    = request.form.get("full_name", "").strip()
+    first_name   = request.form.get("first_name", "").strip()
+    last_name    = request.form.get("last_name", "").strip()
+    middle_name  = request.form.get("middle_name", "").strip()
+    suffix       = request.form.get("suffix", "").strip()
+    
+    # Format the name: "Lastname, Firstname M. Suffix"
+    middle_initial = (middle_name[0].upper() + ".") if middle_name else ""
+    full_name_parts = [part for part in [first_name, middle_initial, suffix] if part]
+    formatted_first_part = " ".join(full_name_parts)
+    full_name = f"{last_name}, {formatted_first_part}" if last_name and formatted_first_part else (last_name or formatted_first_part)
     email        = request.form.get("email", "").strip()
     password     = request.form.get("password", "").strip()
     section      = request.form.get("section", "").strip()

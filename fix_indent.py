@@ -1,20 +1,8 @@
-import sys
+app_path = 'app.py'
+with open(app_path, 'r', encoding='utf-8') as f:
+    app_content = f.read()
 
-with open('c:\\xamp2\\htdocs\\EXAM_MANAGEMENT\\system\\scheduler.py', 'r', encoding='utf-8') as f:
-    lines = f.readlines()
+app_content = app_content.replace('        first_name   = request.form.get("first_name", "").strip()', '    first_name   = request.form.get("first_name", "").strip()')
 
-out = []
-in_loop = False
-for line in lines:
-    if 'group_sections = [e.get' in line:
-        in_loop = True
-    if in_loop:
-        if 'if not placed_group:' in line:
-            in_loop = False
-        else:
-            if line.strip(): # skip empty
-                line = '    ' + line
-    out.append(line)
-
-with open('c:\\xamp2\\htdocs\\EXAM_MANAGEMENT\\system\\scheduler.py', 'w', encoding='utf-8') as f:
-    f.writelines(out)
+with open(app_path, 'w', encoding='utf-8') as f:
+    f.write(app_content)

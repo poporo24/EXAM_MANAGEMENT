@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Manage Proctor Availability - CCA Exam Management System">
+    <title>Manage Availability - Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar-transition { transition: width 0.3s ease; }
+        .content-transition { transition: margin-left 0.3s ease; }
+    </style>
+</head>
+<body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="bg-white border-r border-gray-200 fixed h-full w-64 sidebar-transition z-20 flex flex-col">
+        <div class="h-16 flex items-center justify-between px-4 border-b border-gray-200">
+            <div class="flex items-center gap-3 overflow-hidden whitespace-nowrap">
+                <i class="fa-solid fa-graduation-cap text-2xl text-[#668054]"></i>
+                <span class="font-bold text-lg nav-text">CCA Exams</span>
+            </div>
+            <button onclick="toggleSidebar()" class="text-gray-500 hover:text-[#668054] focus:outline-none">
+                <i class="fa-solid fa-bars text-xl"></i>
+            </button>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+            <a href="/dashboard" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-chart-line w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Dashboard</span>
+            </a>
+            <a href="/schedule" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-calendar-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Schedule</span>
+            </a>
+            <a href="/faculty" class="flex items-center px-4 py-3 bg-green-50 text-[#668054] border-r-4 border-[#668054] group" title="Instructors">
+                <i class="fa-solid fa-chalkboard-teacher w-6 text-center text-lg"></i>
+                <span class="ml-3 nav-text font-medium">Instructors</span>
+            </a>
+        </nav>
+    </aside>
+
+    <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
+        <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
+            <h1 class="text-xl font-semibold text-gray-800">Manage Availability</h1>
+            <div class="flex items-center gap-4">
+                <a href="/faculty" class="text-sm font-medium text-gray-600 hover:text-gray-900"><i class="fa-solid fa-arrow-left mr-1"></i> Back to Instructors</a>
+            </div>
+        </header>
+
+        <div class="max-w-3xl mx-auto py-8 px-4">
+            <div class="mb-6 flex items-center justify-between">
+                <h2 class="text-2xl font-bold text-gray-800">{{ instructor.name }}</h2>
+            </div>
+
+            <div class="bg-white shadow-sm rounded-xl border border-gray-200 p-6">
+                <form action="/admin/proctor_availability/{{ instructor.id }}" method="POST">
+                    <div id="availabilityContainer" class="space-y-4 mb-4">
+                        {% if saved_dates %}
+                            {% for av in saved_dates %}
+                            <div class="flex gap-2 items-center av-row">
+                                <input type="date" name="available_dates" value="{{ av.date }}" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
+                                <input type="time" name="start_times" value="{{ av.start_time }}" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
+                                <input type="time" name="end_times" value="{{ av.end_time }}" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
+                                <button type="button" onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 p-2"><i class="fa-solid fa-times"></i></button>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="flex gap-2 items-center av-row">
+                                <input type="date" name="available_dates" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
+                                <input type="time" name="start_times" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
+                                <input type="time" name="end_times" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
+                                <button type="button" onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 p-2"><i class="fa-solid fa-times"></i></button>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="flex justify-between items-center mt-6 border-t border-gray-100 pt-4">
+                        <button type="button" onclick="addAvailabilityRow()" class="text-sm font-medium text-[#668054] hover:text-[#829c74]">
+                            <i class="fa-solid fa-plus mr-1"></i> Add Date
+                        </button>
+                        <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[#668054] hover:bg-[#829c74] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#668054]">
+                            Save Availability
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('main-content');
+            sidebar.classList.toggle('w-64');
+            sidebar.classList.toggle('w-16');
+            mainContent.classList.toggle('ml-64');
+            mainContent.classList.toggle('ml-16');
+            const navTexts = document.querySelectorAll('.nav-text');
+            navTexts.forEach(el => el.classList.toggle('hidden'));
+        }
+
+        function addAvailabilityRow() {
+            const container = document.getElementById('availabilityContainer');
+            const row = document.createElement('div');
+            row.className = 'flex gap-2 items-center av-row mt-4';
+            row.innerHTML = 
+                <input type="date" name="available_dates" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
+                <input type="time" name="start_times" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
+                <input type="time" name="end_times" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
+                <button type="button" onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 p-2"><i class="fa-solid fa-times"></i></button>
+            ;
+            container.appendChild(row);
+        }
+    </script>
+</body>
+</html>

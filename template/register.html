@@ -3,144 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CCA Exam Management - Register</title>
+    <meta name="description" content="Register for CCA Exam Management System">
+    <title>Register - CCA Exam Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --cca-green: #6a824e;
-            --cca-light-green: #94a87e;
-            --bg-gray: #f4f7f6;
-        }
-
-        body, html {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-gray);
-        }
-
-        .header {
-            background-color: var(--cca-green);
-            color: white;
-            padding: 20px 50px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .header-titles h1 { margin: 0; font-size: 1.8rem; }
-        .header-titles p { margin: 0; font-size: 0.9rem; font-style: italic; opacity: 0.9; }
-
-        .main-content {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: calc(100vh - 100px);
-            padding: 20px;
-        }
-
-        .register-card {
-            background: white;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            width: 100%;
-            max-width: 450px;
-        }
-
-        .register-card h2 {
-            margin-top: 0;
-            color: #333;
-            text-align: center;
-            margin-bottom: 25px;
-        }
-
-        .input-box { margin-bottom: 15px; }
-
-        input, select {
-            width: 100%;
-            padding: 12px 15px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background-color: #fafafa;
-            box-sizing: border-box;
-        }
-
-        .register-btn {
-            width: 100%;
-            padding: 12px;
-            background-color: var(--cca-green);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            font-size: 1rem;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-
-        .register-btn:hover { background-color: var(--cca-light-green); }
-
-        .footer-links {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 0.9rem;
-        }
-
-        .footer-links a { color: var(--cca-green); text-decoration: none; }
-
-        .flash-msg {
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            font-size: 0.85rem;
-            text-align: center;
-        }
-        .msg-danger { background-color: #ffebee; color: #c62828; }
-        .msg-success { background-color: #e8f5e9; color: #2e7d32; }
+        body { font-family: 'Inter', sans-serif; }
     </style>
 </head>
-<body>
-
-    <div class="header">
-        <div class="header-titles">
-            <h1>City College of Angeles</h1>
-            <p>Totalis Humanae</p>
-        </div>
-    </div>
-
-    <div class="main-content">
-        <div class="register-card">
-            <h2>Create Account</h2>
-
-            <!-- Display Messages -->
-            {% with messages = get_flashed_messages(with_categories=true) %}
-              {% if messages %}
-                {% for category, message in messages %}
-                  <div class="flash-msg msg-{{ category }}">{{ message }}</div>
-                {% endfor %}
-              {% endif %}
-            {% endwith %}
-
-            <form action="/register" method="POST">
-                <div class="input-box">
-                    <input type="text" name="full_name" placeholder="Full Name" required>
-                </div>
-                <div class="input-box">
-                    <input type="email" name="email" placeholder="Institutional Email" required>
-                </div>
-                <div class="input-box">
-                    <input type="password" name="password" placeholder="Password" required>
-                </div>
-                <!-- Role is fixed to 'student' for public sign-up. -->
-                <!-- Proctor accounts are created by the admin. -->
-                <button type="submit" class="register-btn">Create Student Account</button>
-            </form>
-
-            <div class="footer-links">
-                Already have an account? <a href="/">Log in here</a>
+<body class="bg-[#f4f7f6] min-h-screen flex items-center justify-center relative overflow-hidden text-gray-800 py-10">
+    <!-- Background pattern -->
+    <div class="absolute inset-0 z-0 opacity-[0.03]" style="background-image: radial-gradient(#668054 2px, transparent 2px); background-size: 30px 30px;"></div>
+    
+    <div class="z-10 w-full max-w-md bg-white rounded-xl shadow-xl p-8 border border-gray-100">
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#f4f7f6] mb-4">
+                <i class="fa-solid fa-user-plus text-2xl text-[#668054]"></i>
             </div>
+            <h1 class="text-2xl font-bold text-gray-900">Create an Account</h1>
+            <p class="text-sm text-gray-500 mt-2">Join the CCA Exam Management System</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="mb-6">
+                    {% for category, message in messages %}
+                        <div class="p-4 rounded-md mb-2 text-sm {% if category == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form action="/register" method="POST" class="space-y-5">
+            <div>
+                <label for="full_name" class="block text-sm font-medium text-gray-700">Full Name</label>
+                <div class="mt-1 relative rounded-md shadow-sm">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-user text-gray-400"></i>
+                    </div>
+                    <input type="text" name="full_name" id="full_name" required class="focus:ring-[#668054] focus:border-[#668054] block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 px-3 border" placeholder="John Doe">
+                </div>
+            </div>
+
+            <div>
+                <label for="email" class="block text-sm font-medium text-gray-700">Email Address</label>
+                <div class="mt-1 relative rounded-md shadow-sm">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-envelope text-gray-400"></i>
+                    </div>
+                    <input type="email" name="email" id="email" required class="focus:ring-[#668054] focus:border-[#668054] block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 px-3 border" placeholder="you@example.com">
+                </div>
+            </div>
+
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                <div class="mt-1 relative rounded-md shadow-sm">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-lock text-gray-400"></i>
+                    </div>
+                    <input type="password" name="password" id="password" required class="focus:ring-[#668054] focus:border-[#668054] block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 px-3 border" placeholder="••••••••">
+                </div>
+            </div>
+
+            <div>
+                <label for="role" class="block text-sm font-medium text-gray-700">Account Type</label>
+                <div class="mt-1 relative rounded-md shadow-sm">
+                    <select name="role" id="role" onchange="toggleSection()" required class="focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border">
+                        <option value="student">Student</option>
+                        <option value="proctor">Proctor / Instructor</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div id="section_container">
+                    <label for="section" class="block text-sm font-medium text-gray-700">Section</label>
+                    <div class="mt-1 relative rounded-md shadow-sm">
+                        <input type="text" name="section" id="section" class="focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border" placeholder="e.g. BSCS-1A">
+                    </div>
+                </div>
+                <div>
+                    <label for="institute_id" class="block text-sm font-medium text-gray-700">Institute</label>
+                    <div class="mt-1 relative rounded-md shadow-sm">
+                        <select name="institute_id" id="institute_id" required class="focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border">
+                            <option value="">Select...</option>
+                            {% for inst in institutes %}
+                            <option value="{{ inst.id }}">{{ inst.name }} ({{ inst.code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                function toggleSection() {
+                    const role = document.getElementById('role').value;
+                    const sectionContainer = document.getElementById('section_container');
+                    const sectionInput = document.getElementById('section');
+                    if (role === 'proctor') {
+                        sectionContainer.style.display = 'none';
+                        sectionInput.value = '';
+                    } else {
+                        sectionContainer.style.display = 'block';
+                    }
+                }
+            </script>
+
+            <div class="pt-2">
+                <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#668054] hover:bg-[#829c74] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#668054] transition-colors">
+                    Register Account
+                </button>
+            </div>
+        </form>
+
+        <div class="mt-6 text-center">
+            <p class="text-sm text-gray-600">
+                Already have an account? 
+                <a href="/login" class="font-medium text-[#668054] hover:text-[#829c74]">Sign in here</a>
+            </p>
         </div>
     </div>
-
 </body>
 </html>

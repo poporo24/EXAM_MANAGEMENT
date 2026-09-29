@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Students - CCA Exam Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>body { font-family: "Inter", sans-serif; } .sidebar-transition { transition: width 0.3s ease; } .content-transition { transition: margin-left 0.3s ease; }</style>
+</head>
+<body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="bg-white border-r border-gray-200 fixed h-full w-64 sidebar-transition z-20 flex flex-col">
+        <div class="h-16 flex items-center justify-between px-4 border-b border-gray-200">
+            <div class="flex items-center gap-3 overflow-hidden whitespace-nowrap">
+                <i class="fa-solid fa-graduation-cap text-2xl text-[#668054]"></i>
+                <span class="font-bold text-lg nav-text">CCA Exams</span>
+            </div>
+            <button onclick="toggleSidebar()" class="text-gray-500 hover:text-[#668054] focus:outline-none">
+                <i class="fa-solid fa-bars text-xl"></i>
+            </button>
+        </div>
+        <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+            <a href="/dashboard" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054]"><i class="fa-solid fa-chart-line w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Dashboard</span></a>
+            <a href="/dashboard#exams" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054]"><i class="fa-solid fa-file-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Exams</span></a>
+            <a href="/dashboard#rooms" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054]"><i class="fa-solid fa-door-open w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Rooms</span></a>
+            <a href="/dashboard#instructors" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054]"><i class="fa-solid fa-chalkboard-teacher w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Instructors</span></a>
+            <a href="/schedule" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054]"><i class="fa-solid fa-calendar-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Schedule</span></a>
+            <a href="/subjects" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054]"><i class="fa-solid fa-book w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Subjects</span></a>
+            <a href="/institutes" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054]"><i class="fa-solid fa-building w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Institutes</span></a>
+            <a href="/reports" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054]"><i class="fa-solid fa-chart-pie w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Reports</span></a>
+            <a href="/students" class="flex items-center px-4 py-3 bg-green-50 text-[#668054] border-r-4 border-[#668054]">
+                <i class="fa-solid fa-user-graduate w-6 text-center text-lg"></i>
+                <span class="ml-3 nav-text font-medium">Students</span>
+                {% if pending_count > 0 %}<span class="ml-auto bg-amber-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{{ pending_count }}</span>{% endif %}
+            </a>
+            <a href="/settings" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054]"><i class="fa-solid fa-cog w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Settings</span></a>
+        </nav>
+        <div class="border-t border-gray-200 p-4">
+            <div class="flex items-center mb-4 overflow-hidden whitespace-nowrap">
+                <div class="w-8 h-8 rounded-full bg-[#829c74] text-white flex items-center justify-center font-bold">A</div>
+                <div class="ml-3 nav-text"><p class="text-sm font-medium text-gray-900">Admin User</p><p class="text-xs text-gray-500">Administrator</p></div>
+            </div>
+            <a href="/logout" class="flex items-center text-gray-600 hover:text-red-600 w-full"><i class="fa-solid fa-sign-out-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Logout</span></a>
+        </div>
+    </aside>
+
+    <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
+        <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
+            <h1 class="text-xl font-semibold text-gray-800">Student Management</h1>
+            <a href="/notifications" class="relative text-gray-500 hover:text-[#668054]">
+                <i class="fa-solid fa-bell text-xl"></i>
+                {% if unread_count > 0 %}<span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">{{ unread_count }}</span>{% endif %}
+            </a>
+        </header>
+
+        <div class="p-8">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}<div class="mb-6">{% for category, message in messages %}
+                <div class="p-4 rounded-md shadow-sm mb-2 {% if category == 'danger' %}bg-red-50 text-red-700 border-l-4 border-red-500{% elif category == 'warning' %}bg-amber-50 text-amber-700 border-l-4 border-amber-500{% else %}bg-green-50 text-green-700 border-l-4 border-[#668054]{% endif %}">{{ message }}</div>
+                {% endfor %}</div>{% endif %}
+            {% endwith %}
+
+            <!-- ── Pending Approvals ─────────────────────────────── -->
+            {% if pending_students %}
+            <div class="bg-white shadow-sm rounded-xl border border-amber-200 overflow-hidden mb-8">
+                <div class="px-6 py-4 border-b border-amber-200 bg-amber-50 flex items-center gap-3">
+                    <i class="fa-solid fa-user-clock text-amber-600 text-lg"></i>
+                    <h2 class="font-semibold text-amber-800 text-lg">Pending Approvals</h2>
+                    <span class="ml-auto inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">{{ pending_students|length }} waiting</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50"><tr>
+                            <th class="px-4 py-3 w-10"><input type="checkbox" id="checkAllPending" onclick="toggleAll('pending-cb')" class="rounded border-gray-300 text-[#668054]"></th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Section</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registered</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                        </tr></thead>
+                        <tbody class="bg-white divide-y divide-gray-100">
+                            {% for s in pending_students %}
+                            <tr class="hover:bg-amber-50">
+                                <td class="px-4 py-4"><input type="checkbox" name="pending-cb" value="{{ s.id }}" class="pending-cb rounded border-gray-300 text-[#668054]"></td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-9 h-9 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-sm">{{ s.full_name[0]|upper }}</div>
+                                        <span class="text-sm font-medium text-gray-900">{{ s.full_name }}</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ s.email }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{% if s.section %}<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{{ s.section }}</span>{% else %}<span class="text-gray-400">—</span>{% endif %}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ s.created_at.strftime("%b %d, %Y %I:%M %p") if s.created_at else "—" }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap flex gap-2">
+                                    <form action="/students/approve/{{ s.id }}" method="POST">
+                                        <button class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700"><i class="fa-solid fa-check mr-1"></i>Approve</button>
+                                    </form>
+                                    <form action="/students/reject/{{ s.id }}" method="POST" onsubmit="return confirm('Permanently reject this registration?')">
+                                        <button class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-times mr-1"></i>Reject</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Bulk actions for pending -->
+                <div class="px-6 py-3 bg-gray-50 border-t border-gray-200 flex items-center gap-3">
+                    <span class="text-xs text-gray-500">Bulk:</span>
+                    <form action="/students/bulk_action" method="POST" id="pendingBulkForm">
+                        <input type="hidden" name="bulk_action" value="approve">
+                        <div id="pendingBulkIds"></div>
+                        <button type="button" onclick="submitBulk('pendingBulkForm','pending-cb','approve')" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700"><i class="fa-solid fa-check mr-1"></i>Approve Selected</button>
+                    </form>
+                    <form action="/students/bulk_action" method="POST" id="pendingDeleteForm">
+                        <input type="hidden" name="bulk_action" value="delete">
+                        <div id="pendingDeleteIds"></div>
+                        <button type="button" onclick="submitBulk('pendingDeleteForm','pending-cb','delete')" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700" onclick="return confirm('Delete selected?')"><i class="fa-solid fa-trash mr-1"></i>Delete Selected</button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <div class="bg-green-50 border border-green-200 rounded-xl px-6 py-4 mb-8 flex items-center gap-3 text-green-700">
+                <i class="fa-solid fa-circle-check text-green-500"></i>
+                <span class="text-sm font-medium">No pending student registrations.</span>
+            </div>
+            {% endif %}
+
+            <!-- ── Active Students ──────────────────────────────────── -->
+            {% set active_students = all_students | selectattr("is_active", "equalto", 1) | list %}
+            {% set pending_ids = pending_students | map(attribute="id") | list %}
+            {% set inactive_students = all_students | selectattr("is_active", "equalto", 0) | rejectattr("id", "in", pending_ids) | list %}
+
+            <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden mb-6">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between flex-wrap gap-3">
+                    <h2 class="font-semibold text-gray-800 text-lg">
+                        <i class="fa-solid fa-users mr-2 text-[#668054]"></i>Active Students
+                        <span class="text-sm font-normal text-gray-500 ml-1">({{ active_students|length }})</span>
+                    </h2>
+                    <div class="flex items-center gap-3">
+                        <input type="text" id="searchStudent" onkeyup="filterStudents()" placeholder="Search name, email, section…"
+                               class="w-56 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#668054]">
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50"><tr>
+                            <th class="px-4 py-3 w-10"><input type="checkbox" id="checkAllActive" onclick="toggleAll('active-cb')" class="rounded border-gray-300 text-[#668054]"></th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Section</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Registered</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        </tr></thead>
+                        <tbody class="bg-white divide-y divide-gray-100" id="studentBody">
+                            {% if active_students %}
+                                {% for s in active_students %}
+                                <tr class="hover:bg-gray-50 student-row">
+                                    <td class="px-4 py-4"><input type="checkbox" name="active-cb" value="{{ s.id }}" class="active-cb rounded border-gray-300 text-[#668054]"></td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-9 h-9 rounded-full bg-[#d6e4cf] text-[#668054] flex items-center justify-center font-bold text-sm">{{ s.full_name[0]|upper }}</div>
+                                            <span class="text-sm font-medium text-gray-900">{{ s.full_name }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ s.email }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">{% if s.section %}<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{{ s.section }}</span>{% else %}<span class="text-gray-400">—</span>{% endif %}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ s.created_at.strftime("%b %d, %Y") if s.created_at else "—" }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap flex gap-2">
+                                        <button onclick="openChangePwModal({{ s.id }}, '{{ s.full_name|e }}')" class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"><i class="fa-solid fa-key mr-1"></i>Password</button>
+                                        <form action="/students/deactivate/{{ s.id }}" method="POST" onsubmit="return confirm('Deactivate this student account?')">
+                                            <button class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-amber-500 hover:bg-amber-600"><i class="fa-solid fa-ban mr-1"></i>Deactivate</button>
+                                        </form>
+                                        <form action="/students/reject/{{ s.id }}" method="POST" onsubmit="return confirm('Permanently delete this account?')">
+                                            <button class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-trash mr-1"></i>Delete</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr><td colspan="6" class="px-6 py-10 text-center text-gray-400 text-sm">No active students yet.</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Bulk actions for active students -->
+                {% if active_students %}
+                <div class="px-6 py-3 bg-gray-50 border-t border-gray-200 flex items-center gap-3 flex-wrap">
+                    <span class="text-xs text-gray-500 font-medium">Bulk action on selected:</span>
+                    <button type="button" onclick="submitBulk('activeBulkDeact','active-cb','deactivate')" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-amber-500 hover:bg-amber-600"><i class="fa-solid fa-ban mr-1"></i>Deactivate</button>
+                    <button type="button" onclick="confirmBulkDelete()" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-trash mr-1"></i>Delete</button>
+                    <form action="/students/bulk_action" method="POST" id="activeBulkDeact"><input type="hidden" name="bulk_action" value="deactivate"><div id="activeBulkDeactIds"></div></form>
+                    <form action="/students/bulk_action" method="POST" id="activeBulkDel"><input type="hidden" name="bulk_action" value="delete"><div id="activeBulkDelIds"></div></form>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- ── Deactivated Students ─────────────────────────────── -->
+            {% if inactive_students %}
+            <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-3">
+                    <i class="fa-solid fa-user-slash text-gray-400 text-lg"></i>
+                    <h2 class="font-semibold text-gray-600 text-lg">Deactivated Students <span class="text-sm font-normal text-gray-400">({{ inactive_students|length }})</span></h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50"><tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Section</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        </tr></thead>
+                        <tbody class="bg-white divide-y divide-gray-100">
+                            {% for s in inactive_students %}
+                            <tr class="hover:bg-gray-50 opacity-70">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-9 h-9 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center font-bold text-sm">{{ s.full_name[0]|upper }}</div>
+                                        <span class="text-sm font-medium text-gray-500">{{ s.full_name }}</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ s.email }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{% if s.section %}<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ s.section }}</span>{% else %}<span class="text-gray-400">—</span>{% endif %}</td>
+                                <td class="px-6 py-4 whitespace-nowrap flex gap-2">
+                                    <form action="/students/reactivate/{{ s.id }}" method="POST">
+                                        <button class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700"><i class="fa-solid fa-rotate-left mr-1"></i>Reactivate</button>
+                                    </form>
+                                    <form action="/students/reject/{{ s.id }}" method="POST" onsubmit="return confirm('Permanently delete this account?')">
+                                        <button class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-trash mr-1"></i>Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </main>
+
+    <!-- ── Change Password Modal ──────────────────────────────── -->
+    <div id="changePwModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-gray-900 bg-opacity-60" onclick="closeChangePwModal()"></div>
+            <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md z-10 overflow-hidden">
+                <div class="bg-blue-600 px-6 py-4 flex items-center gap-3">
+                    <i class="fa-solid fa-key text-2xl text-white"></i>
+                    <h3 class="text-lg font-bold text-white">Change Password</h3>
+                </div>
+                <form id="changePwForm" method="POST" action="" class="p-6 space-y-4">
+                    <input type="hidden" name="redirect_to" value="students_page">
+                    <p class="text-sm text-gray-600">Setting new password for: <strong id="changePwName" class="text-gray-900"></strong></p>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                        <input type="password" name="new_password" required minlength="6"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               placeholder="At least 6 characters">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+                        <input type="password" name="confirm_password" required minlength="6"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               placeholder="Repeat the new password">
+                    </div>
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button type="button" onclick="closeChangePwModal()"
+                                class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100">Cancel</button>
+                        <button type="submit"
+                                class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors">Save Password</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            const s = document.getElementById("sidebar"), m = document.getElementById("main-content");
+            if (s.classList.contains("w-64")) {
+                s.classList.replace("w-64","w-16"); m.classList.replace("ml-64","ml-16");
+                s.querySelectorAll(".nav-text").forEach(e => e.classList.add("hidden"));
+            } else {
+                s.classList.replace("w-16","w-64"); m.classList.replace("ml-16","ml-64");
+                s.querySelectorAll(".nav-text").forEach(e => e.classList.remove("hidden"));
+            }
+        }
+        function filterStudents() {
+            const q = document.getElementById("searchStudent").value.toLowerCase();
+            document.querySelectorAll(".student-row").forEach(r => r.style.display = r.innerText.toLowerCase().includes(q) ? "" : "none");
+        }
+        function toggleAll(cls) {
+            const master = document.getElementById("checkAll" + (cls === "active-cb" ? "Active" : "Pending"));
+            document.querySelectorAll("." + cls).forEach(cb => cb.checked = master.checked);
+        }
+        function getChecked(cls) {
+            return Array.from(document.querySelectorAll("." + cls + ":checked")).map(cb => cb.value);
+        }
+        function submitBulk(formId, cbClass, action) {
+            const ids = getChecked(cbClass);
+            if (!ids.length) { alert("Please select at least one student."); return; }
+            const form = document.getElementById(formId);
+            const container = form.querySelector("div");
+            container.innerHTML = "";
+            ids.forEach(id => {
+                const inp = document.createElement("input");
+                inp.type = "hidden"; inp.name = "selected_ids"; inp.value = id;
+                container.appendChild(inp);
+            });
+            form.querySelector("input[name=bulk_action]").value = action;
+            form.submit();
+        }
+        function confirmBulkDelete() {
+            const ids = getChecked("active-cb");
+            if (!ids.length) { alert("Please select at least one student."); return; }
+            if (!confirm("Permanently delete " + ids.length + " student(s)? This cannot be undone.")) return;
+            submitBulk("activeBulkDel", "active-cb", "delete");
+        }
+        function openChangePwModal(userId, name) {
+            document.getElementById('changePwName').textContent = name;
+            document.getElementById('changePwForm').action = '/admin/change_password/' + userId;
+            document.getElementById('changePwModal').classList.remove('hidden');
+        }
+        function closeChangePwModal() {
+            document.getElementById('changePwModal').classList.add('hidden');
+            document.getElementById('changePwForm').reset();
+        }
+    </script>
+</body>
+</html>

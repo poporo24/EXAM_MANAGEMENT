@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Reports - CCA Exam Management System">
+    <title>Reports</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar-transition { transition: width 0.3s ease; }
+        .content-transition { transition: margin-left 0.3s ease; }
+    </style>
+</head>
+<body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="bg-white border-r border-gray-200 fixed h-full w-64 sidebar-transition z-20 flex flex-col">
+        <div class="h-16 flex items-center justify-between px-4 border-b border-gray-200">
+            <div class="flex items-center gap-3 overflow-hidden whitespace-nowrap">
+                <i class="fa-solid fa-graduation-cap text-2xl text-[#668054]"></i>
+                <span class="font-bold text-lg nav-text">CCA Exams</span>
+            </div>
+            <button onclick="toggleSidebar()" class="text-gray-500 hover:text-[#668054] focus:outline-none">
+                <i class="fa-solid fa-bars text-xl"></i>
+            </button>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+            {% if session.get('role') == 'secretary' %}
+                <a href="/secretary" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                    <i class="fa-solid fa-inbox w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Exam Collection</span>
+                </a>
+            {% else %}
+                <a href="/dashboard" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                    <i class="fa-solid fa-chart-line w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Dashboard</span>
+                </a>
+                <a href="/schedule" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                    <i class="fa-solid fa-calendar-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Schedule</span>
+                </a>
+                <a href="/subjects" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                    <i class="fa-solid fa-book w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Subjects</span>
+                </a>
+                <a href="/institutes" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                    <i class="fa-solid fa-building w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Institutes</span>
+                </a>
+            {% endif %}
+            
+            <a href="/reports" class="flex items-center px-4 py-3 bg-green-50 text-[#668054] border-r-4 border-[#668054] group" title="Reports">
+                <i class="fa-solid fa-chart-pie w-6 text-center text-lg"></i>
+                <span class="ml-3 nav-text font-medium">Reports</span>
+            </a>
+            
+            {% if session.get('role') != 'secretary' %}
+            <a href="/settings" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-cog w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Settings</span>
+            </a>
+            {% endif %}
+        </nav>
+
+        <div class="border-t border-gray-200 p-4">
+            <div class="flex items-center mb-4 overflow-hidden whitespace-nowrap">
+                <div class="w-8 h-8 rounded-full bg-[#829c74] text-white flex items-center justify-center font-bold">U</div>
+                <div class="ml-3 nav-text">
+                    <p class="text-sm font-medium text-gray-900">{{ session.get('role', 'User')|title }}</p>
+                </div>
+            </div>
+            <a href="/logout" class="flex items-center text-gray-600 hover:text-red-600 group w-full">
+                <i class="fa-solid fa-sign-out-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Logout</span>
+            </a>
+        </div>
+    </aside>
+
+    <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
+        <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
+            <h1 class="text-xl font-semibold text-gray-800">Reports Center</h1>
+            <div class="flex items-center gap-4">
+                <a href="/notifications" class="text-gray-500 hover:text-[#668054] relative">
+                    <i class="fa-regular fa-bell text-xl"></i>
+                    {% if unread_count and unread_count > 0 %}
+                    <span class="absolute top-0 right-0 -mt-1 -mr-1 flex h-3 w-3">
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </span>
+                    {% endif %}
+                </a>
+            </div>
+        </header>
+
+        <div class="p-8">
+            <!-- Tabs -->
+            <div class="border-b border-gray-200 mb-6">
+                <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                    <button onclick="switchTab('absence-tab')" id="nav-absence-tab" class="tab-btn border-[#668054] text-[#668054] whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">Proctor Absence Report</button>
+                    <button onclick="switchTab('assignment-tab')" id="nav-assignment-tab" class="tab-btn border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">Assignment Report</button>
+                    <button onclick="switchTab('scheduling-tab')" id="nav-scheduling-tab" class="tab-btn border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">Scheduling Report</button>
+                </nav>
+            </div>
+
+            <!-- Tab 1: Absence Report -->
+            <div id="absence-tab" class="tab-content block">
+                <div class="bg-white shadow-sm rounded-xl border border-gray-200 p-6 mb-6">
+                    <form action="/reports" method="GET" class="flex flex-col sm:flex-row gap-4 items-end">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">From Date</label>
+                            <input type="date" name="from" value="{{ date_from|default('') }}" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">To Date</label>
+                            <input type="date" name="to" value="{{ date_to|default('') }}" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                        </div>
+                        <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[#668054] hover:bg-[#829c74]">Filter</button>
+                        <div class="flex-grow"></div>
+                        <a href="/export/absence_report.pdf" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            <i class="fa-solid fa-file-pdf mr-2 text-red-500"></i> Export PDF
+                        </a>
+                    </form>
+                </div>
+
+                <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Instructor</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exam Subject</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exam Date</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reported At</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% if absence_report %}
+                                    {% for rep in absence_report %}
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ rep.instructor_name }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ rep.subject_name }} - {{ rep.section }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ rep.exam_date }}</td>
+                                        <td class="px-6 py-4 text-sm text-gray-500 max-w-xs">{{ rep.reason }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ rep.created_at }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr><td colspan="5" class="px-6 py-10 text-center text-gray-500">No absences reported for this period.</td></tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Assignment Report -->
+            <div id="assignment-tab" class="tab-content hidden">
+                <div class="flex justify-end mb-4">
+                    <a href="/export/assignment_report.pdf" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        <i class="fa-solid fa-file-pdf mr-2 text-red-500"></i> Export PDF
+                    </a>
+                </div>
+                
+                {% set total_proctors = assignment_report|length if assignment_report else 0 %}
+                {% set total_h = assignment_report|map(attribute='total_hours')|sum if assignment_report else 0 %}
+                
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                        <p class="text-sm text-gray-500">Total Proctors Assessed</p>
+                        <p class="text-2xl font-bold">{{ total_proctors }}</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                        <p class="text-sm text-gray-500">Average Hours / Proctor</p>
+                        <p class="text-2xl font-bold">{% if total_proctors > 0 %}{{ (total_h / total_proctors)|round(1) }}{% else %}0{% endif %} hrs</p>
+                    </div>
+                </div>
+
+                <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Instructor Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Institute</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Exams Assigned</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Hours</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% if assignment_report %}
+                                    {% for row in assignment_report %}
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ row.name }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ row.institute }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ row.exam_count }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-700">{{ row.total_hours }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr><td colspan="4" class="px-6 py-10 text-center text-gray-500">No assignment data available.</td></tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Scheduling Report -->
+            <div id="scheduling-tab" class="tab-content hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col justify-center items-center">
+                        <p class="text-sm font-medium text-gray-500 uppercase">Total Exams</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2">{{ scheduling_report.total_exams if scheduling_report else 0 }}</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col justify-center items-center">
+                        <p class="text-sm font-medium text-gray-500 uppercase">Scheduled</p>
+                        <p class="text-3xl font-bold text-green-600 mt-2">{{ scheduling_report.scheduled if scheduling_report else 0 }}</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col justify-center items-center">
+                        <p class="text-sm font-medium text-gray-500 uppercase">Unscheduled</p>
+                        <p class="text-3xl font-bold text-red-600 mt-2">{{ scheduling_report.unscheduled if scheduling_report else 0 }}</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col justify-center items-center">
+                        <p class="text-sm font-medium text-gray-500 uppercase">Pending</p>
+                        <p class="text-3xl font-bold text-yellow-500 mt-2">{{ scheduling_report.pending if scheduling_report else 0 }}</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- By Institute -->
+                    <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                            <h3 class="font-semibold text-gray-800">Breakdown by Institute</h3>
+                        </div>
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-white">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Institute</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Exams</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Scheduled</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 bg-white">
+                                {% if scheduling_report and scheduling_report.by_institute %}
+                                    {% for item in scheduling_report.by_institute %}
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.name }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ item.total }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold text-right">{{ item.scheduled }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr><td colspan="3" class="px-6 py-8 text-center text-gray-500">No data available</td></tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- By Type -->
+                    <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                            <h3 class="font-semibold text-gray-800">Breakdown by Exam Type</h3>
+                        </div>
+                        <div class="p-6">
+                            {% if scheduling_report and scheduling_report.by_type %}
+                                <div class="space-y-4">
+                                    {% for type_name, count in scheduling_report.by_type.items() %}
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-sm font-medium text-gray-700">{{ type_name }}</span>
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-gray-100 text-gray-800">{{ count }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-center text-gray-500 py-4">No data available</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('main-content');
+            sidebar.classList.toggle('w-64');
+            sidebar.classList.toggle('w-16');
+            mainContent.classList.toggle('ml-64');
+            mainContent.classList.toggle('ml-16');
+            
+            const isCollapsed = sidebar.classList.contains('w-16');
+            localStorage.setItem('sidebarCollapsed', isCollapsed);
+            
+            sidebar.querySelectorAll('.nav-text').forEach(el => {
+                if (isCollapsed) el.classList.add('hidden');
+                else el.classList.remove('hidden');
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                const sidebar = document.getElementById('sidebar');
+                const mainContent = document.getElementById('main-content');
+                sidebar.classList.remove('w-64');
+                sidebar.classList.add('w-16');
+                mainContent.classList.remove('ml-64');
+                mainContent.classList.add('ml-16');
+                sidebar.querySelectorAll('.nav-text').forEach(el => el.classList.add('hidden'));
+            }
+        });
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+                tab.classList.remove('block');
+            });
+            document.getElementById(tabId).classList.remove('hidden');
+            document.getElementById(tabId).classList.add('block');
+            
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('border-[#668054]', 'text-[#668054]');
+                btn.classList.add('border-transparent', 'text-gray-500');
+            });
+            
+            const activeBtn = document.getElementById('nav-' + tabId);
+            activeBtn.classList.remove('border-transparent', 'text-gray-500');
+            activeBtn.classList.add('border-[#668054]', 'text-[#668054]');
+        }
+    </script>
+</body>
+</html>

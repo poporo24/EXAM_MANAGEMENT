@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Subjects - CCA Exam Management System">
+    <title>Subjects - Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar-transition { transition: width 0.3s ease; }
+        .content-transition { transition: margin-left 0.3s ease; }
+        .group-card { border-left: 4px solid #668054; }
+        .alias-item { transition: background 0.15s; }
+        .alias-item:hover { background: #f0f4ee; }
+        .subject-checkbox { display: none; }
+        .subject-label {
+            display: flex; align-items: center; gap: 10px;
+            padding: 8px 12px; border: 1.5px solid #e5e7eb; border-radius: 8px;
+            cursor: pointer; transition: border-color 0.15s, background 0.15s;
+            font-size: 0.82rem;
+        }
+        .subject-label:hover { border-color: #668054; background: #f4f9f2; }
+        .subject-checkbox:checked + .subject-label {
+            border-color: #668054; background: #eef4ec; font-weight: 600;
+        }
+        .check-icon { display: none; }
+        .subject-checkbox:checked + .subject-label .check-icon { display: inline-flex; }
+        .subject-checkbox:checked + .subject-label .uncheck-icon { display: none; }
+        .link-panel { max-height: 320px; overflow-y: auto; }
+        .group-count-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 0.72rem; padding: 2px 8px; border-radius: 999px;
+            background: #dbeafe; color: #1d4ed8; font-weight: 600;
+            cursor: pointer; text-decoration: none;
+        }
+        .group-count-badge:hover { background: #bfdbfe; }
+    </style>
+</head>
+<body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="bg-white border-r border-gray-200 fixed h-full w-64 sidebar-transition z-20 flex flex-col">
+        <div class="h-16 flex items-center justify-between px-4 border-b border-gray-200">
+            <div class="flex items-center gap-3 overflow-hidden whitespace-nowrap">
+                <i class="fa-solid fa-graduation-cap text-2xl text-[#668054]"></i>
+                <span class="font-bold text-lg nav-text">CCA Exams</span>
+            </div>
+            <button onclick="toggleSidebar()" class="text-gray-500 hover:text-[#668054] focus:outline-none">
+                <i class="fa-solid fa-bars text-xl"></i>
+            </button>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+            <a href="/dashboard" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-chart-line w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Dashboard</span>
+            </a>
+            <a href="/schedule" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-calendar-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Schedule</span>
+            </a>
+            <a href="/subjects" class="flex items-center px-4 py-3 bg-green-50 text-[#668054] border-r-4 border-[#668054] group">
+                <i class="fa-solid fa-book w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Subjects</span>
+            </a>
+            <a href="/institutes" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-building w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Institutes</span>
+            </a>
+            <a href="/reports" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-chart-pie w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Reports</span>
+            </a>
+            <a href="/settings" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-cog w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Settings</span>
+            </a>
+        </nav>
+
+        <div class="border-t border-gray-200 p-4">
+            <div class="flex items-center mb-4 overflow-hidden whitespace-nowrap">
+                <div class="w-8 h-8 rounded-full bg-[#829c74] text-white flex items-center justify-center font-bold">A</div>
+                <div class="ml-3 nav-text">
+                    <p class="text-sm font-medium text-gray-900">Admin User</p>
+                    <p class="text-xs text-gray-500">Administrator</p>
+                </div>
+            </div>
+            <a href="/logout" class="flex items-center text-gray-600 hover:text-red-600 group w-full">
+                <i class="fa-solid fa-sign-out-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Logout</span>
+            </a>
+        </div>
+    </aside>
+
+    <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
+        <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
+            <h1 class="text-xl font-semibold text-gray-800">Subject Management</h1>
+        </header>
+
+        <div class="p-8 space-y-8">
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div>
+                        {% for category, message in messages %}
+                            <div class="p-4 rounded-md shadow-sm mb-2 {% if category == 'error' or category == 'danger' %}bg-red-50 text-red-700 border-l-4 border-red-500{% elif category == 'warning' %}bg-yellow-50 text-yellow-700 border-l-4 border-yellow-400{% else %}bg-green-50 text-green-700 border-l-4 border-[#668054]{% endif %}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <!-- TOP TOOLS ROW -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Import CSV -->
+                <div class="bg-white shadow-sm rounded-xl border border-gray-200 p-6 flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-1">Import Subjects</h3>
+                        <p class="text-sm text-gray-500 mb-3">Upload a CSV file to bulk add subjects.</p>
+
+                        <!-- Column reference table -->
+                        <div class="mb-4">
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Required Columns</p>
+                            <table class="w-full text-xs border border-gray-200 rounded-lg overflow-hidden">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-2 py-1.5 text-left font-semibold text-gray-600">Column</th>
+                                        <th class="px-2 py-1.5 text-left font-semibold text-gray-600">Type</th>
+                                        <th class="px-2 py-1.5 text-left font-semibold text-gray-600">Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    <tr><td class="px-2 py-1"><code class="bg-gray-100 px-1 rounded">name</code></td><td class="px-2 py-1 text-gray-500">Text</td><td class="px-2 py-1 text-gray-400">Required. Full subject name</td></tr>
+                                    <tr><td class="px-2 py-1"><code class="bg-gray-100 px-1 rounded">code</code></td><td class="px-2 py-1 text-gray-500">Text</td><td class="px-2 py-1 text-gray-400">Subject code e.g. <em>IT201</em></td></tr>
+                                    <tr><td class="px-2 py-1"><code class="bg-gray-100 px-1 rounded">institute_code</code></td><td class="px-2 py-1 text-gray-500">Text</td><td class="px-2 py-1 text-gray-400">e.g. <em>ICSLIS</em>, blank = common</td></tr>
+                                    <tr><td class="px-2 py-1"><code class="bg-gray-100 px-1 rounded">is_common</code></td><td class="px-2 py-1 text-gray-500">0 / 1</td><td class="px-2 py-1 text-gray-400">1 = shared across institutes</td></tr>
+                                    <tr><td class="px-2 py-1"><code class="bg-gray-100 px-1 rounded">content_group</code></td><td class="px-2 py-1 text-gray-500">Number</td><td class="px-2 py-1 text-gray-400">Alias group ID, leave blank if none</td></tr>
+                                </tbody>
+                            </table>
+                            <p class="text-xs text-gray-400 mt-1.5"><span class="font-medium text-gray-500">Sample row:</span> <code class="bg-gray-100 px-1 rounded">Information Technology 2,IT201,ICSLIS,0,</code></p>
+                        </div>
+
+                        <form action="/subjects/import" method="POST" enctype="multipart/form-data" class="space-y-4">
+                            <input type="file" name="csv_file" accept=".csv" required class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-[#668054] hover:file:bg-green-100">
+                            <button type="submit" class="w-full inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[#668054] hover:bg-[#829c74]">
+                                <i class="fa-solid fa-upload mr-2"></i> Import CSV
+                            </button>
+                        </form>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-gray-100 flex items-center justify-center gap-4 text-sm">
+                        <a href="/static/template_subjects.csv" class="text-[#668054] hover:underline">Download CSV Template</a>
+                        <span class="text-gray-300">|</span>
+                        <a href="/static/sample_subjects.csv" class="text-blue-500 hover:underline">Download Sample Data</a>
+                    </div>
+                </div>
+
+                <!-- Link Subjects as Aliases -->
+                <div class="lg:col-span-2 bg-white shadow-sm rounded-xl border border-gray-200 p-6">
+                    <div class="flex items-start justify-between mb-1">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-800">Link Subjects as Aliases</h3>
+                            <p class="text-sm text-gray-500 mt-0.5">Select two or more subjects that have the <strong>same exam content</strong> but different names per institute. They will share the same exam slot.</p>
+                        </div>
+                        <span class="ml-4 flex-shrink-0 text-xs text-gray-400 bg-gray-100 rounded-full px-3 py-1 mt-1 hidden lg:inline-block">e.g. Major in CITE = Minor in CABE</span>
+                    </div>
+
+                    <form action="/subjects/link_content" method="POST" id="linkForm" class="mt-4">
+                        <div class="link-panel grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4 pr-1" id="subjectCheckboxList">
+                            {% for sub in subjects %}
+                            <div>
+                                <input type="checkbox" name="subject_ids" value="{{ sub.id }}" id="chk_{{ sub.id }}" class="subject-checkbox">
+                                <label for="chk_{{ sub.id }}" class="subject-label">
+                                    <span class="check-icon w-4 h-4 rounded-full bg-[#668054] items-center justify-center flex-shrink-0">
+                                        <i class="fa-solid fa-check text-white text-[9px]"></i>
+                                    </span>
+                                    <span class="uncheck-icon w-4 h-4 rounded-full border-2 border-gray-300 flex-shrink-0"></span>
+                                    <span class="flex-1 min-w-0">
+                                        <span class="block font-medium text-gray-800 truncate">{{ sub.name }}</span>
+                                        <span class="block text-gray-400 text-xs">{{ sub.code }}{% if sub.institute_name %} &middot; {{ sub.institute_name }}{% endif %}{% if sub.content_group_id %} <span class="text-blue-400">(grouped)</span>{% endif %}</span>
+                                    </span>
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <p id="selectedCount" class="text-sm text-gray-500">0 subjects selected</p>
+                            <div class="flex gap-2">
+                                <button type="button" onclick="clearSelection()" class="inline-flex items-center px-3 py-2 text-sm border border-gray-300 rounded-md text-gray-600 hover:bg-gray-50">
+                                    Clear
+                                </button>
+                                <button type="submit" id="linkBtn" class="inline-flex items-center px-5 py-2 text-sm font-medium rounded-md text-white bg-[#668054] hover:bg-[#829c74] opacity-40 cursor-not-allowed" disabled>
+                                    <i class="fa-solid fa-link mr-2"></i> Link Selected
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- ALIAS GROUPS PANEL -->
+            {% if content_groups %}
+            <div id="aliasGroupsSection">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="text-base font-semibold text-gray-800">Subject Alias Groups</h2>
+                        <p class="text-sm text-gray-500">These subjects share identical exam content and will be scheduled in the same time slot.</p>
+                    </div>
+                    <span class="text-sm font-medium text-[#668054] bg-green-50 border border-green-200 rounded-full px-3 py-1">
+                        {{ content_groups | length }} group{{ 's' if content_groups | length != 1 else '' }}
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                    {% for group_id, group_subjects in content_groups.items() %}
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm group-card overflow-hidden" id="group_{{ group_id }}">
+                        <div class="px-5 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-object-group text-[#668054] text-sm"></i>
+                                <span class="text-sm font-semibold text-gray-700">Alias Group #{{ group_id }}</span>
+                            </div>
+                            <span class="text-xs bg-green-100 text-green-700 rounded-full px-2 py-0.5 font-medium">
+                                {{ group_subjects | length }} subject{{ 's' if group_subjects | length != 1 else '' }}
+                            </span>
+                        </div>
+                        <ul class="divide-y divide-gray-100">
+                            {% for sub in group_subjects %}
+                            <li class="alias-item px-5 py-3 flex items-center justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-medium text-gray-800 truncate">{{ sub.name }}</p>
+                                    <p class="text-xs text-gray-500 truncate">
+                                        {{ sub.code }}{% if sub.institute_name %} &middot; <span class="text-gray-600">{{ sub.institute_name }}</span>{% endif %}
+                                    </p>
+                                </div>
+                                <div class="flex items-center gap-2 flex-shrink-0">
+                                    {% if sub.is_common %}
+                                        <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-yellow-100 text-yellow-800">Common</span>
+                                    {% endif %}
+                                    <a href="javascript:void(0)"
+                                       onclick="openUnlinkConfirmModal('/subjects/{{ sub.id }}/unlink', '{{ sub.name|escape }}')"
+                                       class="text-xs text-red-500 hover:text-red-700 border border-red-200 rounded px-2 py-0.5 hover:bg-red-50 transition-colors"
+                                       title="Remove from group">
+                                        <i class="fa-solid fa-unlink mr-1"></i>Unlink
+                                    </a>
+                                </div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center">
+                <i class="fa-solid fa-object-group text-3xl text-gray-300 mb-3"></i>
+                <p class="text-gray-500 font-medium">No alias groups yet</p>
+                <p class="text-sm text-gray-400 mt-1">Use the form above to link subjects that have the same exam content across different institutes.</p>
+            </div>
+            {% endif %}
+
+            <!-- ALL SUBJECTS TABLE -->
+            <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                    <div>
+                        <h2 class="font-semibold text-gray-800">All Subjects</h2>
+                        <p class="text-xs text-gray-500 mt-0.5">{{ subjects | length }} subject{{ 's' if subjects | length != 1 else '' }} total</p>
+                    </div>
+                    <button onclick="openModal('addSubjectModal')" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#668054] hover:bg-[#829c74]">
+                        <i class="fa-solid fa-plus mr-2"></i> Add Subject
+                    </button>
+                </div>
+
+                <!-- Bulk delete form wraps the table -->
+                <form id="bulkDeleteForm" action="/subjects/bulk_delete" method="POST">
+
+                <!-- Floating bulk-action toolbar (hidden until items checked) -->
+                <div id="bulkToolbar" class="hidden px-6 py-3 bg-red-50 border-b border-red-200 flex items-center justify-between transition-all">
+                    <span class="text-sm font-semibold text-red-700">
+                        <i class="fa-solid fa-circle-check mr-1"></i>
+                        <span id="bulkCount">0</span> subject(s) selected
+                    </span>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="clearBulkSelection()" class="text-sm text-gray-600 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-100">
+                            Clear
+                        </button>
+                        <button type="submit"
+                            onclick="return confirm('Delete the selected subjects? This cannot be undone and may affect associated exams.')"
+                            class="inline-flex items-center gap-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md px-4 py-1.5 transition-colors">
+                            <i class="fa-solid fa-trash"></i> Delete Selected
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="pl-6 pr-2 py-3 w-10">
+                                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)"
+                                        class="h-4 w-4 text-[#668054] border-gray-300 rounded cursor-pointer"
+                                        title="Select all">
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name &amp; Code</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Institute</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alias Group</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="subjectTableBody">
+                            {% if subjects %}
+                                {% for sub in subjects %}
+                                <tr class="hover:bg-gray-50 subject-row" id="row_{{ sub.id }}">
+                                    <td class="pl-6 pr-2 py-4 w-10">
+                                        <input type="checkbox" name="subject_ids" value="{{ sub.id }}"
+                                            class="row-checkbox h-4 w-4 text-[#668054] border-gray-300 rounded cursor-pointer"
+                                            onchange="updateBulkToolbar()">
+                                    </td>
+                                    <td class="px-4 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900">{{ sub.name }}</div>
+                                        <div class="text-sm text-gray-500">{{ sub.code }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ sub.institute_name or '&mdash;' }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        {% if sub.is_common %}
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Common Subject</span>
+                                        {% else %}
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Standard</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        {% if sub.content_group_id %}
+                                            {% set grp = content_groups.get(sub.content_group_id, []) %}
+                                            <a href="#group_{{ sub.content_group_id }}" class="group-count-badge" title="Jump to alias group">
+                                                <i class="fa-solid fa-object-group text-[10px]"></i>
+                                                Grp #{{ sub.content_group_id }}
+                                                <span class="bg-blue-200 text-blue-900 rounded-full px-1.5 text-[10px]">&times;{{ grp | length }}</span>
+                                            </a>
+                                        {% else %}
+                                        <span class="text-gray-400 text-xs">&mdash;</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button type="button" onclick="openEditSubjectModal('{{ sub.id }}', {{ sub.name | tojson }}, '{{ sub.code }}', '{{ sub.institute_id }}', '{{ sub.is_common }}')" class="text-blue-600 hover:text-blue-900 mr-3" title="Edit subject">
+                                            <i class="fa-solid fa-edit"></i>
+                                        </button>
+                                        <a href="/subjects/{{ sub.id }}/delete" onclick="return confirm('Delete this subject? Associated exams will also be affected.')" class="text-red-600 hover:text-red-900" title="Delete subject">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr><td colspan="6" class="px-6 py-10 text-center text-gray-500">No subjects found. Add one or import via CSV.</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+                </form><!-- end bulkDeleteForm -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Add Subject Modal -->
+    <div id="addSubjectModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal('addSubjectModal')"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Add New Subject</h3>
+                    <form action="/subjects/add" method="POST" id="addSubjectForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Subject Name</label>
+                            <input type="text" name="name" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Course Code</label>
+                            <input type="text" name="code" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2" placeholder="e.g. CS101">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Institute</label>
+                            <select name="institute_id" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                                <option value="">&#8212; No specific institute &#8212;</option>
+                                {% for inst in institutes %}
+                                <option value="{{ inst.id }}">{{ inst.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox" name="is_common" value="true" id="add_is_common" class="h-4 w-4 text-[#668054] focus:ring-[#668054] border-gray-300 rounded">
+                            <label for="add_is_common" class="ml-2 block text-sm text-gray-900">Common Subject <span class="text-gray-400">(taken by multiple institutes)</span></label>
+                        </div>
+                    </form>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="submit" form="addSubjectForm" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-[#668054] text-white hover:bg-[#829c74] sm:ml-3 sm:w-auto sm:text-sm">Save</button>
+                    <button type="button" onclick="closeModal('addSubjectModal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Subject Modal -->
+    <div id="editSubjectModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal('editSubjectModal')"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Edit Subject</h3>
+                    <form id="editSubjectForm" method="POST" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Subject Name</label>
+                            <input type="text" name="name" id="edit_sub_name" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Course Code</label>
+                            <input type="text" name="code" id="edit_sub_code" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Institute</label>
+                            <select name="institute_id" id="edit_sub_inst" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                                <option value="">&#8212; No specific institute &#8212;</option>
+                                {% for inst in institutes %}
+                                <option value="{{ inst.id }}">{{ inst.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox" name="is_common" id="edit_sub_common" value="true" class="h-4 w-4 text-[#668054] border-gray-300 rounded">
+                            <label for="edit_sub_common" class="ml-2 block text-sm text-gray-900">Common Subject</label>
+                        </div>
+                    </form>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="submit" form="editSubjectForm" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-[#668054] text-white hover:bg-[#829c74] sm:ml-3 sm:w-auto sm:text-sm">Update</button>
+                    <button type="button" onclick="closeModal('editSubjectModal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('main-content');
+            sidebar.classList.toggle('w-64');
+            sidebar.classList.toggle('w-16');
+            mainContent.classList.toggle('ml-64');
+            mainContent.classList.toggle('ml-16');
+            const isCollapsed = sidebar.classList.contains('w-16');
+            localStorage.setItem('sidebarCollapsed', isCollapsed);
+            sidebar.querySelectorAll('.nav-text').forEach(el => {
+                if (isCollapsed) el.classList.add('hidden');
+                else el.classList.remove('hidden');
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                const sidebar = document.getElementById('sidebar');
+                const mainContent = document.getElementById('main-content');
+                sidebar.classList.remove('w-64');
+                sidebar.classList.add('w-16');
+                mainContent.classList.remove('ml-64');
+                mainContent.classList.add('ml-16');
+                sidebar.querySelectorAll('.nav-text').forEach(el => el.classList.add('hidden'));
+            }
+            updateLinkButton();
+        });
+
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+
+        function openEditSubjectModal(id, name, code, institute_id, is_common) {
+            document.getElementById('editSubjectForm').action = '/subjects/' + id + '/edit';
+            document.getElementById('edit_sub_name').value = name;
+            document.getElementById('edit_sub_code').value = code;
+            document.getElementById('edit_sub_inst').value = institute_id;
+            document.getElementById('edit_sub_common').checked = is_common === 'True' || is_common === 'true' || is_common === true;
+            openModal('editSubjectModal');
+        }
+
+        function updateLinkButton() {
+            const checked = document.querySelectorAll('.subject-checkbox:checked');
+            const btn = document.getElementById('linkBtn');
+            const count = document.getElementById('selectedCount');
+            const n = checked.length;
+            count.textContent = n === 0 ? '0 subjects selected' : n + ' subject' + (n > 1 ? 's' : '') + ' selected';
+            if (n >= 2) {
+                btn.disabled = false;
+                btn.classList.remove('opacity-40', 'cursor-not-allowed');
+            } else {
+                btn.disabled = true;
+                btn.classList.add('opacity-40', 'cursor-not-allowed');
+            }
+        }
+
+        function clearSelection() {
+            document.querySelectorAll('.subject-checkbox').forEach(cb => { cb.checked = false; });
+            updateLinkButton();
+        }
+
+        document.querySelectorAll('.subject-checkbox').forEach(cb => {
+            cb.addEventListener('change', updateLinkButton);
+        });
+
+        /* ── Bulk delete helpers ───────────────────────── */
+        function updateBulkToolbar() {
+            const checked = document.querySelectorAll('.row-checkbox:checked');
+            const toolbar = document.getElementById('bulkToolbar');
+            const countEl = document.getElementById('bulkCount');
+            const selectAll = document.getElementById('selectAllCheckbox');
+            const total = document.querySelectorAll('.row-checkbox').length;
+            countEl.textContent = checked.length;
+            if (checked.length > 0) {
+                toolbar.classList.remove('hidden');
+            } else {
+                toolbar.classList.add('hidden');
+            }
+            selectAll.indeterminate = checked.length > 0 && checked.length < total;
+            selectAll.checked = checked.length === total && total > 0;
+        }
+
+        function toggleSelectAll(masterCb) {
+            document.querySelectorAll('.row-checkbox').forEach(cb => {
+                cb.checked = masterCb.checked;
+            });
+            updateBulkToolbar();
+        }
+
+        function clearBulkSelection() {
+            document.querySelectorAll('.row-checkbox').forEach(cb => { cb.checked = false; });
+            document.getElementById('selectAllCheckbox').checked = false;
+            updateBulkToolbar();
+        }
+    </script>
+
+    <!-- Unlink Confirmation Modal -->
+    <div id="unlinkConfirmModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeUnlinkConfirmModal()"></div>
+            <div class="relative bg-white rounded-xl shadow-xl w-full max-w-sm z-10 overflow-hidden">
+                <div class="px-6 pt-6 pb-4">
+                    <div class="flex items-center justify-center w-12 h-12 mx-auto rounded-full bg-red-100 mb-4">
+                        <i class="fa-solid fa-unlink text-red-600 text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900 text-center mb-2">Unlink Subject</h3>
+                    <p class="text-sm text-gray-600 text-center">
+                        Remove <strong id="unlinkSubjectName" class="text-gray-800"></strong> from the alias group?
+                    </p>
+                    <p class="text-xs text-gray-400 text-center mt-2">
+                        If only one subject remains, the group will dissolve.
+                    </p>
+                </div>
+                <div class="bg-gray-50 px-6 py-4 flex justify-end gap-3">
+                    <button type="button" onclick="closeUnlinkConfirmModal()"
+                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
+                        Cancel
+                    </button>
+                    <a id="unlinkConfirmBtn" href="#"
+                        class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 transition-colors">
+                        <i class="fa-solid fa-unlink mr-2"></i> Unlink
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openUnlinkConfirmModal(url, subjectName) {
+            document.getElementById('unlinkSubjectName').textContent = subjectName;
+            document.getElementById('unlinkConfirmBtn').href = url;
+            document.getElementById('unlinkConfirmModal').classList.remove('hidden');
+        }
+        function closeUnlinkConfirmModal() {
+            document.getElementById('unlinkConfirmModal').classList.add('hidden');
+        }
+    </script>
+
+</body>
+</html>

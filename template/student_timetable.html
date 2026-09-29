@@ -3,275 +3,404 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CCA Exam Timetable — View your personal examination schedule for City College of Angeles.">
     <title>CCA | Exam Timetable</title>
-    <meta name="description" content="City College of Angeles official exam timetable for students.">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background: #f0f4ee; }
-        .no-scrollbar::-webkit-scrollbar { display:none; }
-        .no-scrollbar { -ms-overflow-style:none; scrollbar-width:none; }
-
-        @keyframes fadeUp {
-            from { opacity:0; transform:translateY(20px); }
-            to   { opacity:1; transform:translateY(0); }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --green-dark:#3d5c2e; --green-mid:#4e7038; --green-light:#668054; --green-pale:#829c74;
+            --green-bg:#f0f4ed; --green-border:#c8d8bd; --white:#ffffff;
+            --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb; --gray-400:#9ca3af;
+            --gray-500:#6b7280; --gray-700:#374151; --gray-900:#111827;
+            --confirmed:#16a34a;
         }
-        .fade-up { animation: fadeUp .45s ease both; }
-        .d1 { animation-delay:.04s; }
-        .d2 { animation-delay:.10s; }
-        .d3 { animation-delay:.16s; }
+        body { font-family:"Inter",sans-serif; background:var(--green-bg); color:var(--gray-900); min-height:100vh; }
 
-        /* Search highlight */
-        .highlight { background: #fef08a; border-radius: 3px; }
+        /* HERO */
+        .hero { background:linear-gradient(160deg,#2e4520 0%,#3d5c2e 40%,#4e7038 70%,#5d8245 100%); padding:48px 24px 40px; text-align:center; position:relative; overflow:hidden; }
+        .hero::before { content:""; position:absolute; inset:0; background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E"); pointer-events:none; }
+        .hero-eyebrow { font-size:11px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:rgba(255,255,255,0.6); margin-bottom:8px; }
+        .hero h1 { font-size:clamp(28px,5vw,44px); font-weight:800; color:#fff; letter-spacing:-0.02em; line-height:1.1; }
+        .hero-sub { margin-top:6px; font-size:13px; color:rgba(255,255,255,0.55); }
 
+        /* CONTROLS */
+        .controls-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:28px; position:relative; z-index:1; }
+        .ctrl-search { position:relative; flex:0 1 260px; min-width:180px; }
+        .ctrl-search i { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:rgba(255,255,255,0.5); font-size:13px; pointer-events:none; }
+        .ctrl-search input { width:100%; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:#fff; font-family:"Inter",sans-serif; font-size:13px; padding:9px 14px 9px 34px; border-radius:8px; outline:none; transition:background .2s,border-color .2s; }
+        .ctrl-search input::placeholder { color:rgba(255,255,255,0.45); }
+        .ctrl-search input:focus { background:rgba(255,255,255,0.18); border-color:rgba(255,255,255,0.4); }
+
+        .ctrl-btn { display:inline-flex; align-items:center; gap:6px; padding:9px 16px; border-radius:8px; font-family:"Inter",sans-serif; font-size:13px; font-weight:600; cursor:pointer; border:none; transition:all .18s ease; white-space:nowrap; text-decoration:none; }
+        .ctrl-btn-outline { background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25); color:#fff; }
+        .ctrl-btn-outline:hover { background:rgba(255,255,255,0.2); }
+        .ctrl-btn-print { background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:#fff; }
+        .ctrl-btn-print:hover { background:rgba(255,255,255,0.25); }
+        .ctrl-btn-logout { background:#dc2626; color:#fff; }
+        .ctrl-btn-logout:hover { background:#b91c1c; }
+
+        /* INFO STRIP */
+        .info-strip { background:var(--white); border-bottom:1px solid var(--gray-200); padding:10px 32px; display:flex; align-items:center; gap:20px; font-size:13px; color:var(--gray-500); flex-wrap:wrap; }
+        .info-strip .count { display:flex; align-items:center; gap:6px; font-weight:600; color:var(--gray-700); }
+        .info-strip .count i { color:var(--green-light); }
+        .info-strip .readonly { display:flex; align-items:center; gap:8px; }
+        .info-strip .readonly::before { content:""; display:inline-block; width:8px; height:8px; border-radius:50%; background:#3b82f6; flex-shrink:0; }
+        .info-strip .student-info { margin-left:auto; font-weight:600; color:#374151; display:flex; align-items:center; gap:5px; }
+        .info-strip .student-info i { color:var(--green-light); }
+
+        /* MAIN */
+        .main-content { max-width:1100px; margin:0 auto; padding:32px 20px 60px; }
+
+        /* DATE GROUP */
+        .date-group { margin-bottom:32px; }
+        .date-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+        .date-badge { display:inline-flex; align-items:center; gap:8px; background:var(--green-dark); color:#fff; font-size:13px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; padding:7px 16px; border-radius:8px; }
+        .date-badge i { opacity:0.75; font-size:12px; }
+        .date-count { font-size:12px; color:var(--gray-400); font-weight:500; }
+
+        /* CARDS */
+        .cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; }
+        .exam-card { background:var(--white); border:1px solid var(--gray-200); border-radius:12px; padding:20px 20px 18px; transition:box-shadow .2s,transform .15s; position:relative; }
+        .exam-card:hover { box-shadow:0 6px 24px rgba(62,90,46,0.12); transform:translateY(-1px); }
+        .confirmed-badge { position:absolute; top:16px; right:16px; display:flex; align-items:center; gap:4px; font-size:10px; font-weight:700; color:var(--confirmed); letter-spacing:0.04em; }
+        .confirmed-badge i { font-size:10px; }
+        .card-subject { font-size:16px; font-weight:800; color:var(--gray-900); letter-spacing:-0.01em; margin-bottom:10px; padding-right:100px; }
+        .badges-row { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+        .badge { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:4px; font-size:10.5px; font-weight:700; letter-spacing:0.02em; text-transform:uppercase; }
+        .badge-section { background:#dbeafe; color:#1e40af; }
+        .badge-major { background:#dcfce7; color:#15803d; }
+        .badge-minor { background:#fef9c3; color:#92400e; }
+        .card-meta { display:flex; flex-direction:column; gap:7px; }
+        .meta-row { display:flex; align-items:center; gap:9px; font-size:13px; color:var(--gray-700); }
+        .meta-row i { width:16px; text-align:center; color:var(--green-light); font-size:13px; flex-shrink:0; }
+        .meta-row .meta-label { font-weight:500; }
+        .meta-row .meta-sub { font-size:11px; color:var(--gray-400); font-weight:500; margin-left:4px; }
+
+        /* EMPTY */
+        .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:72px 24px; background:var(--white); border:1px solid var(--gray-200); border-radius:16px; text-align:center; color:var(--gray-500); }
+        .empty-state .empty-icon { width:72px; height:72px; border-radius:50%; background:var(--gray-100); display:flex; align-items:center; justify-content:center; font-size:28px; color:var(--gray-400); margin-bottom:20px; }
+        .empty-state h3 { font-size:18px; font-weight:700; color:var(--gray-700); margin-bottom:8px; }
+        .empty-state p { font-size:14px; max-width:360px; line-height:1.6; }
+
+        /* FOOTER */
+        .page-footer { text-align:center; padding:24px; font-size:12px; color:var(--gray-400); line-height:1.7; border-top:1px solid var(--gray-200); background:var(--white); }
+        .page-footer strong { color:var(--gray-500); font-weight:600; }
+
+        
+        /* PRINT */
         @media print {
-            .no-print { display:none !important; }
-            body { background: white; }
+            .hero, .controls-bar, .ctrl-btn-logout, .info-strip, .main-content, .page-footer, #studentPwModal { display:none !important; }
+            body { background:#fff; margin: 0; padding: 0; font-family: "Inter", sans-serif; }
+            .print-container { display: block !important; width: 100%; max-width: 100%; padding: 20px; }
+        }
+        @media screen {
+            .print-container { display: none !important; }
+        }
+
+        /* Print Table Styles */
+        .print-header { text-align: center; margin-bottom: 30px; }
+        .print-logo-section { display: flex; align-items: center; justify-content: flex-start; margin-bottom: 20px; border-bottom: 2px solid #668054; padding-bottom: 15px; }
+        .print-logo-section i { font-size: 40px; color: #668054; margin-right: 15px; }
+        .print-univ-info h2 { margin: 0; font-size: 22px; font-weight: 700; color: #111; }
+        .print-univ-info p { margin: 2px 0 0; font-size: 12px; color: #555; }
+        
+        .print-title-section h1 { font-size: 24px; font-weight: 800; color: #668054; margin: 0 0 5px; text-transform: uppercase; }
+        .print-title-section p { margin: 3px 0; font-size: 14px; font-weight: 600; color: #333; }
+        
+        .print-table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+        .print-table th, .print-table td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        .print-table th { background-color: #668054 !important; color: white !important; font-weight: 600; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .print-table td { color: #333; }
+        .print-table tbody tr:nth-child(even) { background-color: #f9f9f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .print-table .text-left { text-align: left; }
+
+        /* RESPONSIVE */
+        @media (max-width:600px) {
+            .hero { padding:36px 16px 32px; }
+            .info-strip { padding:10px 16px; }
+            .main-content { padding:20px 12px 48px; }
+            .cards-grid { grid-template-columns:1fr; }
+            .info-strip .student-info { margin-left:0; }
         }
     </style>
 </head>
-<body class="min-h-screen">
+<body>
 
-<!-- Hero Header -->
-<header class="bg-gradient-to-br from-[#3d6b4f] to-[#668054] text-white shadow-2xl no-print">
-    <div class="max-w-5xl mx-auto px-6 py-10 text-center">
-        <p class="text-white/70 text-xs uppercase tracking-[0.25em] font-semibold mb-2">City College of Angeles</p>
-        <h1 class="text-4xl font-extrabold mb-2">Exam Timetable</h1>
-        <p class="text-white/80 text-sm">Official schedule of examinations — Academic Year 2025–2026</p>
 
-        <div class="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3 flex-wrap">
-            <!-- Live Search -->
-            <div class="relative w-full max-w-xs">
-                <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-white/50 text-sm"></i>
-                <input type="text" id="search-input"
-                       placeholder="Search subject, room, proctor…"
-                       class="w-full pl-10 pr-4 py-3 rounded-xl bg-white/15 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:bg-white/25 transition text-sm font-medium">
+<!-- PRINT CONTAINER -->
+<div class="print-container">
+    <div class="print-header">
+        <div class="print-logo-section">
+            <i class="fa-solid fa-graduation-cap"></i>
+            <div class="print-univ-info text-left">
+                <h2>City College of Angeles</h2>
+                <p>Arayat Blvd, Angeles, Pampanga, 2009</p>
+                <p>info@cca.edu.ph</p>
             </div>
-            <!-- Section Text Search -->
-            <div class="relative w-full max-w-[160px]">
-                <i class="fas fa-layer-group absolute left-3 top-1/2 -translate-y-1/2 text-white/50 text-sm"></i>
-                <input type="text" id="section-search"
-                       placeholder="Section e.g. BSIT-2A"
-                       class="w-full pl-9 pr-3 py-3 rounded-xl bg-white/15 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:bg-white/25 transition text-sm font-medium uppercase">
-            </div>
-            <!-- Section Dropdown Filter -->
-            <div class="relative">
-                <i class="fas fa-users absolute left-3 top-1/2 -translate-y-1/2 text-white/50 text-sm"></i>
-                <select id="section-filter"
-                    class="pl-9 pr-4 py-3 rounded-xl bg-white/15 border border-white/20 text-white focus:outline-none focus:bg-white/25 transition text-sm font-medium appearance-none cursor-pointer">
-                    <option value="">All Sections</option>
-                    {% set sections = [] %}
-                    {% for _, exams in grouped %}
-                        {% for e in exams %}
-                            {% if e.section and e.section not in sections %}
-                                {% set _ = sections.append(e.section) %}
-                                <option value="{{ e.section }}">{{ e.section }}</option>
-                            {% endif %}
-                        {% endfor %}
-                    {% endfor %}
-                </select>
-            </div>
-            <button onclick="window.print()"
-                class="flex items-center gap-2 px-5 py-3 rounded-xl bg-white/15 border border-white/20 hover:bg-white/25 transition text-sm font-semibold whitespace-nowrap">
-                <i class="fas fa-print"></i> Print
-            </button>
-            <a href="/logout"
-                class="flex items-center gap-2 px-5 py-3 rounded-xl bg-red-500/70 hover:bg-red-600/80 transition text-sm font-semibold whitespace-nowrap">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
         </div>
+        <div class="print-title-section">
+            <h1>EXAM SCHEDULE</h1>
+            <p>{{ exam_term }} Examination</p>
+            <p>{{ exam_semester }}, School Year: 2025-2026</p>
+        </div>
+    </div>
+    
+    <div style="margin-bottom: 15px; font-size: 14px; display: flex; justify-content: space-between;">
+        <div><strong>Student:</strong> {{ full_name }}</div>
+        <div><strong>Section:</strong> {{ section }}</div>
+    </div>
+
+    <table class="print-table">
+        <thead>
+            <tr>
+                <th rowspan="2">Subject</th>
+                <th rowspan="2">Date</th>
+                <th colspan="2">Time</th>
+                <th rowspan="2">Location</th>
+                <th rowspan="2">Duration</th>
+            </tr>
+            <tr>
+                <th>Start Time</th>
+                <th>End Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if grouped %}
+                {% for date_str, exams in grouped %}
+                    {% for exam in exams %}
+                    <tr>
+                        <td class="text-left"><strong>{{ exam.subject_name }}</strong></td>
+                        <td>{{ date_str.split(', ', 1)[1] }}</td>
+                        <td>{{ exam.time }}</td>
+                        <td>{{ exam.time_end }}</td>
+                        <td>{{ exam.room_name or 'TBA' }}</td>
+                        <td>{% if exam.duration_minutes == 60 %}1 Hour{% elif exam.duration_minutes == 120 %}2 Hours{% elif exam.duration_minutes == 90 %}1.5 Hours{% else %}{{ exam.duration_minutes }} min{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="6" style="padding: 20px;">No exams scheduled.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<header class="hero">
+
+    <p class="hero-eyebrow">City College of Angeles</p>
+    <h1>Exam Timetable</h1>
+    <p class="hero-sub">Official schedule of examinations &mdash; Academic Year 2025&ndash;2026</p>
+
+    <div class="controls-bar">
+        <div class="ctrl-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="searchInput" placeholder="Search subject, room, proctor..." oninput="filterExams()" autocomplete="off">
+        </div>
+        <button class="ctrl-btn ctrl-btn-print" onclick="window.print()">
+            <i class="fa-solid fa-print"></i> Print
+        </button>
+        {% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
+        <button class="ctrl-btn ctrl-btn-outline" onclick="openStudentPwModal()">
+            <i class="fa-solid fa-key"></i> Change Password
+        </button>
+        <a href="/logout" class="ctrl-btn ctrl-btn-logout">
+            <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </a>
+        {% endif %}
+
     </div>
 </header>
 
-<!-- Summary Strip -->
-<div class="no-print bg-white border-b border-gray-200 shadow-sm">
-    <div class="max-w-5xl mx-auto px-6 py-4 flex items-center gap-6 text-sm flex-wrap">
-        <div class="flex items-center gap-2 text-gray-600">
-            <i class="fas fa-calendar-check text-[#3d6b4f]"></i>
-            <span><strong class="text-gray-900">{{ total }}</strong> scheduled exam{{ 's' if total != 1 else '' }}</span>
+{% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
+<!-- Change Password Modal -->
+<div id="studentPwModal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.55); align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:16px; width:100%; max-width:420px; margin:20px; box-shadow:0 20px 60px rgba(0,0,0,0.3); overflow:hidden;">
+        <div style="background:var(--green-dark); padding:20px 24px; display:flex; align-items:center; gap:12px;">
+            <i class="fa-solid fa-key" style="color:#fff; font-size:20px;"></i>
+            <h3 style="color:#fff; font-size:17px; font-weight:700; margin:0;">Change My Password</h3>
         </div>
-        <div class="flex items-center gap-2 text-gray-600">
-            <i class="fas fa-info-circle text-blue-400"></i>
-            <span>View-only — contact admin for changes</span>
-        </div>
-        <div class="ml-auto text-gray-400 text-xs font-mono" id="live-count"></div>
+        <form action="/change_my_password" method="POST" style="padding:24px;" onsubmit="return validateStudentPw(this)">
+            <input type="hidden" name="redirect_to" value="student_timetable">
+            <p style="font-size:13px; color:var(--gray-500); margin-bottom:16px;">Choose a strong password for your account.</p>
+            <div style="margin-bottom:14px;">
+                <label style="display:block; font-size:13px; font-weight:600; color:var(--gray-700); margin-bottom:6px;">New Password</label>
+                <input type="password" name="new_password" required minlength="6"
+                       style="width:100%; padding:10px 12px; border:1px solid var(--gray-200); border-radius:8px; font-size:14px; outline:none; box-sizing:border-box;"
+                       placeholder="At least 6 characters">
+            </div>
+            <div style="margin-bottom:20px;">
+                <label style="display:block; font-size:13px; font-weight:600; color:var(--gray-700); margin-bottom:6px;">Confirm Password</label>
+                <input type="password" name="confirm_password" required minlength="6"
+                       style="width:100%; padding:10px 12px; border:1px solid var(--gray-200); border-radius:8px; font-size:14px; outline:none; box-sizing:border-box;"
+                       placeholder="Repeat new password">
+            </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button type="button" onclick="closeStudentPwModal()"
+                        style="padding:9px 18px; border:1px solid var(--gray-200); border-radius:8px; font-size:13px; font-weight:600; background:#fff; color:var(--gray-700); cursor:pointer;">Cancel</button>
+                <button type="submit"
+                        style="padding:9px 18px; border:none; border-radius:8px; font-size:13px; font-weight:600; background:var(--green-dark); color:#fff; cursor:pointer;">
+                    <i class="fa-solid fa-floppy-disk" style="margin-right:6px;"></i>Save Password
+                </button>
+            </div>
+        </form>
     </div>
 </div>
+{% endif %}
 
-<!-- Main Content -->
-<main class="max-w-5xl mx-auto px-6 py-8 no-scrollbar" id="timetable-body">
+<div class="info-strip">
+    <span class="count">
+        <i class="fa-solid fa-calendar-check"></i>
+        <span id="visibleCount">{{ total }}</span> scheduled exam{{ 's' if total != 1 else '' }}
+    </span>
+    <span class="readonly">View-only &mdash; contact admin for changes</span>
+    {% if section %}
+    <span class="student-info">
+        <i class="fa-solid fa-user-graduate"></i>
+        {{ full_name }} &nbsp;&middot;&nbsp; {{ section }}
+    </span>
+    {% endif %}
+</div>
+
+<main class="main-content" id="examContainer">
 
     {% if grouped %}
-        {% for date_label, exams in grouped %}
-        <div class="fade-up d{{ loop.index % 3 + 1 }} mb-8 date-group">
-
-            <!-- Date Header -->
-            <div class="flex items-center gap-3 mb-3">
-                <div class="bg-[#3d6b4f] text-white rounded-lg px-4 py-2 text-xs font-black uppercase tracking-wider shadow-sm">
-                    <i class="fas fa-calendar-day mr-1"></i>{{ date_label }}
+        {% for date_str, exams in grouped %}
+        <div class="date-group" data-date="{{ date_str }}">
+            <div class="date-header">
+                <div class="date-badge">
+                    <i class="fa-regular fa-calendar"></i>
+                    {{ date_str | upper }}
                 </div>
-                <div class="h-px flex-1 bg-gray-200"></div>
-                <span class="text-xs text-gray-400 font-medium">{{ exams|length }} exam{{ 's' if exams|length != 1 else '' }}</span>
+                <span class="date-count">{{ exams | length }} exam{{ 's' if exams | length != 1 else '' }}</span>
             </div>
-
-            <!-- Exam Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 exam-cards">
+            <div class="cards-grid">
                 {% for exam in exams %}
-                <div class="exam-card bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md hover:border-[#668054]/30 transition-all duration-200"
-                     data-section="{{ exam.section | upper if exam.section else '' }}">
+                <div class="exam-card"
+                     data-subject="{{ exam.subject_name | lower }}"
+                     data-section="{{ exam.section | lower }}"
+                     data-room="{{ (exam.room_name or '') | lower }}"
+                     data-proctor="{{ (exam.proctor_name or '') | lower }}">
 
-                    <!-- Subject + Status -->
-                    <div class="flex items-start justify-between gap-2 mb-1">
-                        <h3 class="font-extrabold text-gray-900 text-base leading-snug subject-name">
-                            {{ exam.subject_name }}
-                        </h3>
-                        <span class="shrink-0 bg-green-100 text-green-700 border border-green-200 text-[10px] font-black uppercase px-2 py-0.5 rounded-full">
-                            ✓ Confirmed
+                    <span class="confirmed-badge">
+                        <i class="fa-solid fa-check-circle"></i> CONFIRMED
+                    </span>
+
+                    <div class="card-subject">{{ exam.subject_name }}</div>
+
+                    <div class="badges-row">
+                        {% if exam.section %}
+                        <span class="badge badge-section"><i class="fa-solid fa-tag"></i> {{ exam.section }}</span>
+                        {% endif %}
+                        {% if exam.subject_code %}
+                        <span class="badge badge-section">{{ exam.subject_code }}</span>
+                        {% endif %}
+                        <span class="badge {% if exam.subject_type == 'Major' %}badge-major{% else %}badge-minor{% endif %}">
+                            <i class="fa-solid fa-bookmark"></i> {{ exam.subject_type | upper }} SUBJECT
                         </span>
                     </div>
 
-                    <!-- Section Badge -->
-                    {% if exam.section %}
-                    <span class="inline-block mb-1 bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black uppercase px-2 py-0.5 rounded section-tag">
-                        <i class="fas fa-users mr-1 text-indigo-400"></i>{{ exam.section }}
-                    </span>
-                    {% else %}
-                    <div class="mb-1"></div>
-                    {% endif %}
-
-                    <!-- Major/Minor Badge -->
-                    {% if exam.subject_type == 'Major' %}
-                    <span class="inline-block mb-3 bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-black uppercase px-2 py-0.5 rounded">
-                        📘 Major Subject
-                    </span>
-                    {% else %}
-                    <span class="inline-block mb-3 bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-black uppercase px-2 py-0.5 rounded">
-                        📗 Minor Subject
-                    </span>
-                    {% endif %}
-
-                    <!-- Details -->
-                    <div class="space-y-2 text-sm">
-                        <div class="flex items-center gap-2 text-gray-600">
-                            <i class="fas fa-clock w-4 text-[#3d6b4f] text-xs"></i>
-                            <span class="font-mono font-semibold">
-                                {% set dt = exam.exam_date_time %}
-                                {% if dt %}{{ dt.strftime('%I:%M %p') }}{% endif %}
-                            </span>
-                            <span class="text-gray-400 text-xs">·</span>
-                            <span class="text-gray-500 text-xs">{{ exam.duration_minutes }} min</span>
+                    <div class="card-meta">
+                        <div class="meta-row">
+                            <i class="fa-regular fa-clock"></i>
+                            <span class="meta-label">{{ exam.time }}<span class="meta-sub">{{ exam.duration_minutes }} min</span></span>
                         </div>
-                        <div class="flex items-center gap-2 text-gray-600">
-                            <i class="fas fa-map-marker-alt w-4 text-[#3d6b4f] text-xs"></i>
-                            <span class="font-semibold room-name">{{ exam.room_name if exam.room_name else 'TBD' }}</span>
+                        <div class="meta-row">
+                            <i class="fa-solid fa-location-dot"></i>
+                            <span class="meta-label">{{ exam.room_name or '&mdash;' }}{% if exam.building %}<span class="meta-sub">{{ exam.building }}{% if exam.floor %}, Floor {{ exam.floor }}{% endif %}</span>{% endif %}</span>
                         </div>
-                        <div class="flex items-center gap-2 text-gray-600">
-                            <i class="fas fa-user-tie w-4 text-[#3d6b4f] text-xs"></i>
-                            <span class="proctor-name">{{ exam.proctor_name if exam.proctor_name else 'TBD' }}</span>
-                            {% if exam.department %}
-                            <span class="text-gray-400 text-xs">· {{ exam.department }}</span>
-                            {% endif %}
+                        <div class="meta-row">
+                            <i class="fa-solid fa-user-tie"></i>
+                            <span class="meta-label">{{ exam.proctor_name or '&mdash;' }}{% if exam.institute_code %}<span class="meta-sub">{{ exam.institute_code }}</span>{% endif %}</span>
                         </div>
                     </div>
+
                 </div>
                 {% endfor %}
             </div>
         </div>
         {% endfor %}
-
     {% else %}
-        <div class="fade-up d1 mt-10 bg-white rounded-2xl border border-dashed border-gray-200 p-20 text-center">
-            <div class="text-7xl mb-5">📅</div>
-            <h2 class="text-2xl font-bold text-gray-600 mb-2">No Exams Scheduled Yet</h2>
-            <p class="text-gray-400">The exam schedule has not been generated yet.<br>Please check back soon.</p>
+        {% if not section %}
+        <div class="empty-state">
+            <div class="empty-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
+            <h3>No Section Assigned</h3>
+            <p>Your account does not have a section configured. Please contact your administrator or institute to have your section updated in the system.</p>
         </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon"><i class="fa-solid fa-calendar-xmark"></i></div>
+            <h3>No Exams Scheduled Yet</h3>
+            <p>There are currently no examinations scheduled for section <strong>{{ section }}</strong>. Check back later or contact your institute.</p>
+        </div>
+        {% endif %}
     {% endif %}
 
-    <!-- No-results message (shown by JS when search finds nothing) -->
-    <div id="no-results" class="hidden mt-10 text-center py-16">
-        <div class="text-5xl mb-4">🔍</div>
-        <p class="text-gray-500 font-semibold">No exams match your search.</p>
+    <div class="empty-state" id="noResults" style="display:none;">
+        <div class="empty-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+        <h3>No Results Found</h3>
+        <p>No exams match your search. Try a different subject name, room, or proctor.</p>
     </div>
 
 </main>
 
-<!-- Footer -->
-<footer class="mt-12 pb-8 text-center text-xs text-gray-400 no-print">
-    <p class="font-semibold text-gray-500">City College of Angeles · Exam Management System</p>
-    <p class="mt-1">This timetable is for information purposes only. Room assignments may change. Please confirm with your department.</p>
+<footer class="page-footer">
+    <strong>City College of Angeles &mdash; Exam Management System</strong><br>
+    This timetable is for information purposes only. Room assignments may change. Please confirm with your institute.
 </footer>
 
 <script>
-function filterExams() {
-    const q           = (document.getElementById('search-input').value  || '').toLowerCase().trim();
-    const sectionDrop = (document.getElementById('section-filter').value || '').toUpperCase().trim();
-    const sectionText = (document.getElementById('section-search').value || '').toUpperCase().trim();
+    function filterExams() {
+        const search = document.getElementById('searchInput').value.toLowerCase().trim();
+        const groups = document.querySelectorAll('.date-group');
+        let totalVisible = 0;
 
-    let visibleCount = 0;
+        groups.forEach(group => {
+            const cards = group.querySelectorAll('.exam-card');
+            let groupVisible = 0;
+            cards.forEach(card => {
+                const combined = card.dataset.subject + ' ' + card.dataset.room + ' ' + card.dataset.proctor;
+                if (!search || combined.includes(search)) {
+                    card.style.display = '';
+                    groupVisible++;
+                    totalVisible++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+            group.style.display = groupVisible > 0 ? '' : 'none';
+        });
 
-    document.querySelectorAll('.exam-card').forEach(card => {
-        const subject = card.querySelector('.subject-name')?.textContent?.toLowerCase()  || '';
-        const room    = card.querySelector('.room-name')?.textContent?.toLowerCase()     || '';
-        const proctor = card.querySelector('.proctor-name')?.textContent?.toLowerCase()  || '';
-        // Always trim cardSec to avoid invisible-space mismatches
-        const cardSec = (card.dataset.section || '').toUpperCase().trim();
-        const text    = subject + ' ' + room + ' ' + proctor + ' ' + cardSec.toLowerCase();
-
-        const matchesSearch = !q || text.includes(q);
-
-        // Priority: dropdown (exact) → text box (partial contains) → show all
-        let matchesSection;
-        if (sectionDrop) {
-            matchesSection = cardSec === sectionDrop;
-        } else if (sectionText) {
-            matchesSection = cardSec.includes(sectionText);
-        } else {
-            matchesSection = true;
-        }
-
-        if (matchesSearch && matchesSection) {
-            card.style.display = '';
-            visibleCount++;
-        } else {
-            card.style.display = 'none';
-        }
-    });
-
-    // Hide date-group headers with no visible cards
-    document.querySelectorAll('.date-group').forEach(group => {
-        const hasVisible = [...group.querySelectorAll('.exam-card')]
-            .some(c => c.style.display !== 'none');
-        group.style.display = hasVisible ? '' : 'none';
-    });
-
-    // No-results banner
-    const hasFilter = q || sectionDrop || sectionText;
-    document.getElementById('no-results').classList.toggle('hidden', visibleCount > 0 || !hasFilter);
-
-    // Live result count badge
-    const liveCount = document.getElementById('live-count');
-    if (liveCount) {
-        liveCount.textContent = hasFilter
-            ? `${visibleCount} result${visibleCount !== 1 ? 's' : ''}`
-            : '';
+        document.getElementById('visibleCount').textContent = totalVisible;
+        document.getElementById('noResults').style.display =
+            (totalVisible === 0 && search) ? 'flex' : 'none';
     }
-}
 
-// Dropdown → clear text box, then filter
-document.getElementById('section-filter').addEventListener('change', () => {
-    document.getElementById('section-search').value = '';
-    filterExams();
-});
-
-// Text box → reset dropdown to "All Sections", then filter
-document.getElementById('section-search').addEventListener('input', () => {
-    document.getElementById('section-filter').value = '';
-    filterExams();
-});
-
-// Main search → just filter
-document.getElementById('search-input').addEventListener('input', filterExams);
+    function openStudentPwModal() {
+        const m = document.getElementById('studentPwModal');
+        m.style.display = 'flex';
+    }
+    function closeStudentPwModal() {
+        const m = document.getElementById('studentPwModal');
+        m.style.display = 'none';
+        m.querySelector('form').reset();
+    }
+    function validateStudentPw(form) {
+        const pw = form.querySelector('[name=new_password]').value;
+        const cf = form.querySelector('[name=confirm_password]').value;
+        if (pw !== cf) { alert('Passwords do not match.'); return false; }
+        if (pw.length < 6) { alert('Password must be at least 6 characters.'); return false; }
+        return true;
+    }
+    // Close modal on backdrop click
+    document.getElementById('studentPwModal').addEventListener('click', function(e) {
+        if (e.target === this) closeStudentPwModal();
+    });
 </script>
+
 </body>
 </html>

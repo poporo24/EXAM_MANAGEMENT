@@ -1,0 +1,4 @@
+name,email,institute_code,building,is_pwd,subjects_taught
+Juan Dela Cruz,juan.delacruz@cca.edu.ph,ICSLIS,Main Building,0,IT 2|Database
+Maria Clara,maria.clara@cca.edu.ph,IEAS,Annex Building,0,History 1|Ethics
+Jose Rizal,jose.rizal@cca.edu.ph,IBM,Main Building,1,Business Math

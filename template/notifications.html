@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Notifications - CCA Exam Management System">
+    <title>Notifications</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar-transition { transition: width 0.3s ease; }
+        .content-transition { transition: margin-left 0.3s ease; }
+    </style>
+</head>
+<body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
+
+    <!-- Sidebar (Dynamic based on Role) -->
+    <aside id="sidebar" class="bg-white border-r border-gray-200 fixed h-full w-64 sidebar-transition z-20 flex flex-col">
+        <div class="h-16 flex items-center justify-between px-4 border-b border-gray-200">
+            <div class="flex items-center gap-3 overflow-hidden whitespace-nowrap">
+                <i class="fa-solid fa-graduation-cap text-2xl text-[#668054]"></i>
+                <span class="font-bold text-lg nav-text">CCA Exams</span>
+            </div>
+            <button onclick="toggleSidebar()" class="text-gray-500 hover:text-[#668054] focus:outline-none">
+                <i class="fa-solid fa-bars text-xl"></i>
+            </button>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+            {% set role = session.get('role') %}
+            
+            {% if role == 'admin' or role == 'super_admin' %}
+                <a href="/dashboard" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                    <i class="fa-solid fa-chart-line w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Dashboard</span>
+                </a>
+                <a href="/schedule" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                    <i class="fa-solid fa-calendar-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Schedule</span>
+                </a>
+            {% elif role == 'proctor' %}
+                <a href="/proctor" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                    <i class="fa-solid fa-clipboard-list w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">My Exams</span>
+                </a>
+            {% elif role == 'student' %}
+                <a href="/timetable" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                    <i class="fa-solid fa-calendar-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">My Schedule</span>
+                </a>
+            {% elif role == 'secretary' %}
+                <a href="/secretary" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                    <i class="fa-solid fa-inbox w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Exam Collection</span>
+                </a>
+            {% endif %}
+
+            <a href="/notifications" class="flex items-center px-4 py-3 bg-green-50 text-[#668054] border-r-4 border-[#668054] group" title="Notifications">
+                <i class="fa-solid fa-bell w-6 text-center text-lg relative">
+                    {% if unread_count and unread_count > 0 %}
+                    <span class="absolute top-0 right-0 -mt-1 -mr-1 flex h-2 w-2" id="sidebar-bell-badge">
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                    {% endif %}
+                </i>
+                <span class="ml-3 nav-text font-medium">Notifications</span>
+            </a>
+        </nav>
+
+        <div class="border-t border-gray-200 p-4">
+            <div class="flex items-center mb-4 overflow-hidden whitespace-nowrap">
+                <div class="w-8 h-8 rounded-full bg-[#829c74] text-white flex items-center justify-center font-bold">U</div>
+                <div class="ml-3 nav-text">
+                    <p class="text-sm font-medium text-gray-900">{{ role|title }}</p>
+                </div>
+            </div>
+            <a href="/logout" class="flex items-center text-gray-600 hover:text-red-600 group w-full">
+                <i class="fa-solid fa-sign-out-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Logout</span>
+            </a>
+        </div>
+    </aside>
+
+    <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
+        <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
+            <h1 class="text-xl font-semibold text-gray-800">Your Notifications</h1>
+            {% if unread_count and unread_count > 0 %}
+            <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-bold" id="header-unread-badge">{{ unread_count }} New</span>
+            {% endif %}
+        </header>
+
+        <div class="p-8 max-w-4xl mx-auto">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="mb-6">
+                        {% for category, message in messages %}
+                            <div class="p-4 rounded-md shadow-sm mb-2 {% if category == 'error' %}bg-red-50 text-red-700 border-l-4 border-red-500{% else %}bg-green-50 text-green-700 border-l-4 border-[#668054]{% endif %}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-lg font-semibold text-gray-800">Recent Activity</h2>
+                {% if notifications and notifications|length > 0 %}
+                <form action="/notifications/mark_all_read" method="POST">
+                    <button type="submit" class="text-sm font-medium text-[#668054] hover:text-[#829c74]">
+                        <i class="fa-solid fa-check-double mr-1"></i> Mark All as Read
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+
+            <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                {% if notifications and notifications|length > 0 %}
+                    <div class="divide-y divide-gray-100">
+                        {% for notif in notifications %}
+                        <div id="notif-{{ notif.id }}" onclick="markRead('{{ notif.id }}')" class="p-4 sm:px-6 hover:bg-gray-50 cursor-pointer transition-colors {% if not notif.is_read %}bg-blue-50/30{% endif %} flex items-start">
+                            <div class="flex-shrink-0 mt-1 mr-4">
+                                {% if not notif.is_read %}
+                                    <div class="h-2.5 w-2.5 rounded-full bg-blue-500" id="dot-{{ notif.id }}"></div>
+                                {% else %}
+                                    <div class="h-2.5 w-2.5 rounded-full bg-gray-300"></div>
+                                {% endif %}
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium text-gray-900 {% if not notif.is_read %}font-bold{% endif %}">{{ notif.title }}</p>
+                                <p class="text-sm text-gray-500 mt-1">{{ notif.message }}</p>
+                                <p class="text-xs text-gray-400 mt-2">{{ notif.created_at }}</p>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="p-12 text-center flex flex-col items-center">
+                        <div class="h-16 w-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                            <i class="fa-regular fa-bell-slash text-2xl text-gray-400"></i>
+                        </div>
+                        <h3 class="text-lg font-medium text-gray-900">No notifications yet</h3>
+                        <p class="text-sm text-gray-500 mt-1">When there's activity on your account, it will show up here.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('main-content');
+            sidebar.classList.toggle('w-64');
+            sidebar.classList.toggle('w-16');
+            mainContent.classList.toggle('ml-64');
+            mainContent.classList.toggle('ml-16');
+            
+            const isCollapsed = sidebar.classList.contains('w-16');
+            localStorage.setItem('sidebarCollapsed', isCollapsed);
+            
+            sidebar.querySelectorAll('.nav-text').forEach(el => {
+                if (isCollapsed) el.classList.add('hidden');
+                else el.classList.remove('hidden');
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                const sidebar = document.getElementById('sidebar');
+                const mainContent = document.getElementById('main-content');
+                sidebar.classList.remove('w-64');
+                sidebar.classList.add('w-16');
+                mainContent.classList.remove('ml-64');
+                mainContent.classList.add('ml-16');
+                sidebar.querySelectorAll('.nav-text').forEach(el => el.classList.add('hidden'));
+            }
+        });
+
+        function markRead(id) {
+            const dot = document.getElementById('dot-' + id);
+            const container = document.getElementById('notif-' + id);
+            
+            // Only fire if it's currently unread visually
+            if (dot && dot.classList.contains('bg-blue-500')) {
+                fetch('/notifications/mark_read/' + id, {
+                    method: 'POST'
+                }).then(response => {
+                    if (response.ok) {
+                        // Update UI
+                        dot.classList.remove('bg-blue-500');
+                        dot.classList.add('bg-gray-300');
+                        container.classList.remove('bg-blue-50/30');
+                        container.querySelector('.font-medium').classList.remove('font-bold');
+                        
+                        // Let page reload logic handle badge count update in header if necessary
+                        // or we could decrement a client-side counter here, but this is simpler
+                    }
+                }).catch(err => console.error("Error marking read:", err));
+            }
+        }
+    </script>
+</body>
+</html>

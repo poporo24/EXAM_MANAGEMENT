@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Faculty Management - CCA Exam Management System">
+    <title>Faculty Management - Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar-transition { transition: width 0.3s ease; }
+        .content-transition { transition: margin-left 0.3s ease; }
+    </style>
+</head>
+<body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="bg-white border-r border-gray-200 fixed h-full w-64 sidebar-transition z-20 flex flex-col">
+        <div class="h-16 flex items-center justify-between px-4 border-b border-gray-200">
+            <div class="flex items-center gap-3 overflow-hidden whitespace-nowrap">
+                <i class="fa-solid fa-graduation-cap text-2xl text-[#668054]"></i>
+                <span class="font-bold text-lg nav-text">CCA Exams</span>
+            </div>
+            <button onclick="toggleSidebar()" class="text-gray-500 hover:text-[#668054] focus:outline-none">
+                <i class="fa-solid fa-bars text-xl"></i>
+            </button>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+            <a href="/dashboard" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-chart-line w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Dashboard</span>
+            </a>
+            <a href="/schedule" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-calendar-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Schedule</span>
+            </a>
+            <a href="/dashboard#exams" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-file-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Exams</span>
+            </a>
+            <a href="/dashboard#rooms" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-door-open w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Rooms</span>
+            </a>
+            <a href="/faculty" class="flex items-center px-4 py-3 bg-green-50 text-[#668054] border-r-4 border-[#668054] group" title="Instructors">
+                <i class="fa-solid fa-chalkboard-teacher w-6 text-center text-lg"></i>
+                <span class="ml-3 nav-text font-medium">Instructors</span>
+            </a>
+            <a href="/subjects" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-book w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Subjects</span>
+            </a>
+            <a href="/institutes" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-building w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Institutes</span>
+            </a>
+            <a href="/reports" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-chart-pie w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Reports</span>
+            </a>
+            <a href="/settings" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-cog w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Settings</span>
+            </a>
+        </nav>
+
+        <div class="border-t border-gray-200 p-4">
+            <div class="flex items-center mb-4 overflow-hidden whitespace-nowrap">
+                <div class="w-8 h-8 rounded-full bg-[#829c74] text-white flex items-center justify-center font-bold">A</div>
+                <div class="ml-3 nav-text">
+                    <p class="text-sm font-medium text-gray-900">Admin User</p>
+                    <p class="text-xs text-gray-500">Administrator</p>
+                </div>
+            </div>
+            <a href="/logout" class="flex items-center text-gray-600 hover:text-red-600 group w-full">
+                <i class="fa-solid fa-sign-out-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Logout</span>
+            </a>
+        </div>
+    </aside>
+
+    <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
+        <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
+            <h1 class="text-xl font-semibold text-gray-800">Faculty Management</h1>
+            <div class="flex items-center gap-4">
+                <a href="/notifications" class="text-gray-500 hover:text-[#668054] relative">
+                    <i class="fa-regular fa-bell text-xl"></i>
+                    {% if unread_count and unread_count > 0 %}
+                    <span class="absolute top-0 right-0 -mt-1 -mr-1 flex h-3 w-3">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </span>
+                    {% endif %}
+                </a>
+            </div>
+        </header>
+
+        <div class="p-8">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="mb-6">
+                        {% for category, message in messages %}
+                            <div class="p-4 rounded-md shadow-sm mb-2 {% if category == 'error' %}bg-red-50 text-red-700 border-l-4 border-red-500{% else %}bg-green-50 text-green-700 border-l-4 border-[#668054]{% endif %} flex justify-between items-center">
+                                <span>{{ message }}</span>
+                                <button onclick="this.parentElement.remove()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-times"></i></button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <!-- Stats Row -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                {% set total_fac = instructors|length if instructors else 0 %}
+                {% set active_fac = instructors|selectattr("status", "equalto", "Active")|list|length if instructors else 0 %}
+                {% set inactive_fac = total_fac - active_fac %}
+                {% set total_hrs = period_summary|map(attribute='total_hours')|sum if period_summary else 0 %}
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center">
+                    <div class="p-3 rounded-lg bg-blue-50 text-blue-600 mr-4">
+                        <i class="fa-solid fa-users text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Total Faculty</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ total_fac }}</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center">
+                    <div class="p-3 rounded-lg bg-green-50 text-green-600 mr-4">
+                        <i class="fa-solid fa-user-check text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Active</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ active_fac }}</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center">
+                    <div class="p-3 rounded-lg bg-gray-50 text-gray-600 mr-4">
+                        <i class="fa-solid fa-user-minus text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Inactive</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ inactive_fac }}</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center">
+                    <div class="p-3 rounded-lg bg-purple-50 text-purple-600 mr-4">
+                        <i class="fa-solid fa-clock text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Total Proctor Hours</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ total_hrs }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Faculty Table -->
+            <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden mb-8">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex flex-wrap gap-2 justify-between items-center">
+                    <h2 class="font-semibold text-gray-800">Faculty Members</h2>
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <!-- Import CSV → opens modal -->
+                        <button type="button" onclick="openFacultyImportModal()" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            <i class="fa-solid fa-file-csv mr-2 text-[#668054]"></i> Import CSV
+                        </button>
+                        <button onclick="openModal('addInstructorModal')" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#668054] hover:bg-[#829c74]">
+                            <i class="fa-solid fa-plus mr-2"></i> Add Instructor
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Bulk delete form wraps table -->
+                <form id="facultyBulkForm" action="/faculty/bulk_delete" method="POST">
+
+                <!-- Bulk action toolbar -->
+                <div id="facultyBulkToolbar" class="hidden px-6 py-3 bg-red-50 border-b border-red-200 flex items-center justify-between">
+                    <span class="text-sm font-semibold text-red-700">
+                        <i class="fa-solid fa-circle-check mr-1"></i>
+                        <span id="facultyBulkCount">0</span> instructor(s) selected
+                    </span>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="clearFacultySelection()" class="text-sm text-gray-600 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-100">Clear</button>
+                        <button type="submit"
+                            onclick="return confirm('Delete the selected instructors? This cannot be undone.')"
+                            class="inline-flex items-center gap-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md px-4 py-1.5 transition-colors">
+                            <i class="fa-solid fa-trash"></i> Delete Selected
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="pl-6 pr-2 py-3 w-10">
+                                    <input type="checkbox" id="facultySelectAll" onchange="toggleFacultyAll(this)"
+                                        class="h-4 w-4 text-[#668054] border-gray-300 rounded cursor-pointer" title="Select all">
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name &amp; Dept</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username (Email)</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subjects Taught</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% if instructors %}
+                                {% for ins in instructors %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="pl-6 pr-2 py-4 w-10">
+                                        <input type="checkbox" name="instructor_ids" value="{{ ins.id }}"
+                                            class="faculty-row-checkbox h-4 w-4 text-[#668054] border-gray-300 rounded cursor-pointer"
+                                            onchange="updateFacultyToolbar()">
+                                    </td>
+                                    <td class="px-4 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900">
+                                            {{ ins.name }} {% if ins.is_pwd %}<i class="fa-solid fa-wheelchair text-blue-500 text-xs ml-1" title="PWD"></i>{% endif %}
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-mono text-gray-600 bg-gray-50 px-2 py-1 rounded inline-block">
+                                            {{ ins.proctor_email or 'N/A' }}
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900">{{ ins.institute_name }}</div>
+                                        <div class="text-sm text-gray-500">{{ ins.building }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        {% if ins.status == 'Active' %}
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+                                        {% else %}
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {{ ins.total_hours|default(0) }} hrs
+                                    </td>
+                                    <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title="{{ ins.subjects_taught }}">
+                                        {{ ins.subjects_taught|default('-') }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <a href="/admin/proctor_availability/{{ ins.id }}" class="text-[#668054] hover:text-[#829c74] mr-3" title="Manage Availability"><i class="fa-solid fa-calendar-alt"></i></a>
+                                        <button type="button" onclick="openEditInstructorModal('{{ ins.id }}', '{{ ins.name|escape }}', '{{ ins.institute_id }}', '{{ ins.building|escape }}', '{{ ins.is_pwd }}', '{{ ins.subjects_taught|escape|default('') }}')" class="text-blue-600 hover:text-blue-900 mr-3"><i class="fa-solid fa-edit"></i></button>
+                                        {% if ins.status == 'Active' %}
+                                        <form action="/faculty/{{ ins.id }}/deactivate" method="POST" class="inline-block">
+                                            <button type="submit" class="text-yellow-600 hover:text-yellow-900 mr-3" title="Deactivate"><i class="fa-solid fa-ban"></i></button>
+                                        </form>
+                                        {% else %}
+                                        <form action="/faculty/{{ ins.id }}/activate" method="POST" class="inline-block">
+                                            <button type="submit" class="text-green-600 hover:text-green-900 mr-3" title="Activate"><i class="fa-solid fa-check-circle"></i></button>
+                                        </form>
+                                        {% endif %}
+                                        <a href="/delete_instructor/{{ ins.id }}" onclick="return confirm('Delete this instructor?')" class="text-red-600 hover:text-red-900"><i class="fa-solid fa-trash"></i></a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr><td colspan="8" class="px-6 py-10 text-center text-gray-500">No instructors found.</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+                </form><!-- end facultyBulkForm -->
+            </div>
+
+            <!-- Reliever Management -->
+            {% if relievers is defined %}
+            <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                    <h2 class="font-semibold text-gray-800">Reliever Management</h2>
+                    <button onclick="openModal('addRelieverModal')" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#829c74] hover:bg-[#668054]">
+                        <i class="fa-solid fa-user-plus mr-2"></i> Assign Reliever
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exam Details</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reliever Assigned</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned At</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% if relievers %}
+                                {% for reliever in relievers %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900">{{ reliever.exam_subject }} ({{ reliever.exam_section }})</div>
+                                        <div class="text-sm text-gray-500">{{ reliever.exam_date }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ reliever.instructor_name }}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title="{{ reliever.reason }}">{{ reliever.reason }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ reliever.assigned_at }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <a href="/relievers/remove/{{ reliever.id }}" onclick="return confirm('Remove this reliever?')" class="text-red-600 hover:text-red-900"><i class="fa-solid fa-trash"></i></a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr><td colspan="5" class="px-6 py-10 text-center text-gray-500">No relievers assigned.</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+    </main>
+
+    <!-- Add Instructor Modal -->
+    <div id="addInstructorModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal('addInstructorModal')"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Add New Instructor</h3>
+                    <form action="/add_instructor" method="POST" id="addInstructorForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Full Name</label>
+                            <input type="text" name="name" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Institute</label>
+                            <select name="institute_id" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                                {% for inst in institutes %}
+                                <option value="{{ inst.id }}">{{ inst.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Building</label>
+                            <input type="text" name="building" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox" name="is_pwd" value="true" class="h-4 w-4 text-[#668054] border-gray-300 rounded">
+                            <label class="ml-2 block text-sm text-gray-900">Is PWD?</label>
+                        </div>
+                    </form>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="submit" form="addInstructorForm" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-[#668054] text-white hover:bg-[#829c74] sm:ml-3 sm:w-auto sm:text-sm">Save</button>
+                    <button type="button" onclick="closeModal('addInstructorModal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Instructor Modal -->
+    <div id="editInstructorModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal('editInstructorModal')"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Edit Instructor</h3>
+                    <form id="editInstructorForm" method="POST" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Full Name</label>
+                            <input type="text" name="name" id="edit_inst_name" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Institute</label>
+                            <select name="institute_id" id="edit_inst_institute" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                                {% for inst in institutes %}
+                                <option value="{{ inst.id }}">{{ inst.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Building</label>
+                            <input type="text" name="building" id="edit_inst_building" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Subjects Taught (Optional)</label>
+                            <textarea name="subjects_taught" id="edit_inst_subjects" rows="2" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2" placeholder="e.g. CS101, IT202"></textarea>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox" name="is_pwd" id="edit_inst_pwd" value="true" class="h-4 w-4 text-[#668054] border-gray-300 rounded">
+                            <label class="ml-2 block text-sm text-gray-900">Is PWD?</label>
+                        </div>
+                    </form>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="submit" form="editInstructorForm" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-[#668054] text-white hover:bg-[#829c74] sm:ml-3 sm:w-auto sm:text-sm">Update</button>
+                    <button type="button" onclick="closeModal('editInstructorModal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Reliever Modal -->
+    {% if relievers is defined %}
+    <div id="addRelieverModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal('addRelieverModal')"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Assign Reliever</h3>
+                    <form action="/relievers/add" method="POST" id="addRelieverForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Select Exam</label>
+                            <select name="exam_id" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                                <option value="">Select...</option>
+                                {% if exams %}
+                                    {% for ex in exams %}
+                                    <option value="{{ ex.id }}">{{ ex.subject_name }} - {{ ex.section }} ({{ ex.datetime }})</option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Select Reliever (Instructor)</label>
+                            <select name="instructor_id" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                                <option value="">Select...</option>
+                                {% for ins in instructors %}
+                                    {% if ins.status == 'Active' %}
+                                    <option value="{{ ins.id }}">{{ ins.name }} ({{ ins.institute_name }})</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Reason</label>
+                            <textarea name="reason" rows="3" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2" placeholder="e.g. Original proctor is absent due to sickness"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="submit" form="addRelieverForm" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-[#668054] text-white hover:bg-[#829c74] sm:ml-3 sm:w-auto sm:text-sm">Assign</button>
+                    <button type="button" onclick="closeModal('addRelieverModal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('main-content');
+            sidebar.classList.toggle('w-64');
+            sidebar.classList.toggle('w-16');
+            mainContent.classList.toggle('ml-64');
+            mainContent.classList.toggle('ml-16');
+            
+            const isCollapsed = sidebar.classList.contains('w-16');
+            localStorage.setItem('sidebarCollapsed', isCollapsed);
+            
+            sidebar.querySelectorAll('.nav-text').forEach(el => {
+                if (isCollapsed) el.classList.add('hidden');
+                else el.classList.remove('hidden');
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                const sidebar = document.getElementById('sidebar');
+                const mainContent = document.getElementById('main-content');
+                sidebar.classList.remove('w-64');
+                sidebar.classList.add('w-16');
+                mainContent.classList.remove('ml-64');
+                mainContent.classList.add('ml-16');
+                sidebar.querySelectorAll('.nav-text').forEach(el => el.classList.add('hidden'));
+            }
+        });
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function openEditInstructorModal(id, name, inst_id, building, is_pwd, subjects) {
+            document.getElementById('editInstructorForm').action = '/faculty/' + id + '/edit';
+            document.getElementById('edit_inst_name').value = name;
+            document.getElementById('edit_inst_institute').value = inst_id;
+            document.getElementById('edit_inst_building').value = building !== 'None' ? building : '';
+            document.getElementById('edit_inst_subjects').value = subjects !== 'None' ? subjects : '';
+            document.getElementById('edit_inst_pwd').checked = is_pwd === 'True' || is_pwd === 'true' || is_pwd === true;
+            openModal('editInstructorModal');
+        }
+
+        /* ── Faculty bulk delete ─────────────────────── */
+        function updateFacultyToolbar() {
+            const checked = document.querySelectorAll('.faculty-row-checkbox:checked');
+            const total   = document.querySelectorAll('.faculty-row-checkbox').length;
+            const toolbar = document.getElementById('facultyBulkToolbar');
+            const countEl = document.getElementById('facultyBulkCount');
+            const master  = document.getElementById('facultySelectAll');
+            countEl.textContent = checked.length;
+            toolbar.classList.toggle('hidden', checked.length === 0);
+            master.indeterminate = checked.length > 0 && checked.length < total;
+            master.checked = checked.length === total && total > 0;
+        }
+
+        function toggleFacultyAll(masterCb) {
+            document.querySelectorAll('.faculty-row-checkbox').forEach(cb => {
+                cb.checked = masterCb.checked;
+            });
+            updateFacultyToolbar();
+        }
+
+        function clearFacultySelection() {
+            document.querySelectorAll('.faculty-row-checkbox').forEach(cb => { cb.checked = false; });
+            document.getElementById('facultySelectAll').checked = false;
+            updateFacultyToolbar();
+        }
+
+        function openFacultyImportModal() {
+            document.getElementById('importFacultyModal').classList.remove('hidden');
+        }
+        function closeFacultyImportModal() {
+            document.getElementById('importFacultyModal').classList.add('hidden');
+        }
+    </script>
+
+    <!-- ── Import Faculty Modal ──────────────────────────────────────────── -->
+    <div id="importFacultyModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="closeFacultyImportModal()"></div>
+            <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg p-6 z-10">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Import Instructors via CSV</h3>
+                    <button onclick="closeFacultyImportModal()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                </div>
+
+                <!-- Column reference -->
+                <div class="mb-4">
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Required Columns</p>
+                    <table class="w-full text-xs border border-gray-200 rounded-lg overflow-hidden">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-600">Column</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-600">Type</th>
+                                <th class="px-3 py-2 text-left font-semibold text-gray-600">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">name</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">Required. Full name</td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">email</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">Optional. Login username</td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">institute_code</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">e.g. <em>IBM</em>, <em>IEAS</em></td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">building</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">Home building</td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">is_pwd</code></td><td class="px-3 py-1.5 text-gray-500">0 / 1</td><td class="px-3 py-1.5 text-gray-400">1 = PWD instructor</td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">subjects_taught</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">Pipe-separated: <em>Math|Physics</em></td></tr>
+                        </tbody>
+                    </table>
+                    <p class="text-xs text-gray-400 mt-2"><span class="font-medium text-gray-500">Sample row:</span> <code class="bg-gray-100 px-1 rounded">Juan Dela Cruz,juan@cca.edu.ph,ICSLIS,Main Building,0,IT 2|Database</code></p>
+                </div>
+
+                <!-- Upload form -->
+                <form action="/import/instructors" method="POST" enctype="multipart/form-data" class="space-y-3">
+                    <input type="file" name="csv_file" accept=".csv" required
+                        class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-[#668054] hover:file:bg-green-100 border border-gray-200 rounded-lg p-2">
+                    <button type="submit" class="w-full py-2.5 text-sm font-semibold text-white bg-[#668054] hover:bg-[#4e7038] rounded-lg transition-colors">
+                        <i class="fa-solid fa-upload mr-2"></i> Upload &amp; Import
+                    </button>
+                </form>
+
+                <!-- Download links -->
+                <div class="mt-4 pt-4 border-t border-gray-100 flex justify-center gap-6 text-xs">
+                    <a href="/static/template_instructors.csv" class="text-[#668054] hover:underline"><i class="fa-solid fa-download mr-1"></i> Template CSV</a>
+                    <a href="/static/sample_instructors.csv" class="text-blue-500 hover:underline"><i class="fa-solid fa-file-csv mr-1"></i> Sample Data CSV</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

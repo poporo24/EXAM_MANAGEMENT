@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCA Exam Management System — Live Demonstration Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .step-active { border-color: #668054; background-color: #f4f7f2; }
+        .tab-btn.active { border-bottom: 3px solid #668054; color: #668054; font-weight: 700; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen">
+
+    <!-- Header Navigation -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-[#668054] text-white flex items-center justify-center font-bold text-xl shadow-sm">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-gray-900 leading-tight">CCA Exam Management System</h1>
+                    <p class="text-xs text-gray-500 font-medium">Official Demonstration Portal & Presentation Deck</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="http://127.0.0.1:9999" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-[#668054] hover:bg-[#526842] text-white text-sm font-semibold rounded-lg shadow transition">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Live App
+                </a>
+                <button onclick="window.print()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                    <i class="fa-solid fa-print mr-1"></i> Print / PDF
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <div class="bg-white border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-6 flex space-x-8">
+            <button onclick="showTab('scenario-tab')" id="btn-scenario-tab" class="tab-btn active py-4 text-sm font-medium transition">
+                <i class="fa-solid fa-list-check mr-2"></i> 8-Stage Demo Script
+            </button>
+            <button onclick="showTab('credentials-tab')" id="btn-credentials-tab" class="tab-btn py-4 text-sm font-medium text-gray-500 hover:text-gray-700 transition">
+                <i class="fa-solid fa-key mr-2"></i> Demo Accounts Matrix
+            </button>
+            <button onclick="showTab('subject-aliasing-tab')" id="btn-subject-aliasing-tab" class="tab-btn py-4 text-sm font-medium text-gray-500 hover:text-gray-700 transition">
+                <i class="fa-solid fa-object-group mr-2 text-green-600"></i> Subject Aliasing Feature Showcase
+            </button>
+            <button onclick="showTab('architecture-tab')" id="btn-architecture-tab" class="tab-btn py-4 text-sm font-medium text-gray-500 hover:text-gray-700 transition">
+                <i class="fa-solid fa-diagram-project mr-2"></i> System Architecture & Workflows
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content Container -->
+    <main class="max-w-7xl mx-auto px-6 py-8">
+
+        <!-- TAB 1: 8-Stage Demo Script -->
+        <section id="scenario-tab" class="tab-content space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-900">Step-by-Step Live Demonstration Script</h2>
+                        <p class="text-sm text-gray-500">Structured walkthrough designed for faculty, academic deans, and evaluation panels.</p>
+                    </div>
+                    <span class="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">8 Demonstration Stages</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+                    <!-- Stage 1 -->
+                    <div class="p-5 border rounded-xl bg-white hover:border-[#668054] transition shadow-sm flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold px-2 py-0.5 bg-[#668054] text-white rounded">Stage 1</span>
+                                <i class="fa-solid fa-gauge text-gray-400"></i>
+                            </div>
+                            <h3 class="font-bold text-gray-900 text-sm mb-1">Admin Dashboard & KPIs</h3>
+                            <p class="text-xs text-gray-600">Log in as Administrator. Show real-time KPI tiles, conflict counters, and department metrics.</p>
+                        </div>
+                        <a href="http://127.0.0.1:9999/dashboard" target="_blank" class="mt-4 text-xs text-[#668054] font-semibold hover:underline flex items-center gap-1">
+                            Go to Dashboard <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </a>
+                    </div>
+
+                    <!-- Stage 2 -->
+                    <div class="p-5 border-2 border-green-600 rounded-xl bg-green-50/40 transition shadow-sm flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold px-2 py-0.5 bg-green-700 text-white rounded">Stage 2 (Showcase)</span>
+                                <i class="fa-solid fa-object-group text-green-600"></i>
+                            </div>
+                            <h3 class="font-bold text-gray-900 text-sm mb-1">Cross-Institute Subject Aliasing</h3>
+                            <p class="text-xs text-gray-600">Show how Major in ICSLIS (IT201) & Minor in IBM (BUS105) link into one exam slot with Unlink controls.</p>
+                        </div>
+                        <a href="http://127.0.0.1:9999/subjects" target="_blank" class="mt-4 text-xs text-[#668054] font-semibold hover:underline flex items-center gap-1">
+                            Showcase Subjects <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </a>
+                    </div>
+
+                    <!-- Stage 3 -->
+                    <div class="p-5 border rounded-xl bg-white hover:border-[#668054] transition shadow-sm flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold px-2 py-0.5 bg-[#668054] text-white rounded">Stage 3</span>
+                                <i class="fa-solid fa-bolt text-gray-400"></i>
+                            </div>
+                            <h3 class="font-bold text-gray-900 text-sm mb-1">AI Automated Scheduler</h3>
+                            <p class="text-xs text-gray-600">Trigger Auto-Scheduler. Solves room capacities, max 2 majors/day, PWD rooms, and 15-min travel buffers.</p>
+                        </div>
+                        <a href="http://127.0.0.1:9999/schedule" target="_blank" class="mt-4 text-xs text-[#668054] font-semibold hover:underline flex items-center gap-1">
+                            Open Schedule <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </a>
+                    </div>
+
+                    <!-- Stage 4 -->
+                    <div class="p-5 border rounded-xl bg-white hover:border-[#668054] transition shadow-sm flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold px-2 py-0.5 bg-[#668054] text-white rounded">Stage 4</span>
+                                <i class="fa-solid fa-triangle-exclamation text-gray-400"></i>
+                            </div>
+                            <h3 class="font-bold text-gray-900 text-sm mb-1">Conflict Prevention Engine</h3>
+                            <p class="text-xs text-gray-600">Manually edit a slot to test double-booking. System instantly detects clash and enforces integrity.</p>
+                        </div>
+                        <a href="http://127.0.0.1:9999/schedule" target="_blank" class="mt-4 text-xs text-[#668054] font-semibold hover:underline flex items-center gap-1">
+                            Test Conflict <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </a>
+                    </div>
+
+                    <!-- Stage 5 -->
+                    <div class="p-5 border rounded-xl bg-white hover:border-[#668054] transition shadow-sm flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold px-2 py-0.5 bg-[#668054] text-white rounded">Stage 5</span>
+                                <i class="fa-solid fa-user-check text-gray-400"></i>
+                            </div>
+                            <h3 class="font-bold text-gray-900 text-sm mb-1">Proctor Availability Portal</h3>
+                            <p class="text-xs text-gray-600">Log in as Proctor. Submit available hours, check assigned rooms, and view balanced duty hours.</p>
+                        </div>
+                        <a href="http://127.0.0.1:9999/proctor/dashboard" target="_blank" class="mt-4 text-xs text-[#668054] font-semibold hover:underline flex items-center gap-1">
+                            Proctor Dashboard <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </a>
+                    </div>
+
+                    <!-- Stage 6 -->
+                    <div class="p-5 border rounded-xl bg-white hover:border-[#668054] transition shadow-sm flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold px-2 py-0.5 bg-[#668054] text-white rounded">Stage 6</span>
+                                <i class="fa-solid fa-folder-open text-gray-400"></i>
+                            </div>
+                            <h3 class="font-bold text-gray-900 text-sm mb-1">Secretary Exam Custody</h3>
+                            <p class="text-xs text-gray-600">Log in as Secretary. Real-time paper distribution tracking: Pending, Collected, and Returned.</p>
+                        </div>
+                        <a href="http://127.0.0.1:9999/secretary" target="_blank" class="mt-4 text-xs text-[#668054] font-semibold hover:underline flex items-center gap-1">
+                            Secretary View <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </a>
+                    </div>
+
+                    <!-- Stage 7 -->
+                    <div class="p-5 border rounded-xl bg-white hover:border-[#668054] transition shadow-sm flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold px-2 py-0.5 bg-[#668054] text-white rounded">Stage 7</span>
+                                <i class="fa-solid fa-calendar-day text-gray-400"></i>
+                            </div>
+                            <h3 class="font-bold text-gray-900 text-sm mb-1">Student Timetable</h3>
+                            <p class="text-xs text-gray-600">Log in as Student. Personalized filtered schedule with room numbers, dates, and print-ready card.</p>
+                        </div>
+                        <a href="http://127.0.0.1:9999/student/timetable" target="_blank" class="mt-4 text-xs text-[#668054] font-semibold hover:underline flex items-center gap-1">
+                            Student Timetable <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </a>
+                    </div>
+
+                    <!-- Stage 8 -->
+                    <div class="p-5 border rounded-xl bg-white hover:border-[#668054] transition shadow-sm flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold px-2 py-0.5 bg-[#668054] text-white rounded">Stage 8</span>
+                                <i class="fa-solid fa-file-excel text-gray-400"></i>
+                            </div>
+                            <h3 class="font-bold text-gray-900 text-sm mb-1">Analytics & CSV Export</h3>
+                            <p class="text-xs text-gray-600">Generate proctor workload balance charts, room utilization audit, and 1-click CSV report export.</p>
+                        </div>
+                        <a href="http://127.0.0.1:9999/reports" target="_blank" class="mt-4 text-xs text-[#668054] font-semibold hover:underline flex items-center gap-1">
+                            View Reports <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: Demo Accounts Matrix -->
+        <section id="credentials-tab" class="tab-content hidden space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 class="text-xl font-bold text-gray-900 mb-2">Demonstration Account Credentials</h2>
+                <p class="text-sm text-gray-500 mb-6">Use these accounts during the live demonstration to show different role perspectives.</p>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-600">Role</th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-600">Name</th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-600">Login Email</th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-600">Department / Institute</th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-600">Key Features to Demo</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 font-semibold text-purple-700 bg-purple-50 rounded">Super Admin</td>
+                                <td class="px-4 py-3 font-medium">CCA Super Admin</td>
+                                <td class="px-4 py-3 font-mono text-xs text-gray-800">superadmin@cca.edu.ph</td>
+                                <td class="px-4 py-3 text-gray-600">College-Wide</td>
+                                <td class="px-4 py-3 text-xs text-gray-500">System settings, user roles, SMTP mail config</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 font-semibold text-green-700 bg-green-50 rounded">Admin</td>
+                                <td class="px-4 py-3 font-medium">CCA Admin</td>
+                                <td class="px-4 py-3 font-mono text-xs text-gray-800">admin@cca.edu.ph</td>
+                                <td class="px-4 py-3 text-gray-600">College-Wide</td>
+                                <td class="px-4 py-3 text-xs text-gray-500">Auto-Scheduler, Subject Aliasing, Manual Conflict Edit</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 font-semibold text-blue-700 bg-blue-50 rounded">Proctor</td>
+                                <td class="px-4 py-3 font-medium">Kurt Salonga</td>
+                                <td class="px-4 py-3 font-mono text-xs text-gray-800">kurt.salonga@cca.edu.ph</td>
+                                <td class="px-4 py-3 text-gray-600">ICSLIS</td>
+                                <td class="px-4 py-3 text-xs text-gray-500">Availability setter, assigned room schedule</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 font-semibold text-amber-700 bg-amber-50 rounded">Secretary</td>
+                                <td class="px-4 py-3 font-medium">CCA Secretary</td>
+                                <td class="px-4 py-3 font-mono text-xs text-gray-800">secretary@cca.edu.ph</td>
+                                <td class="px-4 py-3 text-gray-600">All Institutes</td>
+                                <td class="px-4 py-3 text-xs text-gray-500">Paper collection & return tracking status</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 font-semibold text-indigo-700 bg-indigo-50 rounded">Student</td>
+                                <td class="px-4 py-3 font-medium">Jergie Toti</td>
+                                <td class="px-4 py-3 font-mono text-xs text-gray-800">jergietoti@gmail.com</td>
+                                <td class="px-4 py-3 text-gray-600">ICSLIS (Section C101)</td>
+                                <td class="px-4 py-3 text-xs text-gray-500">Personalized exam timetable, room locator</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: Subject Aliasing Showcase -->
+        <section id="subject-aliasing-tab" class="tab-content hidden space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-900">Feature Spotlight: Cross-Institute Subject Aliasing</h2>
+                        <p class="text-sm text-gray-500">Solving the major vs. minor cross-college examination problem.</p>
+                    </div>
+                    <span class="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">New Implementation</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 my-6">
+                    <div class="p-5 border-l-4 border-blue-500 bg-blue-50/40 rounded-r-xl">
+                        <span class="text-xs font-bold text-blue-700 uppercase">Institute 1: ICSLIS</span>
+                        <h3 class="font-bold text-gray-900 mt-1">Information Technology 2</h3>
+                        <p class="text-xs text-gray-600 mt-1 font-mono">Code: IT201</p>
+                        <span class="inline-block mt-3 px-2 py-0.5 bg-blue-100 text-blue-800 font-bold text-xs rounded">Major Subject</span>
+                    </div>
+
+                    <div class="p-5 border-l-4 border-amber-500 bg-amber-50/40 rounded-r-xl">
+                        <span class="text-xs font-bold text-amber-700 uppercase">Institute 2: IBM</span>
+                        <h3 class="font-bold text-gray-900 mt-1">IT for Business Management</h3>
+                        <p class="text-xs text-gray-600 mt-1 font-mono">Code: BUS105</p>
+                        <span class="inline-block mt-3 px-2 py-0.5 bg-amber-100 text-amber-800 font-bold text-xs rounded">Minor Subject</span>
+                    </div>
+
+                    <div class="p-5 border-l-4 border-emerald-500 bg-emerald-50/40 rounded-r-xl">
+                        <span class="text-xs font-bold text-emerald-700 uppercase">Institute 3: IEAS — Institute of Education, Arts and Sciences</span>
+                        <h3 class="font-bold text-gray-900 mt-1">Computing & Informatics</h3>
+                        <p class="text-xs text-gray-600 mt-1 font-mono">Code: ENG200</p>
+                        <span class="inline-block mt-3 px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-xs rounded">Minor Subject</span>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 border border-gray-200 rounded-xl p-5">
+                    <h4 class="font-bold text-gray-900 text-sm mb-2"><i class="fa-solid fa-check-circle text-green-600 mr-2"></i>How the System Handles This:</h4>
+                    <ul class="text-xs text-gray-600 space-y-2 list-disc list-inside">
+                        <li><strong>Single Unified Content Group:</strong> Grouped under <code>content_group_id #1</code>.</li>
+                        <li><strong>Slot Synchronization:</strong> The auto-scheduler treats all three exams as one unified group, locking them to the exact same timeslot.</li>
+                        <li><strong>Workload Constraint Preservation:</strong> For ICSLIS students it counts towards the <em>Max 2 Majors/Day</em> rule; for IBM/IEAS students it does not trigger the major limit.</li>
+                        <li><strong>Unlink Flexibility:</strong> Individual subjects can be unlinked at any time via the one-click Unlink button.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: System Architecture -->
+        <section id="architecture-tab" class="tab-content hidden space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 class="text-xl font-bold text-gray-900 mb-2">System Architecture & Constraint Solver Flow</h2>
+                <p class="text-sm text-gray-500 mb-6">Visual diagram of the multi-constraint scheduling engine and data flow.</p>
+
+                <div class="mermaid bg-gray-50 p-6 rounded-xl border border-gray-200">
+                flowchart TD
+                    Sub[Pending Exams Pool] --> CG{Has Content Group ID?}
+                    CG -- Yes --> Grp[Bundle All Aliased Subjects in Same Slot]
+                    CG -- No --> Indiv[Standard Single Exam]
+                    Grp --> Check1[Check 1: Room Capacity & Availability]
+                    Indiv --> Check1
+                    Check1 --> Check2[Check 2: Proctor Free & Available]
+                    Check2 --> Check3[Check 3: Proctor Does NOT Teach Subject]
+                    Check3 --> Check4[Check 4: Max 2 Majors / Day / Section]
+                    Check4 --> Check5[Check 5: PWD Room Matching]
+                    Check5 --> Check6[Check 6: 15-Min Travel Buffer]
+                    Check6 --> Success[✅ Assigned to Master Schedule]
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="text-center py-6 text-xs text-gray-400">
+        CCA Exam Management System &copy; 2026. City College of Angeles. All rights reserved.
+    </footer>
+
+    <script>
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('active', 'text-[#668054]', 'font-bold');
+                el.classList.add('text-gray-500');
+            });
+            
+            document.getElementById(tabId).classList.remove('hidden');
+            const activeBtn = document.getElementById('btn-' + tabId);
+            activeBtn.classList.add('active', 'text-[#668054]', 'font-bold');
+            activeBtn.classList.remove('text-gray-500');
+        }
+    </script>
+</body>
+</html>

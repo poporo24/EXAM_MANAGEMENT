@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Management System Diagram</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: #2c3e50;
+            text-align: center;
+        }
+
+        .diagram-section {
+            margin-bottom: 50px;
+            page-break-inside: avoid;
+        }
+
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+            background: #fdfdfd;
+            border: 1px solid #eaeaea;
+            padding: 20px;
+            border-radius: 6px;
+        }
+
+        .description {
+            margin-top: 15px;
+            font-size: 0.95em;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        @media print {
+            body {
+                background: none;
+                padding: 0;
+            }
+
+            .container {
+                box-shadow: none;
+                padding: 0;
+                width: 100%;
+            }
+
+            .diagram-section {
+                page-break-inside: avoid;
+                margin-bottom: 30px;
+            }
+
+            .mermaid {
+                border: none;
+                padding: 0;
+                background: transparent;
+            }
+        }
+    </style>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>Exam Management System Diagrams</h1>
+        <p style="text-align: center; color: #7f8c8d;">Comprehensive visual documentation including DFD, ERD, and System
+            Flowcharts</p>
+        <hr style="border: 0; height: 1px; background: #eee; margin-bottom: 40px;">
+
+        <!-- ERD Section -->
+        <div class="diagram-section">
+            <h2>1. Entity-Relationship Diagram (ERD)</h2>
+            <div class="mermaid">
+                erDiagram
+                Users ||--o| Proctors : "user_id"
+                Users ||--o| Students : "user_id"
+                Course ||--o{ Students : "course"
+                Proctors ||--o{ ProctorsAvailability : "id_number"
+                ExamDateandTime ||--o{ ProctorsAvailability : "timeslot_id"
+                Course ||--o{ ExamSchedule : "course_id"
+                Rooms ||--o{ ExamSchedule : "room_id"
+                ExamDateandTime ||--o{ ExamSchedule : "timeslot_id"
+                Proctors ||--o{ ExamSchedule : "proctor_id"
+                Subject ||--o{ ExamSchedule : "subject_id"
+
+                Users {
+                int id PK
+                string last_name
+                string first_name
+                string middle_name
+                string email
+                string password
+                string role
+                }
+                Proctors {
+                int id PK
+                int user_id FK
+                string id_number
+                }
+                Students {
+                int id PK
+                int user_id FK
+                string student_id
+                string institute
+                string course FK
+                string year_level
+                }
+                ProctorsAvailability {
+                int id PK
+                string id_number
+                int timeslot_id FK
+                }
+                ExamDateandTime {
+                int id PK
+                date exam_date
+                time start_time
+                time end_time
+                }
+                ExamSchedule {
+                int id PK
+                int course_id FK
+                int room_id FK
+                int timeslot_id FK
+                int proctor_id FK
+                }
+                Course {
+                int id PK
+                string course_name
+                }
+                Rooms {
+                int id PK
+                string room_name
+                int room_capacity
+                }
+                Subject {
+                int id PK
+                string subject_name
+                }
+            </div>
+            <div class="description">
+                <strong>Description:</strong> This ERD illustrates the core database schema based on the provided
+                reference. It demonstrates how users are divided into proctors and students, and how exam schedules rely
+                on courses, rooms, subjects, proctors, and date/time slots.
+            </div>
+        </div>
+
+        <!-- DFD Section -->
+        <div class="diagram-section" style="page-break-before: always;">
+            <h2>2. Data Flow Diagram (DFD Level 0 - Context Level)</h2>
+            <div class="mermaid">
+                flowchart TD
+                Admin([Admin])
+                Proctor([Proctor])
+                Student([Student])
+                System((Exam Management System))
+
+                Admin -- "Add Rooms, Instructors, Exams\nSet Exam Period\nManual Edit Commands" --> System
+                System -- "Dashboard Stats, Conflicts\nScheduled Exams Report" --> Admin
+
+                Proctor -- "Input Availability Dates" --> System
+                System -- "Assigned Proctoring Schedule" --> Proctor
+
+                Student -- "View Timetable Request" --> System
+                System -- "Public Exam Schedule" --> Student
+            </div>
+            <div class="description">
+                <strong>Description:</strong> The Context-level DFD highlights the external entities interacting with
+                the Exam Management System. Admins configure resources and trigger scheduling. Proctors submit their
+                availability, and students retrieve the final scheduled timetable.
+            </div>
+        </div>
+
+        <!-- Flowchart Section -->
+        <div class="diagram-section" style="page-break-before: always;">
+            <h2>3. System Process Flowchart (Scheduling)</h2>
+            <div class="mermaid">
+                flowchart TD
+                Start([Start]) --> Login{Login Role?}
+
+                Login -->|Admin| Dashboard[Admin Dashboard]
+                Login -->|Proctor| ProctorDash[Proctor Dashboard]
+                Login -->|Student| StudentDash[Student Timetable]
+
+                %% Admin Path
+                Dashboard --> AddData[Add Rooms, Instructors, Pending Exams]
+                AddData --> ScheduleParam[Set Exam Period Start/End]
+                ScheduleParam --> GenerateSched[Generate Schedule via Auto-Scheduler Algorithm]
+                GenerateSched --> CheckRules{Rule Checks Passed?}
+
+                CheckRules -->|No| Fail[Flag as Unscheduled / Output Conflicts]
+                CheckRules -->|Yes| SaveSched[Save Valid Placements to DB]
+
+                SaveSched --> ManualEdit[Manual Review / Drag & Drop / Edit]
+                Fail --> ManualEdit
+                ManualEdit --> AdminEnd([End Admin Session])
+
+                %% Proctor Path
+                ProctorDash --> SetAvail[Set Availability Dates]
+                SetAvail --> ViewAssigned[View Assigned Proctoring Schedule]
+                ViewAssigned --> ProctorEnd([End Proctor Session])
+
+                %% Student Path
+                StudentDash --> ViewPublic[View Scheduled Exams]
+                ViewPublic --> StudentEnd([End Student Session])
+            </div>
+            <div class="description">
+                <strong>Description:</strong> This flowchart demonstrates the typical workflows based on the user's
+                role. It details the automated scheduling algorithm step utilized by the Admin, the availability
+                management for Proctors, and the read-only timetable view for Students.
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>

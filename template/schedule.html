@@ -3,312 +3,599 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CCA | Exam Schedule Results</title>
+    <meta name="description" content="Master Schedule Timetable - CCA Exam Management System">
+    <title>Schedule - Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
-        .sidebar-hover:hover { background-color: #728c61; color: white; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .sidebar-transition { transition: width 0.3s ease; }
+        .content-transition { transition: margin-left 0.3s ease; }
 
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(16px); }
-            to   { opacity: 1; transform: translateY(0); }
+        /* Timetable grid */
+        .timetable-wrapper {
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06);
         }
-        .animate-in { animation: slideIn .35s ease both; }
-        .delay-1 { animation-delay: .05s; }
-        .delay-2 { animation-delay: .10s; }
-        .delay-3 { animation-delay: .15s; }
+        .timetable {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 600px;
+        }
+        .timetable thead th {
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            background: #668054;
+            color: #fff;
+            font-weight: 600;
+            font-size: .75rem;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+            padding: 12px 14px;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .timetable thead th.time-col {
+            background: #4b5e3d;
+            width: 80px;
+        }
+        .timetable tbody tr:nth-child(even) td { background: #f9fafb; }
+        .timetable tbody tr:nth-child(odd)  td { background: #ffffff; }
+        .timetable tbody td {
+            border: 1px solid #e5e7eb;
+            vertical-align: top;
+            padding: 6px;
+            min-width: 160px;
+        }
+        .timetable tbody td.time-cell {
+            background: #f0f5ee !important;
+            text-align: center;
+            font-weight: 700;
+            color: #4b5e3d;
+            font-size: .78rem;
+            white-space: nowrap;
+            padding: 10px 8px;
+        }
 
-        .status-chip-scheduled  { background:#dcfce7;color:#166534;border:1px solid #bbf7d0; }
-        .status-chip-pending    { background:#fef9c3;color:#854d0e;border:1px solid #fde68a; }
-        .status-chip-unscheduled{ background:#fee2e2;color:#991b1b;border:1px solid #fecaca; }
+        /* Exam card inside timetable */
+        .exam-card {
+            background: #e8f0e4;
+            border-left: 3px solid #668054;
+            border-radius: 6px;
+            padding: 7px 9px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            transition: box-shadow .15s, transform .15s;
+        }
+        .exam-card:hover {
+            box-shadow: 0 3px 10px rgba(102,128,84,.25);
+            transform: translateY(-1px);
+        }
+        .exam-card.conflict {
+            background: #fef2f2;
+            border-left-color: #ef4444;
+        }
+        .exam-card .subject { font-weight: 600; font-size: .78rem; color: #1f2937; line-height: 1.3; }
+        .exam-card .meta    { font-size: .7rem; color: #6b7280; margin-top: 2px; }
+        .exam-card .badge   { display: inline-block; font-size: .6rem; font-weight: 700;
+                              padding: 1px 5px; border-radius: 3px; margin-top: 3px; }
+        .badge-conflict { background: #fee2e2; color: #b91c1c; }
+        .badge-conflict-room    { background: #fee2e2; color: #b91c1c; }
+        .badge-conflict-proctor { background: #fde68a; color: #92400e; }
+        .badge-conflict-section { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+        .badge-conflict-subject { background: #ede9fe; color: #5b21b6; }
+        .badge-conflict-daily   { background: #fce7f3; color: #9d174d; }
+        .badge-ok       { background: #d1fae5; color: #065f46; }
+        .badge-major    { background: #dbeafe; color: #1e40af; }
+        .badge-minor    { background: #fef3c7; color: #92400e; }
 
-        /* Modal backdrop */
-        #edit-modal-backdrop {
-            transition: opacity .2s ease;
-        }
-        /* Modal panel */
-        #edit-modal-panel {
-            transition: transform .25s ease, opacity .25s ease;
-        }
-        #edit-modal-backdrop.hidden #edit-modal-panel {
-            transform: translateY(24px); opacity: 0;
-        }
+        /* Generate form row */
+        .gen-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
 
+        
+        
         @media print {
-            aside, .no-print { display: none !important; }
-            main { margin: 0 !important; padding: 0 !important; }
+            @page { size: landscape; margin: 10mm; }
+            .timetable { table-layout: fixed; width: 100%; word-wrap: break-word; }
+            .timetable th, .timetable td { overflow-wrap: break-word; font-size: 11px; padding: 4px !important; }
+            .exam-card { font-size: 10px !important; padding: 4px !important; margin-bottom: 2px !important; }
+            .exam-card .subject { font-size: 11px !important; white-space: normal !important; line-height: 1.1; }
+            .exam-card .meta { font-size: 9px !important; white-space: normal !important; line-height: 1.1; }
+            .badge { padding: 1px 4px !important; font-size: 8px !important; }
+            
+            .no-print { display: none !important; }
+
+            body { background: white !important; margin: 0; padding: 0; font-family: "Inter", sans-serif; }
+            main { margin-left: 0 !important; padding: 0 !important; max-width: 100% !important; }
+            .timetable-wrapper { box-shadow: none; border: 1px solid #ddd; width: 100%; margin-top: 20px; }
+            .timetable-wrapper th { background-color: #668054 !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .timetable-wrapper .time-cell { background-color: #f9f9f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .timetable-wrapper td, .timetable-wrapper th { border-color: #ddd !important; }
+            
+            .print-only { display: block !important; }
+            .print-header { text-align: center; margin-bottom: 20px; padding: 20px 20px 0 20px; }
+            .print-logo-section { display: flex; align-items: center; justify-content: flex-start; margin-bottom: 15px; border-bottom: 2px solid #668054; padding-bottom: 10px; }
+            .print-logo-section i { font-size: 36px; color: #668054; margin-right: 15px; }
+            .print-univ-info h2 { margin: 0; font-size: 22px; font-weight: 700; color: #111; text-align: left; }
+            .print-univ-info p { margin: 2px 0 0; font-size: 12px; color: #555; text-align: left; }
+            .print-title-section h1 { font-size: 24px; font-weight: 800; color: #668054; margin: 0 0 5px; text-transform: uppercase; }
+            .print-title-section p { margin: 3px 0; font-size: 14px; font-weight: 600; color: #333; }
         }
+        @media screen {
+            .print-only { display: none !important; }
+        }
+
     </style>
 </head>
-<body class="flex h-screen overflow-hidden text-gray-800 bg-[#f4f7f6]">
+<body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
 
     <!-- Sidebar -->
-    <aside class="w-64 bg-[#668054] text-white flex flex-col shadow-xl z-10 shrink-0">
-        <div class="p-6 pb-2 text-center">
-            <h1 class="text-xl font-bold border-b border-white/20 pb-2 mb-1">City College of Angeles</h1>
-            <p class="text-sm text-white/80 italic">Totalis Humanae</p>
-            <div class="mt-3 py-2 px-3 bg-black/10 rounded text-xs text-left">
-                <i class="fas fa-user mr-1"></i> {{ session.get('full_name', 'Administrator') }}
+    <aside id="sidebar" class="no-print bg-white border-r border-gray-200 fixed h-full w-64 sidebar-transition z-20 flex flex-col">
+        <div class="h-16 flex items-center justify-between px-4 border-b border-gray-200">
+            <div class="flex items-center gap-3 overflow-hidden whitespace-nowrap">
+                <i class="fa-solid fa-graduation-cap text-2xl text-[#668054]"></i>
+                <span class="font-bold text-lg nav-text">CCA Exams</span>
             </div>
+            <button onclick="toggleSidebar()" class="text-gray-500 hover:text-[#668054] focus:outline-none">
+                <i class="fa-solid fa-bars text-xl"></i>
+            </button>
         </div>
-        <nav class="flex-1 mt-6 px-4 space-y-2">
-            <a href="/dashboard" class="sidebar-hover w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white/70 transition-colors">
-                <i class="fas fa-th-large w-5"></i> Dashboard
+
+        <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+            <a href="/dashboard" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group" title="Dashboard">
+                <i class="fa-solid fa-chart-line w-6 text-center text-lg"></i>
+                <span class="ml-3 nav-text font-medium">Dashboard</span>
             </a>
-            <a href="/dashboard" class="sidebar-hover w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white/70 transition-colors">
-                <i class="fas fa-calendar-alt w-5"></i> Exams
+            <a href="/schedule" class="flex items-center px-4 py-3 bg-green-50 text-[#668054] border-r-4 border-[#668054] group" title="Schedule">
+                <i class="fa-solid fa-calendar-alt w-6 text-center text-lg"></i>
+                <span class="ml-3 nav-text font-medium">Schedule</span>
             </a>
-            <a href="/dashboard" class="sidebar-hover w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white/70 transition-colors">
-                <i class="fas fa-map-marker-alt w-5"></i> Rooms
+            <a href="/dashboard#exams" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-file-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Exams</span>
             </a>
-            <a href="/dashboard" class="sidebar-hover w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white/70 transition-colors">
-                <i class="fas fa-users w-5"></i> Instructors
+            <a href="/faculty" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-chalkboard-teacher w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Faculty</span>
             </a>
-            <a href="/schedule" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-[#829c74] text-white font-semibold transition-colors">
-                <i class="fas fa-calendar-check w-5"></i> Schedule
+            <a href="/dashboard#rooms" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-door-open w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Rooms</span>
+            </a>
+            <a href="/subjects" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-book w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Subjects</span>
+            </a>
+            <a href="/institutes" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-building w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Institutes</span>
+            </a>
+            <a href="/reports" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-chart-pie w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Reports</span>
+            </a>
+            <a href="/settings" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
+                <i class="fa-solid fa-cog w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Settings</span>
             </a>
         </nav>
-        <div class="p-4 mt-auto border-t border-white/10">
-            <a href="/logout" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-red-700 transition-colors">
-                <i class="fas fa-sign-out-alt w-5"></i> Logout
+
+        <div class="border-t border-gray-200 p-4">
+            <div class="flex items-center mb-4 overflow-hidden whitespace-nowrap">
+                <div class="w-8 h-8 rounded-full bg-[#829c74] text-white flex items-center justify-center font-bold">A</div>
+                <div class="ml-3 nav-text">
+                    <p class="text-sm font-medium text-gray-900">Admin User</p>
+                    <p class="text-xs text-gray-500">Administrator</p>
+                </div>
+            </div>
+            <a href="/logout" class="flex items-center text-gray-600 hover:text-red-600 group w-full">
+                <i class="fa-solid fa-sign-out-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Logout</span>
             </a>
         </div>
     </aside>
 
     <!-- Main Content -->
-    <main class="flex-1 flex flex-col overflow-hidden">
-        <div class="flex-1 overflow-y-auto no-scrollbar p-8 max-w-6xl mx-auto w-full">
+    <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
 
-            <!-- Flash Messages -->
-            {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-            <div class="mb-6 space-y-2 no-print">
-                {% for cat, msg in messages %}
-                <div class="flex items-start gap-3 p-4 rounded-xl border
-                    {% if cat == 'success' %}bg-green-50 border-green-200 text-green-800
-                    {% elif cat == 'danger' %}bg-red-50 border-red-200 text-red-800
-                    {% elif cat == 'warning' %}bg-yellow-50 border-yellow-200 text-yellow-800
-                    {% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}
-                    text-sm font-medium animate-in">
-                    <i class="fas {% if cat == 'success' %}fa-check-circle text-green-500
-                        {% elif cat == 'danger' %}fa-times-circle text-red-500
-                        {% elif cat == 'warning' %}fa-exclamation-triangle text-yellow-500
-                        {% else %}fa-info-circle text-blue-500{% endif %} mt-0.5 shrink-0"></i>
-                    <span>{{ msg }}</span>
-                </div>
-                {% endfor %}
+        <!-- Top header -->
+        <header class="no-print bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
+            <h1 class="text-xl font-semibold text-gray-800">Master Schedule — Timetable</h1>
+            <div class="flex items-center gap-4">
+                <a href="/notifications" class="text-gray-500 hover:text-[#668054] relative">
+                    <i class="fa-regular fa-bell text-xl"></i>
+                    {% if unread_count and unread_count > 0 %}
+                    <span class="absolute top-0 right-0 -mt-1 -mr-1 flex h-3 w-3">
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </span>
+                    {% endif %}
+                </a>
             </div>
-            {% endif %}
+        </header>
+
+        <div class="p-6">
+
+            <!-- Flash messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                <div class="no-print mb-5">
+                    {% for category, message in messages %}
+                    <div class="p-4 rounded-lg shadow-sm mb-2 flex items-start gap-3
+                        {% if category == 'error' or category == 'danger' %}bg-red-50 text-red-700 border-l-4 border-red-500
+                        {% elif category == 'warning' %}bg-yellow-50 text-yellow-700 border-l-4 border-yellow-400
+                        {% else %}bg-green-50 text-green-700 border-l-4 border-[#668054]{% endif %}">
+                        <i class="fa-solid {% if category == 'error' or category == 'danger' %}fa-circle-xmark{% elif category == 'warning' %}fa-triangle-exclamation{% else %}fa-circle-check{% endif %} mt-0.5"></i>
+                        <span>{{ message }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
             {% endwith %}
 
-            <!-- Header -->
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 animate-in">
-                <div>
-                    <h1 class="text-3xl font-extrabold text-gray-900">Exam Schedule</h1>
-                    <p class="text-gray-500 text-sm mt-1">Conflict-free schedule generated by the CCA Scheduler</p>
+            <!-- Failed scheduling notification -->
+            {% if failed and failed|length > 0 %}
+            <div class="no-print mb-5 bg-orange-50 border-l-4 border-orange-400 rounded-lg p-4">
+                <div class="flex items-center justify-between cursor-pointer" onclick="toggleFailed()">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation text-orange-500"></i>
+                        <p class="font-semibold text-orange-800">{{ failed|length }} exam(s) could not be auto-scheduled</p>
+                    </div>
+                    <i id="failedChevron" class="fa-solid fa-chevron-down text-orange-500 transition-transform"></i>
                 </div>
-                <div class="flex items-center gap-3 no-print">
-                    <button onclick="window.print()"
-                        class="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-gray-300 text-gray-600 font-semibold hover:bg-gray-100 transition text-sm">
-                        <i class="fas fa-print"></i> Print
-                    </button>
-                    <!-- Re-Generate opens a date-picker modal -->
-                    <button type="button" onclick="openRegenModal()"
-                        class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition text-sm shadow">
-                        <i class="fas fa-magic"></i> Re-Generate
-                    </button>
-                    <form action="/reset_schedule" method="POST" class="m-0"
-                          onsubmit="return confirm('This will clear all scheduled dates and return every exam to Pending. Continue?')">
+                <div id="failedList" class="hidden mt-3 space-y-1">
+                    {% for f in failed %}
+                    <div class="text-sm text-orange-700 flex gap-2">
+                        <span class="font-medium">Exam #{{ f.exam_id }}:</span>
+                        <span>{{ f.reason }}</span>
+                    </div>
+                    {% endfor %}
+                    <p class="text-xs text-orange-600 mt-2">Use the "Manually Schedule" button on the unscheduled exams below to assign a time slot manually.</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Generate / Controls row -->
+            <div class="no-print bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
+                <div class="flex flex-wrap gap-4 items-end justify-between">
+                    <!-- Generate form -->
+                    <form method="POST" action="/generate_schedule" class="gen-row">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Period Start</label>
+                            <input type="date" name="period_start" required
+                                   class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Period End</label>
+                            <input type="date" name="period_end" required
+                                   class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Semester</label>
+                            <select name="exam_semester" required class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                                <option value="1st Semester">1st Semester</option>
+                                <option value="2nd Semester">2nd Semester</option>
+                                <option value="Summer">Summer</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Exam Term</label>
+                            <select name="exam_term" required class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                                <option value="Midterm">Midterm</option>
+                                <option value="Finals">Finals</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Filter Institute</label>
+                            <select id="instituteFilter" name="institute_id"
+                                    class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                                <option value="">All Institutes</option>
+                                {% for inst in institutes %}
+                                <option value="{{ inst.id }}">{{ inst.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                         <button type="submit"
-                            class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600 transition text-sm shadow">
-                            <i class="fas fa-undo"></i> Reset
+                                class="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-[#668054] text-white text-sm font-semibold hover:bg-[#4b5e3d] transition-colors shadow-sm">
+                            <i class="fa-solid fa-bolt"></i> Generate Schedule
+                        </button>
+                    </form>
+
+
+
+
+                    <!-- Action buttons -->
+                    <div class="flex gap-2 flex-wrap items-center">
+                        <form action="/admin/print_section" method="GET" target="_blank" class="flex gap-2 items-center mr-2">
+                            <select name="section" required class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none shadow-sm" title="Select Section to Print">
+                                <option value="">Select Section to Print...</option>
+                                {% for s in all_sections %}
+                                <option value="{{ s }}">{{ s }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-sm">
+                                <i class="fa-solid fa-list"></i> Print List
+                            </button>
+                        </form>
+                        
+                        <a href="/admin/batch_print_sections" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm mr-2">
+                            <i class="fa-solid fa-layer-group"></i> Batch Print Grid (All Sections)
+                        </a>
+
+                        <select onchange="window.location.href='/schedule?section=' + encodeURIComponent(this.value)"
+
+
+                                class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none shadow-sm" title="Filter by Section">
+                            <option value="">All Sections</option>
+                            {% for s in all_sections %}
+                            <option value="{{ s }}" {% if filter_section == s %}selected{% endif %}>{{ s }}</option>
+                            {% endfor %}
+                        </select>
+                        <button onclick="window.print()"
+                                class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                            <i class="fa-solid fa-print"></i> Print
+                        </button>
+                        <a href="/export/schedule.pdf"
+                           class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm">
+                            <i class="fa-solid fa-file-pdf"></i> Export PDF
+                        </a>
+                        <form id="resetScheduleForm" method="POST" action="/reset_schedule" class="inline">
+                            <button type="button" onclick="confirmResetSchedule()"
+                                    class="inline-flex items-center gap-2 px-4 py-2 border border-red-300 rounded-lg text-sm font-medium text-red-600 bg-white hover:bg-red-50 transition-colors">
+                                <i class="fa-solid fa-rotate-left"></i> Reset
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats strip -->
+            <div class="no-print grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Scheduled</p>
+                    <p class="text-2xl font-bold text-[#668054] mt-1">{{ sched_count }} <span class="text-lg text-gray-400 font-normal">/ {{ total }}</span></p>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Unscheduled</p>
+                    <p class="text-2xl font-bold {% if unscheduled|length > 0 %}text-red-500{% else %}text-gray-400{% endif %} mt-1">{{ unscheduled|length }}</p>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 {% if conflict_ids|length > 0 %}cursor-pointer hover:border-orange-300 hover:shadow-md transition-all{% endif %}"
+                     {% if conflict_ids|length > 0 %}onclick="document.getElementById('conflictSummary').scrollIntoView({behavior:'smooth'})" title="Click to view all conflicts"{% endif %}>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Conflicts</p>
+                    <p class="text-2xl font-bold {% if conflict_ids|length > 0 %}text-orange-500{% else %}text-gray-400{% endif %} mt-1">
+                        {{ conflict_ids|length }}
+                        {% if conflict_ids|length > 0 %}<span class="text-xs font-normal text-orange-400 ml-1">↓ view</span>{% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <!-- ══════ TIMETABLE GRID ══════ -->
+            {% if dates and times %}
+            
+            <div class="print-only">
+                <div class="print-header">
+                    <div class="print-logo-section">
+                        <i class="fa-solid fa-graduation-cap"></i>
+                        <div class="print-univ-info">
+                            <h2>City College of Angeles</h2>
+                            <p>Arayat Blvd, Angeles, Pampanga, 2009</p>
+                            <p>info@cca.edu.ph</p>
+                        </div>
+                    </div>
+                    <div class="print-title-section">
+                        <h1>MASTER EXAM SCHEDULE</h1>
+                        <p>{{ exam_term }} Examination</p>
+                        <p>{{ exam_semester }}, School Year: 2025-2026</p>
+                        {% if filter_section %}
+                        <p style="margin-top:5px; font-size:16px; color:#111;"><strong>Section: {{ filter_section }}</strong></p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="timetable-wrapper mb-8">
+
+                <table class="timetable">
+                    <thead>
+                        <tr>
+                            <th class="time-col"><i class="fa-regular fa-clock mr-1"></i> Time</th>
+                            {% for d in dates %}
+                            <th>{{ date_labels[d] }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in times %}
+                        <tr>
+                            <td class="time-cell">{{ t }}</td>
+                            {% for d in dates %}
+                            <td>
+                                {% set cell_exams = timetable[t][d] %}
+                                {% if cell_exams %}
+                                    {% for exam in cell_exams %}
+                                    <div class="exam-card {% if exam.id in conflict_ids %}conflict{% endif %}"
+                                         onclick="openEditScheduleModal('{{ exam.id }}','{{ exam.datetime_raw }}','{{ exam.room_id }}','{{ exam.instructor_id }}','{{ (exam.duration_minutes / 60) | round(1) }}')">
+                                        <div class="subject">{{ exam.subject_name }}</div>
+                                        <div class="meta">
+                                            <span><i class="fa-solid fa-users fa-xs mr-1"></i>{{ exam.section or '—' }}</span>
+                                        </div>
+                                        <div class="meta">
+                                            <span><i class="fa-solid fa-door-open fa-xs mr-1"></i>{{ exam.room_name or '—' }}</span>
+                                        </div>
+                                        <div class="meta">
+                                            <span><i class="fa-solid fa-user fa-xs mr-1"></i>{{ exam.instructor_name or '—' }}</span>
+                                        </div>
+                                        <div class="mt-1">
+                                            {% if exam.id in conflict_ids %}
+                                                {% set reasons = conflict_reasons.get(exam.id, []) %}
+                                                {% if 'room' in reasons %}
+                                                    <span class="badge badge-conflict-room"><i class="fa-solid fa-door-open mr-0.5"></i> Room Conflict</span>
+                                                {% endif %}
+                                                {% if 'proctor' in reasons %}
+                                                    <span class="badge badge-conflict-proctor"><i class="fa-solid fa-user-xmark mr-0.5"></i> Proctor Conflict</span>
+                                                {% endif %}
+                                                {% if 'section' in reasons %}
+                                                    <span class="badge badge-conflict-section"><i class="fa-solid fa-users mr-0.5"></i> Section Conflict</span>
+                                                {% endif %}
+                                                {% if 'subject' in reasons %}
+                                                    <span class="badge badge-conflict-subject"><i class="fa-solid fa-book mr-0.5"></i> Subject Conflict</span>
+                                                {% endif %}
+                                                {% if 'daily_major' in reasons %}
+                                                    <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;2 Major/day</span>
+                                                {% endif %}
+                                                {% if 'daily_minor' in reasons %}
+                                                    <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;3 Minor/day</span>
+                                                {% endif %}
+                                                {% if 'daily_total' in reasons %}
+                                                    <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;3 Exams/day</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="badge badge-ok"><i class="fa-solid fa-check mr-0.5"></i> OK</span>
+                                            {% endif %}
+                                            {% if exam.subject_type == 'Major' %}
+                                                <span class="badge badge-major">Major</span>
+                                            {% else %}
+                                                <span class="badge badge-minor">Minor</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                <div class="text-center text-gray-300 text-xs py-2">—</div>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-16 text-center text-gray-400 mb-8">
+                <i class="fa-regular fa-calendar-xmark text-5xl mb-4 block text-gray-300"></i>
+                <p class="text-lg font-medium text-gray-500">No scheduled exams yet</p>
+                <p class="text-sm mt-1">Set an exam period above and click <strong>Generate Schedule</strong> to auto-assign exams to time slots.</p>
+            </div>
+            {% endif %}
+
+            <!-- ══════ CONFLICTS SUMMARY ══════ -->
+            {% if conflict_ids|length > 0 %}
+            <div id="conflictSummary" class="mb-8 no-print">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-base font-bold text-orange-600 flex items-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Conflicts Detected
+                        <span class="ml-1 inline-flex items-center justify-center w-6 h-6 rounded-full bg-orange-100 text-orange-700 text-xs font-bold">{{ conflict_ids|length }}</span>
+                    </h2>
+                    <form action="{{ url_for('resolve_conflicts_route') }}" method="POST" class="inline">
+                        <input type="hidden" name="conflict_ids" value="{{ conflict_ids|join(',') }}">
+                        <button type="submit" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg shadow-sm text-sm font-semibold transition-colors flex items-center gap-2">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-Resolve Conflicts
                         </button>
                     </form>
                 </div>
-            </div>
-
-            <!-- Summary Banner -->
-            {% if sched_count is not none %}
-            <div class="animate-in delay-1 mb-6 p-5 rounded-2xl
-                {{ 'bg-green-50 border border-green-200' if sched_count == total else 'bg-yellow-50 border border-yellow-200' }}
-                flex items-center gap-4">
-                <div class="text-4xl">
-                    {{ '🎉' if sched_count == total else '⚠️' }}
-                </div>
-                <div>
-                    <p class="font-bold text-lg
-                        {{ 'text-green-800' if sched_count == total else 'text-yellow-800' }}">
-                        {% if sched_count == total %}
-                            All {{ total }} exam{{ 's' if total != 1 else '' }} scheduled successfully — zero conflicts!
-                        {% else %}
-                            {{ sched_count }} of {{ total }} exam{{ 's' if total != 1 else '' }} scheduled.
-                            {{ total - sched_count }} could not be placed automatically.
-                        {% endif %}
-                    </p>
-                    <p class="text-sm text-gray-500 mt-0.5">
-                        Same-subject exams are locked to the same date &amp; time across all sections.
-                    </p>
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Conflict Warning Banner (shown only when conflicts detected in existing data) -->
-            {% if conflict_ids %}
-            <div class="animate-in delay-1 mb-6 p-5 rounded-2xl bg-red-50 border border-red-200 flex items-start gap-4 no-print">
-                <div class="text-3xl mt-0.5">&#9888;&#65039;</div>
-                <div>
-                    <p class="font-bold text-red-800 text-base">
-                        {{ conflict_ids | length }} exam{{ 's are' if conflict_ids | length != 1 else ' is' }} flagged with scheduling conflicts
-                    </p>
-                    <p class="text-red-700 text-sm mt-1">
-                        Highlighted rows have a <strong>room double-booking</strong> (two sections in the same room at the same time)
-                        or an <strong>anti-cheat violation</strong> (same subject at different times across sections).
-                    </p>
-                    <p class="text-red-500 text-xs mt-2 font-semibold">
-                        Fix: Click <strong>Reset</strong> then <strong>Re-Generate</strong>.
-                        Ensure you have at least as many rooms as sections per subject.
-                    </p>
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Grouped Schedule by Date -->
-            {% if grouped %}
-                {% for date_label, exams in grouped %}
-                <div class="animate-in delay-2 mb-8">
-                    <div class="flex items-center gap-3 mb-3">
-                        <div class="h-px flex-1 bg-gray-200"></div>
-                        <span class="text-xs font-bold uppercase tracking-widest text-gray-500 bg-gray-100 px-4 py-1.5 rounded-full">
-                            <i class="fas fa-calendar-day mr-1 text-[#668054]"></i>{{ date_label }}
-                        </span>
-                        <div class="h-px flex-1 bg-gray-200"></div>
+                <div class="bg-white rounded-xl border border-orange-200 shadow-sm overflow-hidden">
+                    <div class="px-5 py-3 bg-orange-50 border-b border-orange-200 text-xs text-orange-700 font-medium">
+                        The following scheduled exams have conflicts. Click <strong>Edit</strong> to reassign the room, proctor, or time slot, or use <strong>Auto-Resolve</strong> to fix them automatically.
                     </div>
-
-                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                        <table class="w-full text-left text-sm">
-                            <thead class="bg-[#668054]/5 text-xs text-gray-500 uppercase font-bold tracking-wider">
-                                <tr>
-                                    <th class="p-4">Subject</th>
-                                    <th class="p-4">Section</th>
-                                    <th class="p-4">Time</th>
-                                    <th class="p-4">Duration</th>
-                                    <th class="p-4">Room</th>
-                                    <th class="p-4">Instructor</th>
-                                    <th class="p-4 text-center">Status</th>
-                                    <th class="p-4 text-center no-print">Edit</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-50">
-                                {% for exam in exams %}
-                                {% set is_conflict = exam.id in conflict_ids %}
-                                <tr class="hover:bg-[#668054]/5 transition
-                                    {% if is_conflict %}border-l-4 border-l-red-400 bg-red-50/30{% endif %}">
-                                    <td class="p-4 font-bold text-gray-800">{{ exam.subject_name }}</td>
-                                    <td class="p-4">
-                                        {% if exam.section %}
-                                        <span class="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black uppercase px-2 py-0.5 rounded">{{ exam.section }}</span>
-                                        {% else %}<span class="text-gray-300">—</span>{% endif %}
-                                    </td>
-                                    <td class="p-4 text-gray-600 font-mono">
-                                        {% set dt = exam.exam_date_time %}
-                                        {% if dt %}{{ dt.strftime('%I:%M %p') }}{% endif %}
-                                    </td>
-                                    <td class="p-4 text-gray-500">{{ exam.duration_minutes }} min</td>
-                                    <td class="p-4">
-                                        <span class="{% if is_conflict %}bg-red-100 text-red-600{% else %}bg-[#668054]/10 text-[#668054]{% endif %} font-semibold px-2.5 py-1 rounded-lg text-xs">
-                                            {{ exam.room_name if exam.room_name else '&#8212;' }}
-                                        </span>
-                                        {% if is_conflict %}
-                                        <span class="ml-1 text-red-500 text-xs font-bold">&#9888;</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="p-4 text-gray-700 font-medium">
-                                        <i class="fas fa-user-tie text-gray-300 mr-1"></i>
-                                        {{ exam.instructor_name if exam.instructor_name else '—' }}
-                                    </td>
-                                    <td class="p-4 text-center">
-                                        {% if is_conflict %}
-                                        <span class="bg-red-100 text-red-700 border border-red-200 text-[11px] font-black uppercase px-2.5 py-1 rounded-full">
-                                            &#9888; Conflict
-                                        </span>
-                                        {% else %}
-                                        <span class="status-chip-scheduled text-[11px] font-black uppercase px-2.5 py-1 rounded-full">
-                                            &#10003; Scheduled
-                                        </span>
-                                        {% endif %}
-                                    </td>
-                                    <!-- Edit button -->
-                                    <td class="p-4 text-center no-print">
-                                        <button
-                                            class="edit-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#668054]/10 text-[#668054] hover:bg-[#668054] hover:text-white font-semibold text-xs transition"
-                                            data-id="{{ exam.id }}"
-                                            data-subject="{{ exam.subject_name | e }}"
-                                            data-section="{{ exam.section or '' }}"
-                                            data-datetime="{{ exam.exam_date_time.strftime('%Y-%m-%dT%H:%M') if exam.exam_date_time else '' }}"
-                                            data-duration="{{ exam.duration_minutes }}"
-                                            data-room="{{ exam.room_id or 0 }}"
-                                            data-inst="{{ exam.instructor_id or 0 }}">
-                                            <i class="fas fa-pen-to-square"></i> Edit
-                                        </button>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                {% endfor %}
-            {% else %}
-                <div class="animate-in delay-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-16 text-center mb-8">
-                    <div class="text-6xl mb-4">📋</div>
-                    <p class="text-gray-500 font-medium">No scheduled exams yet.</p>
-                    <p class="text-gray-400 text-sm mt-1">Click <strong>Re-Generate</strong> to run the scheduler.</p>
-                </div>
-            {% endif %}
-
-            <!-- Unscheduled / Failed Exams -->
-            {% if unscheduled or failed %}
-            <div class="animate-in delay-3 mb-8">
-                <div class="flex items-center gap-3 mb-3">
-                    <div class="h-px flex-1 bg-red-100"></div>
-                    <span class="text-xs font-bold uppercase tracking-widest text-red-500 bg-red-50 px-4 py-1.5 rounded-full">
-                        <i class="fas fa-exclamation-triangle mr-1"></i> Could Not Be Scheduled
-                    </span>
-                    <div class="h-px flex-1 bg-red-100"></div>
-                </div>
-
-                <div class="bg-white rounded-2xl shadow-sm border border-red-100 overflow-hidden">
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-red-50 text-xs text-red-400 uppercase font-bold tracking-wider">
+                    <table class="min-w-full divide-y divide-gray-100 text-sm">
+                        <thead class="bg-gray-50">
                             <tr>
-                                <th class="p-4">Subject</th>
-                                <th class="p-4">Duration</th>
-                                <th class="p-4">Reason</th>
-                                <th class="p-4 text-center">Status</th>
+                                <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Subject & Section</th>
+                                <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date & Time</th>
+                                <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Room</th>
+                                <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Proctor</th>
+                                <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Conflict Type</th>
+                                <th class="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-red-50">
-                            {% for exam in unscheduled %}
-                            <tr class="hover:bg-red-50/50 transition">
-                                <td class="p-4 font-bold text-gray-800">{{ exam.subject_name }}</td>
-                                <td class="p-4 text-gray-500">{{ exam.duration_minutes }} min</td>
-                                <td class="p-4 text-gray-500 text-xs italic">
-                                    {% set reason_found = namespace(val='') %}
-                                    {% for f in failed %}
-                                        {% if f.exam_id == exam.id %}
-                                            {% set reason_found.val = f.reason %}
-                                        {% endif %}
-                                    {% endfor %}
-                                    {{ reason_found.val if reason_found.val else 'No room-instructor pair available for this time slot.' }}
-                                </td>
-                                <td class="p-4 text-center">
-                                    <span class="status-chip-unscheduled text-[11px] font-black uppercase px-2.5 py-1 rounded-full">
-                                        ✗ Unscheduled
+                        <tbody class="divide-y divide-gray-100">
+                            {% for exam in scheduled_exams %}
+                            {% if exam.id in conflict_ids %}
+                            {% set reasons = conflict_reasons.get(exam.id, []) %}
+                            <tr class="hover:bg-orange-50 transition-colors">
+                                <td class="px-5 py-3">
+                                    <span class="font-semibold text-gray-900">{{ exam.subject_name }}</span>
+                                    <span class="text-gray-400 font-normal ml-1">— {{ exam.section }}</span>
+                                    <span class="ml-1 inline-block px-1.5 py-0.5 rounded text-xs font-semibold
+                                        {% if exam.subject_type == 'Major' %}bg-blue-100 text-blue-700{% else %}bg-yellow-100 text-yellow-700{% endif %}">
+                                        {{ exam.subject_type }}
                                     </span>
+                                </td>
+                                <td class="px-5 py-3 text-gray-600 whitespace-nowrap">{{ exam._date_str }} {{ exam._time_str }}</td>
+                                <td class="px-5 py-3 text-gray-600">{{ exam.room_name or '—' }}</td>
+                                <td class="px-5 py-3 text-gray-600">{{ exam.instructor_name or '—' }}</td>
+                                <td class="px-5 py-3">
+                                    <div class="flex flex-wrap gap-1">
+                                        {% if 'room' in reasons %}
+                                            <span class="badge badge-conflict-room"><i class="fa-solid fa-door-open mr-0.5"></i>Room</span>
+                                        {% endif %}
+                                        {% if 'proctor' in reasons %}
+                                            <span class="badge badge-conflict-proctor"><i class="fa-solid fa-user-xmark mr-0.5"></i>Proctor</span>
+                                        {% endif %}
+                                        {% if 'section' in reasons %}
+                                            <span class="badge badge-conflict-section"><i class="fa-solid fa-users mr-0.5"></i>Section</span>
+                                        {% endif %}
+                                        {% if 'subject' in reasons %}
+                                            <span class="badge badge-conflict-subject"><i class="fa-solid fa-book mr-0.5"></i>Subject</span>
+                                        {% endif %}
+                                        {% if 'daily_major' in reasons %}
+                                            <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i>&gt;2 Major/day</span>
+                                        {% endif %}
+                                        {% if 'daily_minor' in reasons %}
+                                            <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i>&gt;3 Minor/day</span>
+                                        {% endif %}
+                                        {% if 'daily_total' in reasons %}
+                                            <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i>&gt;3 Exams/day</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td class="px-5 py-3 text-right">
+                                    <button onclick="openEditScheduleModal('{{ exam.id }}','{{ exam.datetime_raw }}','{{ exam.room_id }}','{{ exam.instructor_id }}','{{ (exam.duration_minutes / 60) | round(1) }}')"
+                                            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-orange-500 text-white text-xs font-semibold hover:bg-orange-600 transition-colors">
+                                        <i class="fa-solid fa-pen-to-square"></i> Edit
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- ══════ UNSCHEDULED EXAMS ══════ -->
+            {% if unscheduled %}
+            <div class="mb-8 no-print">
+                <h2 class="text-base font-bold text-red-600 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-circle-exclamation"></i> Unscheduled Exams
+                    <span class="ml-1 inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-700 text-xs font-bold">{{ unscheduled|length }}</span>
+                </h2>
+                <div class="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-red-50">
+                            <tr>
+                                <th class="px-5 py-3 text-left text-xs font-semibold text-red-700 uppercase tracking-wider">Subject & Section</th>
+                                <th class="px-5 py-3 text-left text-xs font-semibold text-red-700 uppercase tracking-wider">Institute</th>
+                                <th class="px-5 py-3 text-left text-xs font-semibold text-red-700 uppercase tracking-wider">Type</th>
+                                <th class="px-5 py-3 text-left text-xs font-semibold text-red-700 uppercase tracking-wider">Status</th>
+                                <th class="px-5 py-3 text-right text-xs font-semibold text-red-700 uppercase tracking-wider">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {% for exam in unscheduled %}
+                            <tr class="hover:bg-red-50 transition-colors">
+                                <td class="px-5 py-3 font-medium text-gray-900">{{ exam.subject_name }} <span class="text-gray-400 font-normal">— {{ exam.section }}</span></td>
+                                <td class="px-5 py-3 text-gray-500">{{ exam.institute_name or '—' }}</td>
+                                <td class="px-5 py-3">
+                                    <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold
+                                        {% if exam.subject_type == 'Major' %}bg-blue-100 text-blue-700{% else %}bg-yellow-100 text-yellow-700{% endif %}">
+                                        {{ exam.subject_type }}
+                                    </span>
+                                </td>
+                                <td class="px-5 py-3">
+                                    <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700">{{ exam.status }}</span>
+                                </td>
+                                <td class="px-5 py-3 text-right">
+                                    <button onclick="openEditScheduleModal('{{ exam.id }}','','','','{{ (exam.duration_minutes / 60) | round(1) }}')"
+                                            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors">
+                                        <i class="fa-solid fa-calendar-plus"></i> Assign Slot
+                                    </button>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -318,310 +605,285 @@
             </div>
             {% endif %}
 
-            <!-- Back to Dashboard -->
-            <div class="mt-4 no-print">
-                <a href="/dashboard"
-                   class="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-[#668054] font-semibold transition">
-                    <i class="fas fa-arrow-left"></i> Back to Dashboard
-                </a>
-            </div>
-
-        </div>
+        </div><!-- /p-6 -->
     </main>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         RE-GENERATE MODAL (date range picker)
-         ═══════════════════════════════════════════════════════════════════ -->
-    <div id="regen-modal-backdrop"
-         class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-         onclick="if(event.target===this) closeRegenModal()">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
-            <!-- Header -->
-            <div class="flex items-center justify-between px-6 py-4 bg-blue-600 text-white">
-                <div>
-                    <h2 class="font-extrabold text-lg">Re-Generate Schedule</h2>
-                    <p class="text-blue-200 text-xs mt-0.5">Select the exam period window</p>
-                </div>
-                <button onclick="closeRegenModal()" class="text-white/70 hover:text-white transition">
-                    <i class="fas fa-times text-lg"></i>
-                </button>
-            </div>
-            <form action="/generate_schedule" method="POST" class="px-6 py-5 space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
-                        <i class="fas fa-calendar-day text-blue-500 mr-1"></i>Start Date
-                    </label>
-                    <input type="date" name="period_start" required
-                           class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
-                        <i class="fas fa-calendar-day text-blue-500 mr-1"></i>End Date
-                    </label>
-                    <input type="date" name="period_end" required
-                           class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-                </div>
-                <p class="text-xs text-gray-400 italic">
-                    <i class="fas fa-info-circle mr-1"></i>The scheduler will place all pending exams within this window.
-                    Same-subject exams will be locked to the same date &amp; time.
-                </p>
-                <div class="flex gap-3 pt-1">
-                    <button type="submit"
-                        class="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition">
-                        <i class="fas fa-magic"></i> Generate
+    <!-- ══════ Edit / Assign Schedule Modal ══════ -->
+    <div id="editScheduleModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-900 bg-opacity-50 transition-opacity" onclick="closeModal('editScheduleModal')"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="relative inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-[#668054] px-6 py-4 flex items-center justify-between">
+                    <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-calendar-pen"></i> Edit Exam Schedule
+                    </h3>
+                    <button onclick="closeModal('editScheduleModal')" class="text-white/70 hover:text-white">
+                        <i class="fa-solid fa-xmark text-lg"></i>
                     </button>
-                    <button type="button" onclick="closeRegenModal()"
-                        class="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-500 font-semibold text-sm hover:bg-gray-50 transition">
+                </div>
+
+                <div id="conflictWarning" class="hidden bg-red-50 border-b-2 border-red-400 px-6 py-3">
+                    <div class="flex items-center gap-2 text-red-700 text-sm font-medium">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span id="conflictMessage">Conflict detected.</span>
+                    </div>
+                </div>
+
+                <form id="editScheduleForm" method="POST" class="px-6 py-5 space-y-4">
+                    <input type="hidden" id="edit_exam_id" name="exam_id">
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="col-span-2">
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Date &amp; Time</label>
+                            <input type="datetime-local" name="exam_datetime" id="edit_datetime" required
+                                   onchange="fetchAvailableResources()"
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Duration (hrs)</label>
+                            <input type="number" name="duration_hours" id="edit_duration" required min="0.5" step="0.5"
+                                   onchange="fetchAvailableResources()"
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Room</label>
+                            <select name="room_id" id="edit_room_id" required onchange="checkConflict()"
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                                <option value="">Select Room</option>
+                                {% for room in rooms %}
+                                <option value="{{ room.id }}">{{ room.room_name }} (Cap: {{ room.capacity }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Proctor / Instructor</label>
+                            <select name="instructor_id" id="edit_proctor_id" required onchange="checkConflict()"
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                                <option value="">Select Proctor</option>
+                                {% for inst in instructors %}
+                                <option value="{{ inst.id }}">{{ inst.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 pt-1">
+                        <input type="checkbox" name="force_save" id="force_save" value="1"
+                               class="h-4 w-4 text-red-600 border-gray-300 rounded">
+                        <label for="force_save" class="text-sm text-red-600 font-medium">Override conflict warnings</label>
+                    </div>
+                </form>
+
+                <div class="bg-gray-50 px-6 py-4 flex gap-3 justify-end border-t border-gray-200">
+                    <button type="button" onclick="closeModal('editScheduleModal')"
+                            class="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                         Cancel
                     </button>
+                    <button type="submit" form="editScheduleForm"
+                            class="px-5 py-2 rounded-lg bg-[#668054] text-white text-sm font-semibold hover:bg-[#4b5e3d] transition-colors shadow-sm">
+                        Save Schedule
+                    </button>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         EDIT MODAL
-         ═══════════════════════════════════════════════════════════════════ -->
-    <div id="edit-modal-backdrop"
-         class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-         onclick="closeEditModalOnBackdrop(event)">
-
-        <div id="edit-modal-panel"
-             class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
-
-            <!-- Modal Header -->
-            <div class="flex items-center justify-between px-6 py-4 bg-[#668054] text-white">
-                <div>
-                    <h2 class="font-extrabold text-lg" id="modal-title">Edit Exam Schedule</h2>
-                    <p class="text-white/70 text-xs mt-0.5" id="modal-subtitle"></p>
-                </div>
-                <button onclick="closeEditModal()" class="text-white/70 hover:text-white transition">
-                    <i class="fas fa-times text-lg"></i>
-                </button>
-            </div>
-
-            <!-- Conflict Alert Box (hidden until conflicts found) -->
-            <div id="conflict-box" class="hidden mx-6 mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">
-                <div class="flex items-center gap-2 font-bold mb-2">
-                    <i class="fas fa-exclamation-triangle text-red-500"></i>
-                    Conflicts Detected
-                </div>
-                <ul id="conflict-list" class="list-disc list-inside space-y-1 text-xs"></ul>
-                <div class="mt-3 pt-3 border-t border-red-200 flex items-center gap-2">
-                    <input type="checkbox" id="force-save-check" class="accent-red-600">
-                    <label for="force-save-check" class="text-xs font-semibold text-red-700 cursor-pointer">
-                        I understand the risks — save anyway (force override)
-                    </label>
-                </div>
-            </div>
-
-            <!-- Success / clear indicator -->
-            <div id="conflict-ok" class="hidden mx-6 mt-4 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 flex items-center gap-2">
-                <i class="fas fa-check-circle text-green-500"></i>
-                <span class="font-semibold">No conflicts — safe to save.</span>
-            </div>
-
-            <!-- Form -->
-            <form id="edit-form" method="POST" action="" class="px-6 py-5 space-y-4">
-                <input type="hidden" name="duration_minutes" id="f-duration">
-                <input type="hidden" name="force_save"       id="f-force" value="0">
-
-                <!-- Date & Time -->
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
-                        <i class="fas fa-clock text-[#668054] mr-1"></i>Date &amp; Time
-                    </label>
-                    <input type="datetime-local" id="f-datetime" name="exam_datetime"
-                           class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#668054]/40"
-                           oninput="clearConflictState()">
-                </div>
-
-                <!-- Room -->
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
-                        <i class="fas fa-map-marker-alt text-[#668054] mr-1"></i>Room
-                    </label>
-                    <select id="f-room" name="room_id"
-                            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#668054]/40"
-                            onchange="clearConflictState()">
-                        {% for room in rooms %}
-                        <option value="{{ room.id }}">{{ room.room_name }} (cap. {{ room.capacity }})</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <!-- Instructor -->
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
-                        <i class="fas fa-user-tie text-[#668054] mr-1"></i>Proctor / Instructor
-                    </label>
-                    <select id="f-instructor" name="instructor_id"
-                            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#668054]/40"
-                            onchange="clearConflictState()">
-                        {% for inst in instructors %}
-                        <option value="{{ inst.id }}">{{ inst.name }} — {{ inst.department }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <!-- Action Buttons -->
-                <div class="flex gap-3 pt-2">
-                    <button type="button" id="btn-check"
-                            onclick="runConflictCheck()"
-                            class="flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-[#668054] text-[#668054] font-bold text-sm hover:bg-[#668054]/10 transition">
-                        <i class="fas fa-shield-alt"></i> Check Conflicts
-                    </button>
-                    <button type="button" id="btn-save"
-                            onclick="submitEdit()"
-                            class="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#668054] text-white font-bold text-sm hover:bg-[#3d6b4f] transition disabled:opacity-50">
-                        <i class="fas fa-save"></i> Save Changes
-                    </button>
-                    <button type="button" onclick="closeEditModal()"
-                            class="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-500 font-semibold text-sm hover:bg-gray-50 transition">
-                        Cancel
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- ═══════════════════════════════════════════════════════════════════
-         JAVASCRIPT
-         ═══════════════════════════════════════════════════════════════════ -->
     <script>
-    /* ── Re-Generate modal ─────────────────────────────────── */
-    function openRegenModal() {
-        document.getElementById('regen-modal-backdrop').classList.remove('hidden');
-    }
-    function closeRegenModal() {
-        document.getElementById('regen-modal-backdrop').classList.add('hidden');
-    }
-
-    /* ── Edit modal ────────────────────────────────────────── */
-    let currentExamId   = null;
-    let conflictsPassed = false;
-
-    function openEditModal(data) {
-        currentExamId   = data.id;
-        conflictsPassed = false;
-
-        document.getElementById('modal-title').textContent   = data.subject;
-        document.getElementById('modal-subtitle').textContent =
-            (data.section ? 'Section: ' + data.section + '  ·  ' : '') +
-            data.duration + ' min';
-
-        document.getElementById('f-datetime').value   = data.datetime;
-        document.getElementById('f-duration').value   = data.duration;
-        document.getElementById('f-room').value        = data.room_id;
-        document.getElementById('f-instructor').value  = data.inst_id;
-        document.getElementById('edit-form').action    = '/edit_exam_schedule/' + data.id;
-
-        clearConflictState();
-        document.getElementById('edit-modal-backdrop').classList.remove('hidden');
-    }
-
-    function closeEditModal() {
-        document.getElementById('edit-modal-backdrop').classList.add('hidden');
-        clearConflictState();
-    }
-
-    function closeEditModalOnBackdrop(e) {
-        if (e.target === document.getElementById('edit-modal-backdrop')) {
-            closeEditModal();
-        }
-    }
-
-    function clearConflictState() {
-        document.getElementById('conflict-box').classList.add('hidden');
-        document.getElementById('conflict-ok').classList.add('hidden');
-        document.getElementById('conflict-list').innerHTML = '';
-        document.getElementById('force-save-check').checked = false;
-        document.getElementById('f-force').value = '0';
-        conflictsPassed = false;
-    }
-
-    async function runConflictCheck() {
-        const btn = document.getElementById('btn-check');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking…';
-
-        const payload = {
-            exam_id:          currentExamId,
-            room_id:          parseInt(document.getElementById('f-room').value),
-            instructor_id:    parseInt(document.getElementById('f-instructor').value),
-            exam_datetime:    document.getElementById('f-datetime').value,
-            duration_minutes: parseInt(document.getElementById('f-duration').value)
-        };
-
-        try {
-            const res  = await fetch('/check_edit_conflict', {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify(payload)
+        /* ── Sidebar Toggle ─────────────────────────────────────── */
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const main    = document.getElementById('main-content');
+            sidebar.classList.toggle('w-64');
+            sidebar.classList.toggle('w-16');
+            main.classList.toggle('ml-64');
+            main.classList.toggle('ml-16');
+            const collapsed = sidebar.classList.contains('w-16');
+            localStorage.setItem('sidebarCollapsed', collapsed);
+            sidebar.querySelectorAll('.nav-text').forEach(el => {
+                collapsed ? el.classList.add('hidden') : el.classList.remove('hidden');
             });
-            const data = await res.json();
+        }
 
-            if (data.conflicts && data.conflicts.length > 0) {
-                // Show conflict box
-                const ul = document.getElementById('conflict-list');
-                ul.innerHTML = '';
-                data.conflicts.forEach(c => {
-                    const li = document.createElement('li');
-                    li.textContent = c;
-                    ul.appendChild(li);
-                });
-                document.getElementById('conflict-box').classList.remove('hidden');
-                document.getElementById('conflict-ok').classList.add('hidden');
-                conflictsPassed = false;
-            } else {
-                document.getElementById('conflict-box').classList.add('hidden');
-                document.getElementById('conflict-ok').classList.remove('hidden');
-                conflictsPassed = true;
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                const sidebar = document.getElementById('sidebar');
+                const main    = document.getElementById('main-content');
+                sidebar.classList.replace('w-64', 'w-16');
+                main.classList.replace('ml-64', 'ml-16');
+                sidebar.querySelectorAll('.nav-text').forEach(el => el.classList.add('hidden'));
             }
-        } catch (err) {
-            alert('Failed to reach server: ' + err);
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-shield-alt"></i> Check Conflicts';
-        }
-    }
-
-    function submitEdit() {
-        // If conflicts were found and user hasn't forced, require check first
-        const forceChecked = document.getElementById('force-save-check').checked;
-        const conflictVisible = !document.getElementById('conflict-box').classList.contains('hidden');
-
-        if (conflictVisible && !forceChecked) {
-            alert('Please tick the force-override checkbox to save with conflicts, or resolve them first.');
-            return;
-        }
-
-        // Set force flag
-        document.getElementById('f-force').value = forceChecked ? '1' : '0';
-        document.getElementById('edit-form').submit();
-    }
-
-    // Auto-check conflicts when force checkbox changes
-    document.getElementById('force-save-check').addEventListener('change', function() {
-        document.getElementById('f-force').value = this.checked ? '1' : '0';
-    });
-
-    // Wire up all Edit buttons via data-* attributes
-    // (Script is at bottom of body so DOM is already ready — no DOMContentLoaded needed)
-    document.querySelectorAll('.edit-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            openEditModal({
-                id:       this.dataset.id,
-                subject:  this.dataset.subject,
-                section:  this.dataset.section,
-                datetime: this.dataset.datetime,
-                duration: parseInt(this.dataset.duration),
-                room_id:  parseInt(this.dataset.room),
-                inst_id:  parseInt(this.dataset.inst)
-            });
         });
-    });
+
+        /* ── Modal helpers ──────────────────────────────────────── */
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        function openEditScheduleModal(exam_id, datetime, room_id, proctor_id, duration) {
+            document.getElementById('editScheduleForm').action = '/edit_exam_schedule/' + exam_id;
+            document.getElementById('edit_exam_id').value   = exam_id;
+            document.getElementById('edit_datetime').value  = datetime;
+            document.getElementById('edit_duration').value  = duration;
+            
+            const roomSelect = document.getElementById('edit_room_id');
+            const instSelect = document.getElementById('edit_proctor_id');
+            
+            if (!datetime) {
+                roomSelect.innerHTML = '<option value="">Please pick a Date & Time first...</option>';
+                instSelect.innerHTML = '<option value="">Please pick a Date & Time first...</option>';
+            } else {
+                roomSelect.value = room_id;
+                instSelect.value = proctor_id;
+            }
+            
+            document.getElementById('conflictWarning').classList.add('hidden');
+            document.getElementById('force_save').checked  = false;
+            document.getElementById('editScheduleModal').classList.remove('hidden');
+            if (datetime && duration) {
+                fetchAvailableResources();
+            }
+        }
+
+        /* ── Conflict check (AJAX) ──────────────────────────────── */
+        async function fetchAvailableResources() {
+            const exam_id = document.getElementById('edit_exam_id').value;
+            const datetime = document.getElementById('edit_datetime').value;
+            const duration = document.getElementById('edit_duration').value;
+            if (!datetime || !duration) return;
+
+            try {
+                const resp = await fetch('/api/available_resources', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        exam_id, 
+                        exam_datetime: datetime, 
+                        duration_minutes: Math.round(parseFloat(duration) * 60) 
+                    })
+                });
+                const data = await resp.json();
+                
+                // Update Rooms
+                const roomSelect = document.getElementById('edit_room_id');
+                const currentRoom = roomSelect.value;
+                roomSelect.innerHTML = '<option value="">Select Room</option>';
+                data.rooms.forEach(r => {
+                    const opt = document.createElement('option');
+                    opt.value = r.id;
+                    opt.text = r.name;
+                    roomSelect.add(opt);
+                });
+                if (data.rooms.some(r => r.id == currentRoom)) {
+                    roomSelect.value = currentRoom;
+                }
+
+                // Update Instructors
+                const instSelect = document.getElementById('edit_proctor_id');
+                const currentInst = instSelect.value;
+                instSelect.innerHTML = '<option value="">Select Proctor</option>';
+                data.instructors.forEach(i => {
+                    const opt = document.createElement('option');
+                    opt.value = i.id;
+                    opt.text = i.name;
+                    instSelect.add(opt);
+                });
+                if (data.instructors.some(i => i.id == currentInst)) {
+                    instSelect.value = currentInst;
+                }
+                
+                checkConflict();
+            } catch (e) { console.error('Resource fetch error', e); }
+        }
+
+        async function checkConflict() {
+            const exam_id    = document.getElementById('edit_exam_id').value;
+            const datetime   = document.getElementById('edit_datetime').value;
+            const duration   = document.getElementById('edit_duration').value;
+            const room_id    = document.getElementById('edit_room_id').value;
+            const proctor_id = document.getElementById('edit_proctor_id').value;
+            if (!datetime || !duration || !room_id || !proctor_id) return;
+
+            try {
+                const resp = await fetch('/check_edit_conflict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ exam_id, exam_datetime: datetime, duration_minutes: Math.round(parseFloat(duration) * 60), room_id: parseInt(room_id), instructor_id: parseInt(proctor_id) })
+                });
+                const data = await resp.json();
+                const warn  = document.getElementById('conflictWarning');
+                const msg   = document.getElementById('conflictMessage');
+                if (data.conflicts && data.conflicts.length > 0) {
+                    msg.innerText = data.conflicts.join(' | ');
+                    warn.classList.remove('hidden');
+                } else {
+                    warn.classList.add('hidden');
+                }
+            } catch(e) { console.error('Conflict check error', e); }
+        }
+
+        /* ── Failed list toggle ─────────────────────────────────── */
+        function toggleFailed() {
+            const list    = document.getElementById('failedList');
+            const chevron = document.getElementById('failedChevron');
+            list.classList.toggle('hidden');
+            chevron.style.transform = list.classList.contains('hidden') ? '' : 'rotate(180deg)';
+        }
     </script>
+
+<!-- ── Reusable Warning Confirmation Modal ────────────────────────────── -->
+<div id="warnModal" class="fixed inset-0 z-[999] hidden overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-gray-900 bg-opacity-60" onclick="closeWarnModal()"></div>
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden z-10">
+            <div id="warnModalHeader" class="px-6 py-4 flex items-center gap-3">
+                <i class="fa-solid fa-triangle-exclamation text-2xl text-white"></i>
+                <h3 id="warnModalTitle" class="text-lg font-bold text-white"></h3>
+            </div>
+            <div class="p-6">
+                <p id="warnModalMessage" class="text-sm font-medium text-gray-800"></p>
+                <p id="warnModalSub" class="text-xs text-gray-500 mt-2 hidden"></p>
+            </div>
+            <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+                <button onclick="closeWarnModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100">Cancel</button>
+                <button id="warnModalConfirmBtn" class="px-5 py-2 rounded-lg text-sm font-semibold text-white transition-colors"></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let _warnCallback = null;
+    function warnConfirm({ title, message, sub, type, confirmText, onConfirm }) {
+        const c = type === 'warning'
+            ? { header: 'bg-amber-500', btn: 'bg-amber-500 hover:bg-amber-600' }
+            : { header: 'bg-red-600',   btn: 'bg-red-600 hover:bg-red-700' };
+        document.getElementById('warnModalHeader').className = `px-6 py-4 flex items-center gap-3 ${c.header}`;
+        document.getElementById('warnModalTitle').textContent = title;
+        document.getElementById('warnModalMessage').textContent = message;
+        const subEl = document.getElementById('warnModalSub');
+        if (sub) { subEl.textContent = sub; subEl.classList.remove('hidden'); }
+        else { subEl.classList.add('hidden'); }
+        const btn = document.getElementById('warnModalConfirmBtn');
+        btn.textContent = confirmText || 'Confirm';
+        btn.className = `px-5 py-2 rounded-lg text-sm font-semibold text-white transition-colors ${c.btn}`;
+        _warnCallback = onConfirm;
+        document.getElementById('warnModal').classList.remove('hidden');
+    }
+    function closeWarnModal() {
+        document.getElementById('warnModal').classList.add('hidden');
+        _warnCallback = null;
+    }
+    document.getElementById('warnModalConfirmBtn').addEventListener('click', function() {
+        const cb = _warnCallback;
+        closeWarnModal();
+        if (cb) cb();
+    });
+    function confirmResetSchedule() {
+        warnConfirm({ title: 'Reset Schedule', message: 'This will reset all scheduled exams back to Pending status.',
+            sub: 'All assigned rooms, dates, and proctor assignments will be cleared. This CANNOT be undone.',
+            type: 'warning', confirmText: 'Yes, Reset Schedule',
+            onConfirm: () => document.getElementById('resetScheduleForm').submit() });
+    }
+</script>
 
 </body>
 </html>

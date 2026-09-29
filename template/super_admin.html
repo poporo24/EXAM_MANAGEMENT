@@ -47,7 +47,7 @@
 <body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
 
     <!-- Sidebar -->
-    <aside id="sidebar" class="bg-white border-r border-gray-200 fixed h-full w-64 sidebar-transition z-20 flex flex-col">
+    <aside id="sidebar" class="bg-white border-r border-gray-200 fixed h-screen w-64 sidebar-transition z-20 flex flex-col overflow-hidden">
         <div class="h-16 flex items-center justify-between px-4 border-b border-gray-200">
             <div class="flex items-center gap-3 overflow-hidden whitespace-nowrap">
                 <i class="fa-solid fa-graduation-cap text-2xl text-[#668054]"></i>
@@ -58,7 +58,7 @@
             </button>
         </div>
 
-        <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+        <nav class="flex-1 overflow-y-auto py-4 space-y-1 min-h-0">
             <a href="/dashboard" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group" title="Dashboard">
                 <i class="fa-solid fa-chart-line w-6 text-center text-lg"></i>
                 <span class="ml-3 nav-text font-medium">Dashboard</span>

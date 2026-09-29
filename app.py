@@ -97,6 +97,10 @@ def _configure_mail():
     app.config['MAIL_USE_TLS']        = bool(s.get('smtp_use_tls', 1))
     app.config['MAIL_USE_SSL']        = False
     app.config['MAIL_SUPPRESS_SEND']  = not bool(app.config['MAIL_SERVER'])
+    
+    # Re-initialize the Mail extension to pick up these new config values immediately
+    if hasattr(app, 'extensions') and 'mail' in app.extensions:
+        mail.init_app(app)
 
 _configure_mail()
 mail = Mail(app)

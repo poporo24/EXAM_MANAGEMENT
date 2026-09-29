@@ -322,7 +322,20 @@ def register_page():
     if 'user_id' in session:
         return _redirect_by_role()
     institutes = get_all_institutes()
-    return render_template("register.html", institutes=institutes)
+    
+    # Get distinct sections
+    sections = []
+    from system.database import open_db
+    db = open_db()
+    if db:
+        try:
+            cursor = db.cursor()
+            cursor.execute("SELECT DISTINCT section FROM users WHERE section IS NOT NULL AND section != '' ORDER BY section")
+            sections = [r[0] for r in cursor.fetchall()]
+        finally:
+            db.close()
+            
+    return render_template("register.html", institutes=institutes, sections=sections)
 
 @app.route("/register", methods=["POST"])
 def register_submit():

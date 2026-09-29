@@ -41,6 +41,22 @@
             .no-print { display: none !important; }
         }
     </style>
+
+    <style>
+        /* Mobile Responsive Overrides */
+        @media (max-width: 768px) {
+            #sidebar { width: 4rem !important; z-index: 50; }
+            #main-content { margin-left: 4rem !important; width: calc(100% - 4rem) !important; }
+            .nav-text { display: none !important; }
+            
+            /* Make ALL tables horizontally scrollable */
+            table { display: block !important; width: 100% !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+            th, td { white-space: nowrap !important; }
+            
+            /* Make modals scrollable if they overflow */
+            .fixed.inset-0 > div { padding: 1rem; overflow-y: auto; max-height: 100vh; }
+        }
+    </style>
 </head>
 <body onload="window.print()">
 
@@ -69,7 +85,7 @@
         </div>
         
         <div class="timetable-wrapper">
-            <table class="timetable">
+            <div class="overflow-x-auto w-full"><table class="timetable">
                 <thead>
                     <tr>
                         <th class="time-col"><i class="fa-regular fa-clock mr-1"></i> Time</th>
@@ -112,7 +128,7 @@
                     </tr>
                     {% endfor %}
                 </tbody>
-            </table>
+            </table></div>
         </div>
     </div>
     {% endfor %}

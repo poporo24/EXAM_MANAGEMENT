@@ -126,6 +126,22 @@
             .info-strip .student-info { margin-left:0; }
         }
     </style>
+
+    <style>
+        /* Mobile Responsive Overrides */
+        @media (max-width: 768px) {
+            #sidebar { width: 4rem !important; z-index: 50; }
+            #main-content { margin-left: 4rem !important; width: calc(100% - 4rem) !important; }
+            .nav-text { display: none !important; }
+            
+            /* Make ALL tables horizontally scrollable */
+            table { display: block !important; width: 100% !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+            th, td { white-space: nowrap !important; }
+            
+            /* Make modals scrollable if they overflow */
+            .fixed.inset-0 > div { padding: 1rem; overflow-y: auto; max-height: 100vh; }
+        }
+    </style>
 </head>
 <body>
 
@@ -153,7 +169,7 @@
         <div><strong>Section:</strong> {{ section }}</div>
     </div>
 
-    <table class="print-table">
+    <div class="overflow-x-auto w-full"><table class="print-table">
         <thead>
             <tr>
                 <th rowspan="2">Subject</th>
@@ -187,7 +203,7 @@
                 </tr>
             {% endif %}
         </tbody>
-    </table>
+    </table></div>
 </div>
 
 <header class="hero">

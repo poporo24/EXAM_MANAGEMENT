@@ -335,7 +335,17 @@ def register_submit():
     if role not in ['student', 'proctor']:
         role = 'student'
         
+        if not email.endswith("@cca.edu.ph"):
+        flash("Registration is restricted to @cca.edu.ph email addresses only.", "danger")
+        return redirect(url_for('register_page'))
+        
+    import re
+    if len(password) < 8 or not re.search(r'[A-Z]', password) or not re.search(r'\d', password):
+        flash("Password must be at least 8 characters long and contain at least one uppercase letter and one number.", "danger")
+        return redirect(url_for('register_page'))
+
     if not full_name or not email or not password:
+
         flash("All fields are required.", "danger")
         return redirect(url_for('register_page'))
     result = register_user(full_name, email, password, role,

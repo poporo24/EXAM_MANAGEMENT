@@ -11,6 +11,22 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
     </style>
+
+    <style>
+        /* Mobile Responsive Overrides */
+        @media (max-width: 768px) {
+            #sidebar { width: 4rem !important; z-index: 50; }
+            #main-content { margin-left: 4rem !important; width: calc(100% - 4rem) !important; }
+            .nav-text { display: none !important; }
+            
+            /* Make ALL tables horizontally scrollable */
+            table { display: block !important; width: 100% !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+            th, td { white-space: nowrap !important; }
+            
+            /* Make modals scrollable if they overflow */
+            .fixed.inset-0 > div { padding: 1rem; overflow-y: auto; max-height: 100vh; }
+        }
+    </style>
 </head>
 <body class="bg-[#f4f7f6] min-h-screen flex items-center justify-center relative overflow-hidden text-gray-800 py-10">
     <!-- Background pattern -->
@@ -54,7 +70,7 @@
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <i class="fa-solid fa-envelope text-gray-400"></i>
                     </div>
-                    <input type="email" name="email" id="email" required class="focus:ring-[#668054] focus:border-[#668054] block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 px-3 border" placeholder="you@example.com">
+                    <input type="email" name="email" id="email" required pattern=".*@cca\.edu\.ph$" title="Must be a valid @cca.edu.ph email address" class="focus:ring-[#668054] focus:border-[#668054] block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 px-3 border" placeholder="student@cca.edu.ph">
                 </div>
             </div>
 
@@ -64,7 +80,7 @@
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <i class="fa-solid fa-lock text-gray-400"></i>
                     </div>
-                    <input type="password" name="password" id="password" required class="focus:ring-[#668054] focus:border-[#668054] block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 px-3 border" placeholder="••••••••">
+                    <input type="password" name="password" id="password" required minlength="8" pattern="(?=.*\d)(?=.*[A-Z]).{8,}" title="Password must be at least 8 characters long and contain at least one uppercase letter and one number." class="focus:ring-[#668054] focus:border-[#668054] block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 px-3 border" placeholder="••••••••">
                 </div>
             </div>
 

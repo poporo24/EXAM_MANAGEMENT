@@ -48,7 +48,11 @@
 
     <!-- Sidebar -->
     {% set active_page = 'reports' %}
-    {% include 'admin_sidebar.html' %}
+    {% if session.get('role') == 'secretary' %}
+        {% include 'secretary_sidebar.html' %}
+    {% else %}
+        {% include 'admin_sidebar.html' %}
+    {% endif %}
 
     <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
         <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">

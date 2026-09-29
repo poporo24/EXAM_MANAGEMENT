@@ -82,6 +82,20 @@
             .fixed.inset-0 > div { padding: 1rem; overflow-y: auto; max-height: 100vh; }
         }
     </style>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            // Automatically wrap all tables to make them horizontally scrollable on small screens
+            document.querySelectorAll("table").forEach(function(table) {
+                if (!table.parentElement.classList.contains("overflow-x-auto")) {
+                    const wrapper = document.createElement("div");
+                    wrapper.className = "overflow-x-auto w-full";
+                    table.parentNode.insertBefore(wrapper, table);
+                    wrapper.appendChild(table);
+                }
+            });
+        });
+    </script>
 </head>
 <body class="bg-[#f4f7f6] min-h-screen relative overflow-y-auto p-4 sm:p-8 flex flex-col text-gray-800">
     <!-- Background pattern -->

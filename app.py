@@ -330,7 +330,7 @@ def register_page():
     if db:
         try:
             cursor = db.cursor()
-            cursor.execute("SELECT DISTINCT section FROM users WHERE section IS NOT NULL AND section != '' ORDER BY section")
+            cursor.execute("SELECT DISTINCT section FROM (SELECT section FROM users WHERE section IS NOT NULL AND section != '' UNION SELECT section FROM exams WHERE section IS NOT NULL AND section != '') AS all_sections ORDER BY section")
             sections = [r[0] for r in cursor.fetchall()]
         finally:
             db.close()

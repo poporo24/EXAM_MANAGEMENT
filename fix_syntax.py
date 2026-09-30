@@ -1,71 +1,62 @@
+with open("system/database.py", "r", encoding="utf-8") as f:
+    db = f.read()
+
 import re
 
-app_path = 'app.py'
-with open(app_path, 'r', encoding='utf-8') as f:
-    app_content = f.read()
-
-# Let's extract everything BEFORE register_submit and everything AFTER the dashboard route
-part1 = app_content.split('def register_submit():')[0]
-part2 = app_content.split('@app.route("/dashboard")')[1]
-
-clean_func = '''def register_submit():
-    full_name    = request.form.get("full_name", "").strip()
-    email        = request.form.get("email", "").strip()
-    password     = request.form.get("password", "").strip()
-    section      = request.form.get("section", "").strip()
-    institute_id = request.form.get("institute_id") or None
-    role         = request.form.get("role", "student").strip()
-    
-    if role not in ['student', 'proctor']:
-        role = 'student'
-        
-    if not email.endswith("@cca.edu.ph"):
-        flash("Registration is restricted to @cca.edu.ph email addresses only.", "danger")
-        return redirect(url_for('register_page'))
-        
-    import re as regex
-    if len(password) < 8 or not regex.search(r'[A-Z]', password) or not regex.search(r'\d', password):
-        flash("Password must be at least 8 characters long and contain at least one uppercase letter and one number.", "danger")
-        return redirect(url_for('register_page'))
-
-    if not full_name or not email or not password:
-        flash("All fields are required.", "danger")
-        return redirect(url_for('register_page'))
-        
-    # Check if user already exists in MySQL
-    user_exists = get_user_by_email(email)
-    if user_exists:
-        flash("That email is already registered.", "danger")
-        return redirect(url_for('register_page'))
-        
-    # Try creating user in Firebase FIRST so we catch Firebase duplicates
+# We will just replace the entire function approve_student
+new_func = r"""def approve_student(user_id):
+    \"\"\"Activate a student/proctor account and notify them.\"\"\"
+    db = open_db()
+    if not db: return False
     try:
-        from firebase_admin import auth as fb_auth
-        fb_auth.create_user(email=email, password=password, display_name=full_name)
-    except fb_auth.EmailAlreadyExistsError:
-        flash("That email is already registered in the cloud auth system.", "danger")
-        return redirect(url_for('register_page'))
-    except Exception as e:
-        flash(f"Cloud Auth Error: {str(e)}", "danger")
-        return redirect(url_for('register_page'))
+        cursor   = db.cursor()
+        cursor_r = db.cursor(dictionary=True)
+        # Update for both students and proctors
+        cursor.execute("UPDATE users SET is_active=1 WHERE id=%s AND role IN ('student', 'proctor')", (user_id,))
+        db.commit()
+        
+        # Notify via in-app and Email
+        cursor_r.execute("SELECT full_name, email, role FROM users WHERE id=%s", (user_id,))
+        row = cursor_r.fetchone()
+        if not row:
+            return True
+            
+        name = row['full_name']
+        email = row['email']
+        role = row['role']
+        
+        if role == 'student':
+            title = "Account Approved"
+            msg = (f"Hi {name}! Your student account has been approved by the administrator. "
+                   "You can now log in and view your exam timetable.")
+            email_subj = "Account Approved - Exam Timetable Available"
+            email_body = (f"Dear {name},\n\n"
+                          "Your account has been approved by the administrator. "
+                          "Your exam timetable is now available on the system.\n\n"
+                          "Please log in to the CCA Exam Management System to view your schedule.\n\n"
+                          "Best,\nCCA Exam Management System")
+        else:
+            title = "Proctor Account Approved"
+            msg = (f"Hi {name}! Your proctor account has been approved by the administrator. "
+                   "You can now log in and view your proctoring schedule.")
+            email_subj = "Account Approved - Proctoring Schedule Available"
+            email_body = (f"Dear {name},\n\n"
+                          "Your proctor account has been approved by the administrator. "
+                          "Your assigned proctoring schedule is now available on the system.\n\n"
+                          "Please log in to the CCA Exam Management System to view your assignments and set your availability.\n\n"
+                          "Best,\nCCA Exam Management System")
+            
+        create_notification(user_id, title, msg)
+        
+        # Send Email
+        from app import send_email_notification
+        send_email_notification(email, email_subj, email_body)
+        
+        return True
+    finally:
+        db.close()"""
 
-    # Create user in local MySQL
-    result = register_user(full_name, email, password, role, section=section, institute_id=institute_id)
-                           
-    if result == 'ok':
-        flash("Account created! Your registration is pending admin approval. You will be notified once it is activated.", "success")
-        return redirect(url_for('login'))
-    else:
-        flash("Something went wrong saving to the local database.", "danger")
-        return redirect(url_for('register_page'))
+db = re.sub(r'def approve_student\(user_id\):.*?finally:\s*db\.close\(\)', new_func, db, flags=re.DOTALL)
 
-# --- ADMIN DASHBOARD ---
-
-@app.route("/dashboard")'''
-
-new_content = part1 + clean_func + part2
-
-with open(app_path, 'w', encoding='utf-8') as f:
-    f.write(new_content)
-
-print("Fixed syntax error")
+with open("system/database.py", "w", encoding="utf-8") as f:
+    f.write(db)

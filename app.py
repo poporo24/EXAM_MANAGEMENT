@@ -389,8 +389,15 @@ def register_submit():
         from firebase_admin import auth as fb_auth
         fb_auth.create_user(email=email, password=password, display_name=full_name)
     except fb_auth.EmailAlreadyExistsError:
-        flash("That email is already registered in the cloud auth system.", "danger")
-        return redirect(url_for('register_page'))
+        # User is in Firebase but not in MySQL (orphaned due to past rejection).
+        # Safe to delete and recreate.
+        try:
+            fb_user = fb_auth.get_user_by_email(email)
+            fb_auth.delete_user(fb_user.uid)
+            fb_auth.create_user(email=email, password=password, display_name=full_name)
+        except Exception as e:
+            flash("That email is already registered in the cloud auth system.", "danger")
+            return redirect(url_for('register_page'))
     except Exception as e:
         flash(f"Cloud Auth Error: {str(e)}", "danger")
         return redirect(url_for('register_page'))

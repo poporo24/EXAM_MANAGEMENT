@@ -172,7 +172,9 @@
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">SMTP Password</label>
-                                <input type="password" name="smtp_password" value="{{ settings.smtp_password|default('') }}" placeholder="••••••••" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                                <div class="relative w-full"><input type="password" name="smtp_password" value="{{ settings.smtp_password|default('') }}" placeholder="••••••••" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2 pr-10"><div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" onclick="togglePassword(this)">
+    <i class="fa-regular fa-eye text-gray-400 hover:text-gray-600"></i>
+</div></div>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">From Email Address</label>
@@ -201,15 +203,21 @@
                           <form method="POST" action="/settings/change_password" class="space-y-4 max-w-md">
                               <div>
                                   <label class="block text-sm font-medium text-gray-700">Current Password</label>
-                                  <input type="password" name="current_password" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                                  <div class="relative w-full"><input type="password" name="current_password" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2 pr-10"><div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" onclick="togglePassword(this)">
+    <i class="fa-regular fa-eye text-gray-400 hover:text-gray-600"></i>
+</div></div>
                               </div>
                               <div>
                                   <label class="block text-sm font-medium text-gray-700">New Password</label>
-                                  <input type="password" name="new_password" required pattern="(?=.*\d)(?=.*[A-Z]).{8,}" title="Must contain at least one number and one uppercase letter, and at least 8 or more characters" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                                  <div class="relative w-full"><input type="password" name="new_password" required pattern="(?=.*\d)(?=.*[A-Z]).{8,}" title="Must contain at least one number and one uppercase letter, and at least 8 or more characters" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2 pr-10"><div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" onclick="togglePassword(this)">
+    <i class="fa-regular fa-eye text-gray-400 hover:text-gray-600"></i>
+</div></div>
                               </div>
                               <div>
                                   <label class="block text-sm font-medium text-gray-700">Confirm New Password</label>
-                                  <input type="password" name="confirm_password" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                                  <div class="relative w-full"><input type="password" name="confirm_password" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2 pr-10"><div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" onclick="togglePassword(this)">
+    <i class="fa-regular fa-eye text-gray-400 hover:text-gray-600"></i>
+</div></div>
                               </div>
                               <div class="pt-2">
                                   <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[#668054] hover:bg-[#526b42]">
@@ -323,5 +331,23 @@
             }
         });
     </script>
+
+<script>
+    function togglePassword(btn) {
+        const container = btn.parentElement;
+        const input = container.querySelector('input');
+        const icon = btn.querySelector('i');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+</script>
+
 </body>
 </html>

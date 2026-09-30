@@ -141,7 +141,9 @@
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <i class="fa-solid fa-lock text-gray-400"></i>
                     </div>
-                    <input type="password" name="password" id="password" required class="focus:ring-[#668054] focus:border-[#668054] block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 px-3 border" placeholder="••••••••">
+                    <div class="relative w-full"><input type="password" name="password" id="password" required class="focus:ring-[#668054] focus:border-[#668054] block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 px-3 border pr-10" placeholder="••••••••"><div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" onclick="togglePassword(this)">
+    <i class="fa-regular fa-eye text-gray-400 hover:text-gray-600"></i>
+</div></div>
                 </div>
             </div>
 
@@ -183,5 +185,23 @@
 
 
     </div>
+
+<script>
+    function togglePassword(btn) {
+        const container = btn.parentElement;
+        const input = container.querySelector('input');
+        const icon = btn.querySelector('i');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+</script>
+
 </body>
 </html>

@@ -1393,7 +1393,7 @@ def import_exams():
             r['subject_name'] = subj['name']
         else:
             r['subject_id'] = None
-            r['subject_name'] = subj_code # Fallback to code if not found
+            r['subject_name'] = r.get('subject_name') or subj_code # Fallback to CSV name, or code
 
     ok, errors = bulk_import_exams(rows)
     if parse_errors:

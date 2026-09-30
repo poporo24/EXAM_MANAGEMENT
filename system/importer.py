@@ -89,7 +89,7 @@ def parse_subjects_csv(file_content_bytes):
     return (rows, errors)
 
 def parse_exams_csv(file_content_bytes):
-    """Expected columns: subject_code, section, subject_type, duration_minutes, institute_code
+    """Expected columns: subject_name, subject_code, section, subject_type, duration_minutes, institute_code
     subject_type must be 'Major' or 'Minor' (defaults to 'Major').
     Returns list of dicts ready for bulk_import_exams."""
     rows = []
@@ -109,6 +109,7 @@ def parse_exams_csv(file_content_bytes):
                     subject_type = 'Major'
                 duration = int(row.get('duration_minutes', 60) or 60)
                 rows.append({
+                    'subject_name': row.get('subject_name', '').strip(),
                     'subject_code': subject_code,
                     'section': row.get('section', '').strip().upper(),
                     'subject_type': subject_type,

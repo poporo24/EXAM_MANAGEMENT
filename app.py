@@ -96,6 +96,7 @@ def _configure_mail():
     app.config['MAIL_DEFAULT_SENDER'] = s.get('smtp_from', '') or ''
     app.config['MAIL_USE_TLS']        = bool(s.get('smtp_use_tls', 1))
     app.config['MAIL_USE_SSL']        = False
+    app.config['MAIL_TIMEOUT']        = 5
     app.config['MAIL_SUPPRESS_SEND']  = not bool(app.config['MAIL_SERVER'])
     
     # Re-initialize the Mail extension to pick up these new config values immediately
@@ -1539,6 +1540,44 @@ def test_email():
     if not to:
         flash("Enter a recipient email address.", "warning")
         return redirect(url_for('settings_page'))
+    try:
+        # Instead of hanging the server with Flask-Mail, let's manually test the connection with a 5-second timeout
+        import smtplib
+        import socket
+        s = get_system_settings()
+        host = s.get('smtp_host', '')
+        port = int(s.get('smtp_port') or 587)
+        user = s.get('smtp_user', '')
+        password = s.get('smtp_password', '')
+        use_tls = bool(s.get('smtp_use_tls', 1))
+        
+        # Test TCP connection first
+        try:
+            socket.create_connection((host, port), timeout=5)
+        except Exception as e:
+            flash(f"Connection blocked or timed out (Port {port} might be blocked by Render Free Tier): {e}", "danger")
+            return redirect(url_for('settings_page'))
+            
+        # Try full SMTP handshake
+        server = smtplib.SMTP(host, port, timeout=5)
+        server.ehlo()
+        if use_tls:
+            server.starttls()
+            server.ehlo()
+        server.login(user, password)
+        
+        # If we reach here, connection works! Send the email.
+        msg = f"Subject: CCA Exam Management - Test Email\n\nThis is a test email. SMTP works!"
+        server.sendmail(user, [to], msg)
+        server.quit()
+        
+        flash(f"Test email successfully sent to {to}!", "success")
+    except smtplib.SMTPAuthenticationError:
+        flash("SMTP Authentication Failed. Check your App Password.", "danger")
+    except Exception as e:
+        flash(f"SMTP Error: {e}", "danger")
+        
+    return redirect(url_for('settings_page'))
     try:
         _configure_mail()
         msg = MailMessage(

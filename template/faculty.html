@@ -128,7 +128,15 @@
             <!-- Faculty Table -->
             <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden mb-8">
                 <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex flex-wrap gap-2 justify-between items-center">
-                    <h2 class="font-semibold text-gray-800">Faculty Members</h2>
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <h2 class="font-semibold text-gray-800">Faculty Members</h2>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fa-solid fa-search text-gray-400 text-sm"></i>
+                            </div>
+                            <input type="text" id="searchFaculty" onkeyup="filterTable('searchFaculty', '#facultyBulkForm table tbody tr')" class="block w-64 pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm" placeholder="Search faculty...">
+                        </div>
+                    </div>
                     <div class="flex flex-wrap gap-2 items-center">
                         <!-- Import CSV → opens modal -->
                         <button type="button" onclick="openFacultyImportModal()" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
@@ -546,5 +554,15 @@
         </div>
     </div>
 
+
+<script>
+function filterTable(inputId, rowSelector) {
+    const q = document.getElementById(inputId).value.toLowerCase();
+    document.querySelectorAll(rowSelector).forEach(r => {
+        r.style.display = r.innerText.toLowerCase().includes(q) ? "" : "none";
+    });
+}
+</script>
 </body>
+
 </html>

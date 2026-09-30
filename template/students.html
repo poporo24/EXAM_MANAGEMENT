@@ -288,7 +288,7 @@
         }
         function filterStudents() {
             const q = document.getElementById("searchStudent").value.toLowerCase();
-            document.querySelectorAll(".student-row").forEach(r => r.style.display = r.innerText.toLowerCase().includes(q) ? "" : "none");
+            document.querySelectorAll("tbody tr").forEach(r => r.style.display = r.innerText.toLowerCase().includes(q) ? "" : "none");
         }
         function toggleAll(cls) {
             const master = document.getElementById("checkAll" + (cls === "active-cb" ? "Active" : "Pending"));

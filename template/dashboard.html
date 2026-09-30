@@ -193,7 +193,15 @@
             <div id="exams-tab" class="tab-content hidden">
                 <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex flex-wrap gap-2 justify-between items-center">
-                        <h2 class="font-semibold text-gray-800">All Exams</h2>
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <h2 class="font-semibold text-gray-800">All Exams</h2>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fa-solid fa-search text-gray-400 text-sm"></i>
+                                </div>
+                                <input type="text" id="searchAllExams" onkeyup="filterTable('searchAllExams', '#examBulkDeleteForm table tbody tr')" class="block w-64 pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm" placeholder="Search exams...">
+                            </div>
+                        </div>
                         <div class="flex flex-wrap items-center gap-2">
                             <!-- Import CSV → opens modal -->
                             <button type="button" onclick="openModal('importExamsModal')" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
@@ -273,7 +281,15 @@
             <div id="rooms-tab" class="tab-content hidden">
                 <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex flex-wrap gap-2 justify-between items-center">
-                        <h2 class="font-semibold text-gray-800">Rooms</h2>
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <h2 class="font-semibold text-gray-800">Rooms</h2>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fa-solid fa-search text-gray-400 text-sm"></i>
+                                </div>
+                                <input type="text" id="searchRooms" onkeyup="filterTable('searchRooms', '#roomBulkDeleteForm table tbody tr')" class="block w-64 pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm" placeholder="Search rooms...">
+                            </div>
+                        </div>
                         <div class="flex flex-wrap gap-2 items-center">
                             <!-- Import CSV → opens modal -->
                             <button type="button" onclick="openModal('importRoomsModal')" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
@@ -358,7 +374,15 @@
             <div id="instructors-tab" class="tab-content hidden">
                 <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex flex-wrap gap-2 justify-between items-center">
-                        <h2 class="font-semibold text-gray-800">Instructors</h2>
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <h2 class="font-semibold text-gray-800">Instructors</h2>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fa-solid fa-search text-gray-400 text-sm"></i>
+                                </div>
+                                <input type="text" id="searchInstructors" onkeyup="filterTable('searchInstructors', '#instructorBulkForm table tbody tr')" class="block w-64 pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm" placeholder="Search instructors...">
+                            </div>
+                        </div>
                         <div class="flex flex-wrap gap-2 items-center">
                             <!-- Import CSV → opens modal -->
                             <button type="button" onclick="openModal('importInstructorsModal')" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
@@ -1135,5 +1159,15 @@
     }
 </script>
 
+
+<script>
+function filterTable(inputId, rowSelector) {
+    const q = document.getElementById(inputId).value.toLowerCase();
+    document.querySelectorAll(rowSelector).forEach(r => {
+        r.style.display = r.innerText.toLowerCase().includes(q) ? "" : "none";
+    });
+}
+</script>
 </body>
+
 </html>

@@ -903,5 +903,15 @@
     }
 </script>
 
+
+<script>
+function filterSchedule() {
+    const q = document.getElementById('searchSchedule').value.toLowerCase();
+    document.querySelectorAll('.exam-card').forEach(card => {
+        card.style.display = card.innerText.toLowerCase().includes(q) ? "" : "none";
+    });
+}
+</script>
 </body>
+
 </html>

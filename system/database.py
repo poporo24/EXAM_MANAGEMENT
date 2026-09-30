@@ -404,35 +404,21 @@ def approve_student(user_id):
             msg = (f"Hi {name}! Your student account has been approved by the administrator. "
                    "You can now log in and view your exam timetable.")
             email_subj = "Account Approved - Exam Timetable Available"
-            email_body = (f"Dear {name},
-
-"
+            email_body = (f"Dear {name},\n\n"
                           "Your account has been approved by the administrator. "
-                          "Your exam timetable is now available on the system.
-
-"
-                          "Please log in to the CCA Exam Management System to view your schedule.
-
-"
-                          "Best,
-CCA Exam Management System")
+                          "Your exam timetable is now available on the system.\n\n"
+                          "Please log in to the CCA Exam Management System to view your schedule.\n\n"
+                          "Best,\nCCA Exam Management System")
         else:
             title = "Proctor Account Approved"
             msg = (f"Hi {name}! Your proctor account has been approved by the administrator. "
                    "You can now log in and view your proctoring schedule.")
             email_subj = "Account Approved - Proctoring Schedule Available"
-            email_body = (f"Dear {name},
-
-"
+            email_body = (f"Dear {name},\n\n"
                           "Your proctor account has been approved by the administrator. "
-                          "Your assigned proctoring schedule is now available on the system.
-
-"
-                          "Please log in to the CCA Exam Management System to view your assignments and set your availability.
-
-"
-                          "Best,
-CCA Exam Management System")
+                          "Your assigned proctoring schedule is now available on the system.\n\n"
+                          "Please log in to the CCA Exam Management System to view your assignments and set your availability.\n\n"
+                          "Best,\nCCA Exam Management System")
             
         create_notification(user_id, title, msg)
         

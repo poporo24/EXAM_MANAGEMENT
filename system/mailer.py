@@ -35,9 +35,12 @@ CCA Exam Management System"""
     msg.attach(MIMEText(body, 'plain'))
 
     try:
-        server = smtplib.SMTP(host, int(port))
-        if use_tls:
-            server.starttls()
+        if int(port) == 465:
+            server = smtplib.SMTP_SSL(host, int(port))
+        else:
+            server = smtplib.SMTP(host, int(port))
+            if use_tls:
+                server.starttls()
         server.login(user, password)
         server.send_message(msg)
         server.quit()

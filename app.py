@@ -1555,15 +1555,19 @@ def test_email():
         try:
             socket.create_connection((host, port), timeout=5)
         except Exception as e:
-            flash(f"Connection blocked or timed out (Port {port} might be blocked by Render Free Tier): {e}", "danger")
+            flash(f"Connection blocked or timed out (Port {port} might be blocked by your ISP or firewall): {e}", "danger")
             return redirect(url_for('settings_page'))
             
         # Try full SMTP handshake
-        server = smtplib.SMTP(host, port, timeout=5)
-        server.ehlo()
-        if use_tls:
-            server.starttls()
+        if port == 465:
+            server = smtplib.SMTP_SSL(host, port, timeout=5)
             server.ehlo()
+        else:
+            server = smtplib.SMTP(host, port, timeout=5)
+            server.ehlo()
+            if use_tls:
+                server.starttls()
+                server.ehlo()
         server.login(user, password)
         
         # If we reach here, connection works! Send the email.

@@ -106,6 +106,17 @@
             sidebar.classList.toggle('w-16');
             mainContent.classList.toggle('ml-64');
             mainContent.classList.toggle('ml-16');
+            
+            const headers = document.querySelectorAll('.sidebar-header-container');
+            headers.forEach(h => {
+                if (sidebar.classList.contains('w-16')) {
+                    h.classList.remove('justify-between');
+                    h.classList.add('justify-center');
+                } else {
+                    h.classList.add('justify-between');
+                    h.classList.remove('justify-center');
+                }
+            });
             const navTexts = document.querySelectorAll('.nav-text');
             navTexts.forEach(el => el.classList.toggle('hidden'));
         }

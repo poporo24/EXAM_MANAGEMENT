@@ -460,6 +460,10 @@
                 mainContent.classList.remove('ml-64');
                 mainContent.classList.add('ml-16');
                 sidebar.querySelectorAll('.nav-text').forEach(el => el.classList.add('hidden'));
+                document.querySelectorAll('.sidebar-header-container').forEach(h => {
+                    h.classList.remove('justify-between');
+                    h.classList.add('justify-center');
+                });
             }
         });
 

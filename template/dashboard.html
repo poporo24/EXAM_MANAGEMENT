@@ -760,6 +760,10 @@
                 
                 const texts = sidebar.querySelectorAll('.nav-text');
                 texts.forEach(el => el.classList.add('hidden'));
+                document.querySelectorAll('.sidebar-header-container').forEach(h => {
+                    h.classList.remove('justify-between');
+                    h.classList.add('justify-center');
+                });
             }
 
             // Handle URL hash for tabs

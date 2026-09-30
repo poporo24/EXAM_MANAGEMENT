@@ -26,7 +26,7 @@ from system.database import (
     get_subject_content_groups, bulk_import_subjects,
     # users
     register_user, get_all_users, get_user_by_id, update_user, delete_user,
-    get_all_students, get_pending_students, approve_student,
+    get_all_students, get_pending_users, approve_student,
     deactivate_student, bulk_deactivate_students, bulk_delete_students,
     # rooms
     get_all_rooms, get_rooms_by_institute, add_room, edit_room, delete_room,
@@ -427,7 +427,7 @@ def dashboard():
     upcoming_exams  = get_upcoming_exams()
     settings        = get_system_settings()
     unread          = _get_unread(session['user_id'])
-    pending_count   = len(get_pending_students())
+    pending_count   = len(get_pending_users())
     return render_template("dashboard.html",
                            stats=stats, exams=exams,
                            rooms=rooms, instructors=instructors,
@@ -1655,7 +1655,7 @@ def admin_change_password(user_id):
 def students_page():
     guard = require_role('admin')
     if guard: return guard
-    pending_students = get_pending_students()
+    pending_students = get_pending_users()
     all_students     = get_all_students()
     institutes       = get_all_institutes()
     unread           = _get_unread(session['user_id'])
@@ -1737,7 +1737,7 @@ def super_admin_page():
         flash("Access denied.", "danger")
         return redirect(url_for('dashboard'))
     users            = get_all_users()
-    pending_students = get_pending_students()
+    pending_students = get_pending_users()
     institutes       = get_all_institutes()
     unread           = _get_unread(session['user_id'])
     return render_template("super_admin.html",

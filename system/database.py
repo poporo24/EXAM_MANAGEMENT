@@ -364,7 +364,7 @@ def get_all_students():
     finally:
         db.close()
 
-def get_pending_students():
+def get_pending_users():
     """Return students who have registered but not yet been approved (is_active=0)."""
     db = open_db()
     if not db: return []
@@ -372,31 +372,74 @@ def get_pending_students():
         cursor = db.cursor(dictionary=True)
         cursor.execute(
             "SELECT id, full_name, email, section, institute_id, created_at "
-            "FROM users WHERE role='student' AND is_active=0 ORDER BY created_at DESC"
+            "FROM users WHERE role IN ('student', 'proctor') AND is_active=0 ORDER BY created_at DESC"
         )
         return cursor.fetchall()
     finally:
         db.close()
 
 def approve_student(user_id):
-    """Activate a student account and notify them."""
+    """Activate a student/proctor account and notify them."""
     db = open_db()
     if not db: return False
     try:
         cursor   = db.cursor()
         cursor_r = db.cursor(dictionary=True)
-        cursor.execute("UPDATE users SET is_active=1 WHERE id=%s AND role='student'", (user_id,))
+        # Update for both students and proctors
+        cursor.execute("UPDATE users SET is_active=1 WHERE id=%s AND role IN ('student', 'proctor')", (user_id,))
         db.commit()
-        # Notify the student
-        cursor_r.execute("SELECT full_name FROM users WHERE id=%s", (user_id,))
+        
+        # Notify via in-app and Email
+        cursor_r.execute("SELECT full_name, email, role FROM users WHERE id=%s", (user_id,))
         row = cursor_r.fetchone()
-        name = row['full_name'] if row else 'Student'
-        create_notification(
-            user_id,
-            "✅ Account Approved",
-            f"Hi {name}! Your student account has been approved by the administrator. "
-            "You can now log in and view your exam timetable."
-        )
+        if not row:
+            return True
+            
+        name = row['full_name']
+        email = row['email']
+        role = row['role']
+        
+        if role == 'student':
+            title = "Account Approved"
+            msg = (f"Hi {name}! Your student account has been approved by the administrator. "
+                   "You can now log in and view your exam timetable.")
+            email_subj = "Account Approved - Exam Timetable Available"
+            email_body = (f"Dear {name},
+
+"
+                          "Your account has been approved by the administrator. "
+                          "Your exam timetable is now available on the system.
+
+"
+                          "Please log in to the CCA Exam Management System to view your schedule.
+
+"
+                          "Best,
+CCA Exam Management System")
+        else:
+            title = "Proctor Account Approved"
+            msg = (f"Hi {name}! Your proctor account has been approved by the administrator. "
+                   "You can now log in and view your proctoring schedule.")
+            email_subj = "Account Approved - Proctoring Schedule Available"
+            email_body = (f"Dear {name},
+
+"
+                          "Your proctor account has been approved by the administrator. "
+                          "Your assigned proctoring schedule is now available on the system.
+
+"
+                          "Please log in to the CCA Exam Management System to view your assignments and set your availability.
+
+"
+                          "Best,
+CCA Exam Management System")
+            
+        create_notification(user_id, title, msg)
+        
+        # Send Email
+        from app import send_email_notification
+        send_email_notification(email, email_subj, email_body)
+        
         return True
     finally:
         db.close()

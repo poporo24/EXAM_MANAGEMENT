@@ -1,29 +1,5 @@
-subject_name,section,subject_type,duration_minutes,institute_code
-Programming 1,IT1A,Major,90,ICSLIS
-Programming 1,IT1B,Major,90,ICSLIS
-Programming 2,IT2A,Major,90,ICSLIS
-Programming 2,IT2B,Major,90,ICSLIS
-Information Technology 2,IT2A,Major,90,ICSLIS
-Database Management Systems,IT3A,Major,90,ICSLIS
-Web Development 1,IT2A,Major,90,ICSLIS
-System Analysis and Design,IT3A,Major,90,ICSLIS
-Computer Networks,IT3B,Major,90,ICSLIS
-Operating Systems,IT3A,Major,90,ICSLIS
-Library Science 1,LIS1A,Major,90,ICSLIS
-Business Communication,IBM1A,Major,90,IBM
-Business Communication,IBM1B,Major,90,IBM
-Principles of Marketing,IBM2A,Major,90,IBM
-Business Management,IBM2A,Major,90,IBM
-Financial Accounting,IBM1A,Major,90,IBM
-Business Law,IBM2B,Major,90,IBM
-Entrepreneurship,IBM3A,Major,90,IBM
-Foundation of Education,IEAS1A,Major,90,IEAS
-Child and Adolescent Development,IEAS2A,Major,90,IEAS
-Arts Appreciation,IEAS1A,Major,90,IEAS
-Filipino 1,GED1A,Minor,60,
-Filipino 1,GED1B,Minor,60,
-English Communication 1,GED1A,Minor,60,
-English Communication 1,GED1B,Minor,60,
-Mathematics in the Modern World,GED1A,Minor,60,
-Physical Education 1,GED1A,Minor,60,
-National Service Training Program 1,GED1A,Minor,60,
+subject_code,section,subject_type,duration_minutes,institute_code
+IT111,IT1A,Major,90,ICSLIS
+IBM111,IBM1A,Major,90,IBM
+IEAS111,IEAS1A,Major,90,IEAS
+FIL111,GED1A,Minor,60,

@@ -1373,9 +1373,21 @@ def import_exams():
     from system.importer import parse_exams_csv
     rows, parse_errors = parse_exams_csv(f.read())
     institutes = {i['code']: i['id'] for i in get_all_institutes()}
+    subjects_by_code = {s['code'].upper(): s for s in get_all_subjects()}
+    
     for r in rows:
         code = r.pop('institute_code', '').upper()
         r['institute_id'] = institutes.get(code)
+        
+        subj_code = r.pop('subject_code', '').upper()
+        subj = subjects_by_code.get(subj_code)
+        if subj:
+            r['subject_id'] = subj['id']
+            r['subject_name'] = subj['name']
+        else:
+            r['subject_id'] = None
+            r['subject_name'] = subj_code # Fallback to code if not found
+
     ok, errors = bulk_import_exams(rows)
     if parse_errors:
         flash(f"Parse warnings: {'; '.join(parse_errors)}", "warning")

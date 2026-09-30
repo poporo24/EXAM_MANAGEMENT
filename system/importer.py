@@ -89,7 +89,7 @@ def parse_subjects_csv(file_content_bytes):
     return (rows, errors)
 
 def parse_exams_csv(file_content_bytes):
-    """Expected columns: subject_name, section, subject_type, duration_minutes, institute_code
+    """Expected columns: subject_code, section, subject_type, duration_minutes, institute_code
     subject_type must be 'Major' or 'Minor' (defaults to 'Major').
     Returns list of dicts ready for bulk_import_exams."""
     rows = []
@@ -100,16 +100,16 @@ def parse_exams_csv(file_content_bytes):
         reader = csv.DictReader(io.StringIO(content))
         for i, row in enumerate(reader):
             try:
-                subject_name = row.get('subject_name', '').strip()
-                if not subject_name:
-                    errors.append(f"Row {i+2}: Missing subject_name")
+                subject_code = row.get('subject_code', '').strip()
+                if not subject_code:
+                    errors.append(f"Row {i+2}: Missing subject_code")
                     continue
                 subject_type = row.get('subject_type', 'Major').strip()
                 if subject_type not in ('Major', 'Minor'):
                     subject_type = 'Major'
                 duration = int(row.get('duration_minutes', 60) or 60)
                 rows.append({
-                    'subject_name': subject_name,
+                    'subject_code': subject_code,
                     'section': row.get('section', '').strip().upper(),
                     'subject_type': subject_type,
                     'duration_minutes': duration,

@@ -1,5 +1,5 @@
-subject_name,section,subject_type,duration_minutes,institute_code
-Programming 1,IT1A,Major,90,ICSLIS
-Business Communication,IBM1A,Major,90,IBM
-Foundation of Education,IEAS1A,Major,90,IEAS
-Filipino 1,GED1A,Minor,60,
+subject_code,section,subject_type,duration_minutes,institute_code
+IT111,IT1A,Major,90,ICSLIS
+IBM111,IBM1A,Major,90,IBM
+IEAS111,IEAS1A,Major,90,IEAS
+FIL111,GED1A,Minor,60,

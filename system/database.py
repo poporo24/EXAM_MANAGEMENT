@@ -760,8 +760,8 @@ def bulk_import_exams(rows):
                 else:
                     dur_min = major_min
                 cursor.execute(
-                    """INSERT INTO exams (subject_name, section, subject_type, duration_minutes, status, institute_id)
-                       VALUES (%s, %s, %s, %s, 'Pending', %s)""",
+                    """INSERT INTO exams (subject_name, section, subject_type, duration_minutes, status, institute_id, subject_id)
+                       VALUES (%s, %s, %s, %s, \'Pending\', %s, %s)""",
                     (row.get('subject_name'), row.get('section') or None,
                      subject_type, dur_min,
                      row.get('institute_id')))

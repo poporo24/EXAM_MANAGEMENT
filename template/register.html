@@ -132,18 +132,18 @@
                 <div id="section_container">
                     <label for="section" class="block text-sm font-medium text-gray-700">Section</label>
                     <div class="mt-1 relative rounded-md shadow-sm">
-                        <select name="section" id="section" required class="focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border">
-                            <option value="">Select...</option>
+                        <input type="text" name="section" id="section" list="sectionList" class="focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border" placeholder="e.g. BSCS-3A">
+                        <datalist id="sectionList">
                             {% for sec in sections %}
-                            <option value="{{ sec }}">{{ sec }}</option>
+                            <option value="{{ sec }}">
                             {% endfor %}
-                        </select>
+                        </datalist>
                     </div>
                 </div>
                 <div>
-                    <label for="institute_id" class="block text-sm font-medium text-gray-700">Institute</label>
+                    <label for="institute_id" class="block text-sm font-medium text-gray-700">Institute (Optional)</label>
                     <div class="mt-1 relative rounded-md shadow-sm">
-                        <select name="institute_id" id="institute_id" required class="focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border">
+                        <select name="institute_id" id="institute_id" class="focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border">
                             <option value="">Select...</option>
                             {% for inst in institutes %}
                             <option value="{{ inst.id }}">{{ inst.name }} ({{ inst.code }})</option>

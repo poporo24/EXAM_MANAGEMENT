@@ -318,9 +318,20 @@ def update_user(id, full_name, email, role, section, institute_id, is_super_admi
     db = open_db()
     if not db: return
     try:
-        cursor = db.cursor()
-        cursor.execute("UPDATE users SET full_name=%s, email=%s, role=%s, section=%s, institute_id=%s, is_super_admin=%s WHERE id=%s",
-                       (full_name, email, role, section, institute_id, is_super_admin, id))
+        cursor = db.cursor(dictionary=True)
+        # Check current role and instructor_id
+        cursor.execute("SELECT role, instructor_id FROM users WHERE id=%s", (id,))
+        user = cursor.fetchone()
+        
+        instructor_id = user.get('instructor_id') if user else None
+        
+        # If changing to proctor and doesn't have instructor_id, create one
+        if role == 'proctor' and not instructor_id:
+            cursor.execute("INSERT INTO instructors (name, status, institute_id, is_pwd, subjects_taught) VALUES (%s, 'Active', %s, 0, '')", (full_name, institute_id))
+            instructor_id = cursor.lastrowid
+            
+        cursor.execute("UPDATE users SET full_name=%s, email=%s, role=%s, section=%s, institute_id=%s, is_super_admin=%s, instructor_id=%s WHERE id=%s",
+                       (full_name, email, role, section, institute_id, is_super_admin, instructor_id, id))
         db.commit()
     finally:
         db.close()

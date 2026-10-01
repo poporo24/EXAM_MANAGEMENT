@@ -265,32 +265,29 @@ def login():
 
     
     firebase_token = request.form.get("firebase_token")
-    if not firebase_token:
-        flash("Firebase authentication failed. Missing token.", "error")
-        return redirect(url_for('login'))
-        
-    try:
-        decoded_token = fb_auth.verify_id_token(firebase_token)
-        email = decoded_token.get('email')
-        
-        user = get_user_by_email(email)
-        if not user:
-            flash("User not found in system.", "error")
-            return redirect(url_for('login'))
+    if firebase_token:
+        try:
+            decoded_token = fb_auth.verify_id_token(firebase_token)
+            email = decoded_token.get('email')
             
-        session['user_id']        = user['id']
-        session['full_name']      = user['full_name']
-        session['role']           = user.get('role', 'student')
-        session['email']          = user['email']
-        session['section']        = user.get('section', '')
-        session['institute_id']   = user.get('institute_id')
-        session['instructor_id']  = user.get('instructor_id')
-        session['is_super_admin'] = bool(user.get('is_super_admin', 0))
-        
-        return _redirect_by_role()
-    except Exception as e:
-        flash(f"Invalid login session: {str(e)}", "error")
-        return redirect(url_for('login'))
+            user = get_user_by_email(email)
+            if not user:
+                flash("User not found in system.", "error")
+                return redirect(url_for('login'))
+                
+            session['user_id']        = user['id']
+            session['full_name']      = user['full_name']
+            session['role']           = user.get('role', 'student')
+            session['email']          = user['email']
+            session['section']        = user.get('section', '')
+            session['institute_id']   = user.get('institute_id')
+            session['instructor_id']  = user.get('instructor_id')
+            session['is_super_admin'] = bool(user.get('is_super_admin', 0))
+            
+            return _redirect_by_role()
+        except Exception as e:
+            flash(f"Invalid login session: {str(e)}", "error")
+            return redirect(url_for('login'))
 
         all_exams = get_schedule_results()
         sections = sorted(list(set(e.get('section', '').strip() for e in all_exams if e.get('section', '').strip() and e.get('status') == 'Scheduled')))
@@ -1774,7 +1771,7 @@ def super_edit_user(id):
         flash("Access denied.", "danger")
         return redirect(url_for('dashboard'))
     try:
-        full_name    = request.form.get("full_name", "").strip()
+        full_name    = request.form.get("name", "").strip()
         email        = request.form.get("email", "").strip()
         role         = request.form.get("role", "student").strip()
         section      = request.form.get("section", "").strip()

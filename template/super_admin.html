@@ -322,9 +322,23 @@
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Edit User Account</h3>
                     <form id="editUserForm" method="POST" class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Full Name</label>
-                            <input type="text" name="name" id="edit_name" required class="mt-1 focus:ring-purple-500 block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Last Name</label>
+                                <input type="text" name="last_name" id="edit_last_name" required class="mt-1 focus:ring-purple-500 block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">First Name</label>
+                                <input type="text" name="first_name" id="edit_first_name" required class="mt-1 focus:ring-purple-500 block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Middle Name</label>
+                                <input type="text" name="middle_name" id="edit_middle_name" class="mt-1 focus:ring-purple-500 block w-full sm:text-sm border-gray-300 rounded-md border p-2" placeholder="e.g. M.">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Suffix (Optional)</label>
+                                <input type="text" name="suffix" id="edit_suffix" class="mt-1 focus:ring-purple-500 block w-full sm:text-sm border-gray-300 rounded-md border p-2" placeholder="e.g. Jr.">
+                            </div>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Email</label>
@@ -446,7 +460,7 @@
               if(document.getElementById('edit_last_name')) document.getElementById('edit_last_name').value = lastName;
               if(document.getElementById('edit_middle_name')) document.getElementById('edit_middle_name').value = middleName;
               if(document.getElementById('edit_suffix')) document.getElementById('edit_suffix').value = suffix;
-              document.getElementById('edit_name').value = name;
+
               document.getElementById('edit_email').value = email;
               document.getElementById('edit_role').value = role;
               document.getElementById('edit_section').value = section !== 'None' ? section : '';

@@ -275,6 +275,10 @@ def login():
                 flash("User not found in system.", "error")
                 return redirect(url_for('login'))
                 
+            if not user.get('is_active', 1):
+                flash("Your account is pending admin approval. You will be notified once it is activated.", "warning")
+                return redirect(url_for('login'))
+                
             session['user_id']        = user['id']
             session['full_name']      = user['full_name']
             session['role']           = user.get('role', 'student')
@@ -460,200 +464,33 @@ def create_room():
     return redirect(url_for('dashboard') + '#rooms')
 
 @app.route("/add_instructor", methods=["POST"])
-def create_instructor():
+def add_instructor_route():
     guard = require_role('admin')
     if guard: return guard
-    name = request.form.get("name", "").strip()
     
-    existing_instructors = get_all_instructors()
-    if any(i['name'].lower() == name.lower() for i in existing_instructors):
-        flash(f"Warning: Instructor '{name}' is already registered in the system.", "error")
-        return redirect(url_for('dashboard') + '#instructors')
-
+    last = request.form.get("last_name", "").strip()
+    first = request.form.get("first_name", "").strip()
+    middle = request.form.get("middle_name", "").strip()
+    suffix = request.form.get("suffix", "").strip()
+    
+    if last and first:
+        full_name = f"{last}, {first}"
+        if middle:
+            full_name += f" {middle[0]}." if len(middle) == 1 else f" {middle}"
+        if suffix:
+            full_name += f" {suffix}"
+    else:
+        full_name = request.form.get("name", "").strip()
+        
     add_instructor(
-        name,
-        institute_id=request.form.get("institute_id") or None,
-        building=request.form.get("building", ""),
-        is_pwd=1 if request.form.get("is_pwd") else 0,
-        subjects_taught=request.form.get("subjects_taught", "")
-    )
-    flash("Instructor added and proctor account created.", "success")
-    return redirect(url_for('dashboard') + '#instructors')
-
-@app.route("/add_exam", methods=["POST"])
-def create_exam():
-    guard = require_role('admin')
-    if guard: return guard
-    subject_id = request.form.get("subject_id")
-    section = request.form.get("section", "").strip()
-    
-    existing_exams = get_all_exams()
-    if any(str(e.get('subject_id')) == str(subject_id) and e.get('section', '').lower() == section.lower() for e in existing_exams):
-        flash(f"Warning: An exam for this subject and section already exists.", "error")
-        return redirect(url_for('dashboard') + '#exams')
-
-    # Auto-fetch subject name to ensure it exactly matches the linked subject
-    existing_subjects = get_all_subjects()
-    subject_name = next((s['name'] for s in existing_subjects if str(s['id']) == str(subject_id)), request.form.get("name", "Unknown"))
-
-    add_exam(
-        subject_name,
-        request.form.get("section", "").strip(),
-        request.form.get("subject_type", "Major"),
-        int(float(request.form.get("duration_hours", 1)) * 60),
-        institute_id=request.form.get("institute_id") or None,
-        subject_id=request.form.get("subject_id") or None
-    )
-    flash("Exam added.", "success")
-    return redirect(url_for('dashboard') + '#exams')
-
-# ── EDIT ROUTES ───────────────────────────────────────────────────────────────
-
-@app.route("/edit_room/<int:id>", methods=["POST"])
-def update_room(id):
-    guard = require_role('admin')
-    if guard: return guard
-    edit_room(
-        id,
-        request.form.get("room_name"),
-        request.form.get("capacity"),
-        request.form.get("building", ""),
-        request.form.get("floor", 1),
-        request.form.get("institute_id") or None,
-        1 if request.form.get("is_pwd_accessible") else 0
-    )
-    flash("Room updated.", "success")
-    return redirect(url_for('dashboard') + '#rooms')
-
-@app.route("/edit_instructor/<int:id>", methods=["POST"])
-def update_instructor(id):
-    guard = require_role('admin')
-    if guard: return guard
-    edit_instructor(
-        id,
-        request.form.get("name"),
+        full_name,
         request.form.get("institute_id") or None,
         request.form.get("building", ""),
         1 if request.form.get("is_pwd") else 0,
         request.form.get("subjects_taught", "")
     )
-    flash("Instructor updated.", "success")
-    return redirect(url_for('dashboard') + '#instructors')
-
-@app.route("/edit_exam_details/<int:id>", methods=["POST"])
-def update_exam_details(id):
-    guard = require_role('admin')
-    if guard: return guard
-    edit_exam_details(
-        id,
-        request.form.get("name"),
-        request.form.get("section", "").strip(),
-        request.form.get("subject_type", "Major"),
-        int(float(request.form.get("duration_hours", 1)) * 60),
-        request.form.get("institute_id") or None,
-        request.form.get("subject_id") or None
-    )
-    flash("Exam updated.", "success")
-    return redirect(url_for('dashboard') + '#exams')
-
-# ── DEACTIVATE / ACTIVATE ─────────────────────────────────────────────────────
-
-@app.route("/deactivate_instructor/<int:id>", methods=["POST"])
-def deact_instructor(id):
-    guard = require_role('admin')
-    if guard: return guard
-    deactivate_instructor(id)
-    flash("Instructor deactivated.", "warning")
-    return redirect(url_for('dashboard') + '#instructors')
-
-@app.route("/activate_instructor/<int:id>", methods=["POST"])
-def act_instructor(id):
-    guard = require_role('admin')
-    if guard: return guard
-    activate_instructor(id)
-    flash("Instructor activated.", "success")
-    return redirect(url_for('dashboard') + '#instructors')
-
-# ── DELETE ROUTES ─────────────────────────────────────────────────────────────
-
-@app.route("/delete_room/<int:id>")
-def remove_room(id):
-    guard = require_role('admin')
-    if guard: return guard
-    err = delete_room(id)
-    if err:
-        flash(f'Cannot delete room: {err}', 'danger')
-    else:
-        flash('Room deleted.', 'success')
-    return redirect(url_for('dashboard') + '#rooms')
-
-@app.route("/rooms/bulk_delete", methods=["POST"])
-def bulk_delete_rooms():
-    guard = require_role('admin')
-    if guard: return guard
-    ids = request.form.getlist('room_ids')
-    if not ids:
-        flash("No rooms selected.", "warning")
-        return redirect(url_for('dashboard') + '#rooms')
-    deleted, errors = 0, []
-    for sid in ids:
-        try:
-            err = delete_room(int(sid))
-            if err:
-                errors.append(err)
-            else:
-                deleted += 1
-        except Exception as e:
-            errors.append(str(e))
-    if deleted:
-        flash(f"✅ {deleted} room(s) deleted successfully.", "success")
-    if errors:
-        flash(f"⚠️ {len(errors)} room(s) could not be deleted: " + "; ".join(errors), "warning")
-    return redirect(url_for('dashboard') + '#rooms')
-
-@app.route("/delete_instructor/<int:id>")
-def remove_instructor(id):
-    guard = require_role('admin')
-    if guard: return guard
-    err = delete_instructor(id)
-    if err:
-        flash(f'Cannot delete instructor: {err}', 'danger')
-    else:
-        flash('Instructor deleted.', 'success')
-    return redirect(url_for('dashboard') + '#instructors')
-
-@app.route("/instructors/bulk_delete", methods=["POST"])
-def bulk_delete_instructors():
-    guard = require_role('admin')
-    if guard: return guard
-    ids = request.form.getlist('instructor_ids')
-    if not ids:
-        flash("No instructors selected.", "warning")
-        return redirect(url_for('dashboard') + '#instructors')
-    deleted, errors = 0, []
-    for sid in ids:
-        try:
-            err = delete_instructor(int(sid))
-            if err:
-                errors.append(err)
-            else:
-                deleted += 1
-        except Exception as e:
-            errors.append(str(e))
-    if deleted:
-        flash(f"✅ {deleted} instructor(s) deleted successfully.", "success")
-    if errors:
-        flash(f"⚠️ {len(errors)} instructor(s) could not be deleted: " + "; ".join(errors), "warning")
-    return redirect(url_for('dashboard') + '#instructors')
-
-@app.route("/faculty/bulk_delete", methods=["POST"])
-def bulk_delete_faculty():
-    guard = require_role('admin')
-    if guard: return guard
-    ids = request.form.getlist('instructor_ids')
-    if not ids:
-        flash("No instructors selected.", "warning")
-        return redirect(url_for('faculty_page'))
+    flash("Instructor added.", "success")
+    return redirect(url_for('faculty_page'))
     deleted, errors = 0, []
     for sid in ids:
         try:
@@ -1266,8 +1103,23 @@ def faculty_page():
 def faculty_edit(id):
     guard = require_role('admin')
     if guard: return guard
+    
+    last = request.form.get("last_name", "").strip()
+    first = request.form.get("first_name", "").strip()
+    middle = request.form.get("middle_name", "").strip()
+    suffix = request.form.get("suffix", "").strip()
+    
+    if last and first:
+        full_name = f"{last}, {first}"
+        if middle:
+            full_name += f" {middle[0]}." if len(middle) == 1 else f" {middle}"
+        if suffix:
+            full_name += f" {suffix}"
+    else:
+        full_name = request.form.get("name", "").strip()
+        
     edit_instructor(id,
-        request.form.get("name"),
+        full_name,
         request.form.get("institute_id") or None,
         request.form.get("building", ""),
         1 if request.form.get("is_pwd") else 0,
@@ -1771,7 +1623,22 @@ def super_edit_user(id):
         flash("Access denied.", "danger")
         return redirect(url_for('dashboard'))
     try:
-        full_name    = request.form.get("name", "").strip()
+        # Construct full name from 4 fields if they exist, otherwise fallback to "name"
+        last = request.form.get("last_name", "").strip()
+        first = request.form.get("first_name", "").strip()
+        middle = request.form.get("middle_name", "").strip()
+        suffix = request.form.get("suffix", "").strip()
+        
+        if last and first:
+            # Format: Lastname, Firstname M. Suffix
+            full_name = f"{last}, {first}"
+            if middle:
+                full_name += f" {middle[0]}." if len(middle) == 1 else f" {middle}"
+            if suffix:
+                full_name += f" {suffix}"
+        else:
+            full_name = request.form.get("name", "").strip()
+            
         email        = request.form.get("email", "").strip()
         role         = request.form.get("role", "student").strip()
         section      = request.form.get("section", "").strip()
@@ -1782,6 +1649,41 @@ def super_edit_user(id):
         if role not in ("admin", "secretary", "proctor", "student"):
             flash("Invalid role selected.", "danger")
             return redirect(url_for('super_admin_page'))
+
+        # GET OLD EMAIL FIRST before updating DB!
+        from system.database import open_db, update_user
+        db = open_db()
+        old_email = None
+        if db:
+            try:
+                c = db.cursor(dictionary=True)
+                c.execute("SELECT email FROM users WHERE id = %s", (id,))
+                row = c.fetchone()
+                if row: old_email = row['email']
+            finally:
+                db.close()
+
+        # Update local DB
+        update_user(id, full_name, email, role, section, institute_id, is_sa)
+
+        # Sync email & name to Firebase
+        if old_email:
+            try:
+                from firebase_admin import auth as fb_auth
+                try:
+                    fb_user = fb_auth.get_user_by_email(old_email)
+                    # Update both email and display_name
+                    fb_auth.update_user(fb_user.uid, email=email, display_name=full_name)
+                except fb_auth.UserNotFoundError:
+                    # If they don't exist in Firebase, maybe create them?
+                    pass
+            except Exception as fb_err:
+                print(f"Firebase sync error: {fb_err}")
+
+        flash(f"User '{full_name}' updated successfully to role '{role}'.", "success")
+    except Exception as e:
+        flash(f"Error updating user: {str(e)}", "danger")
+    return redirect(url_for('super_admin_page'))
 
         # Update local DB
         update_user(id, full_name, email, role, section, institute_id, is_sa)

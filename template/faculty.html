@@ -302,9 +302,23 @@
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Add New Instructor</h3>
                     <form action="/add_instructor" method="POST" id="addInstructorForm" class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Full Name</label>
-                            <input type="text" name="name" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Last Name</label>
+                                <input type="text" name="last_name" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">First Name</label>
+                                <input type="text" name="first_name" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Middle Name</label>
+                                <input type="text" name="middle_name" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2" placeholder="e.g. M.">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Suffix (Optional)</label>
+                                <input type="text" name="suffix" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2" placeholder="e.g. Jr.">
+                            </div>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Institute</label>
@@ -341,9 +355,23 @@
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Edit Instructor</h3>
                     <form id="editInstructorForm" method="POST" class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Full Name</label>
-                            <input type="text" name="name" id="edit_inst_name" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Last Name</label>
+                                <input type="text" name="last_name" id="edit_inst_last" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">First Name</label>
+                                <input type="text" name="first_name" id="edit_inst_first" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Middle Name</label>
+                                <input type="text" name="middle_name" id="edit_inst_middle" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2" placeholder="e.g. M.">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Suffix (Optional)</label>
+                                <input type="text" name="suffix" id="edit_inst_suffix" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2" placeholder="e.g. Jr.">
+                            </div>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Institute</label>
@@ -476,7 +504,23 @@
 
         function openEditInstructorModal(id, name, inst_id, building, is_pwd, subjects) {
             document.getElementById('editInstructorForm').action = '/faculty/' + id + '/edit';
-            document.getElementById('edit_inst_name').value = name;
+            
+            // Parse "Lastname, Firstname M. Suffix" back into individual fields
+            var lastName = '', firstName = '', middleName = '', suffix = '';
+            if (name.includes(',')) {
+                var commaIdx = name.indexOf(',');
+                lastName = name.substring(0, commaIdx).trim();
+                var rest = name.substring(commaIdx + 1).trim().split(' ').filter(Boolean);
+                var suffixes = ['Jr.', 'Sr.', 'III', 'II', 'IV', 'V'];
+                if (rest.length > 1 && suffixes.indexOf(rest[rest.length - 1]) !== -1) { suffix = rest.pop(); }
+                if (rest.length > 1 && rest[rest.length - 1].length <= 3 && rest[rest.length - 1].endsWith('.')) { middleName = rest.pop().replace('.', ''); }
+                firstName = rest.join(' ');
+            } else { firstName = name; }
+            
+            document.getElementById('edit_inst_last').value = lastName;
+            document.getElementById('edit_inst_first').value = firstName;
+            document.getElementById('edit_inst_middle').value = middleName;
+            document.getElementById('edit_inst_suffix').value = suffix;
             document.getElementById('edit_inst_institute').value = inst_id;
             document.getElementById('edit_inst_building').value = building !== 'None' ? building : '';
             document.getElementById('edit_inst_subjects').value = subjects !== 'None' ? subjects : '';

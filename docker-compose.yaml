@@ -1,0 +1,25 @@
+services:
+  web:
+    build: .
+    ports:
+      - "9999:8000"
+    environment:
+      - PORT=8000
+      - DATABASE_URL=mysql://root:rootpassword@db:3306/cca_exam_management_db
+    depends_on:
+      - db
+
+  db:
+    image: mariadb:10.4
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: cca_exam_management_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./cca_exam_db_export.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  db_data:

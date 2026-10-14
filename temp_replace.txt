@@ -1,0 +1,32 @@
+@app.route("/admin/change_password/<int:user_id>", methods=["POST"])
+def admin_change_password(user_id):
+    guard = require_role('admin')
+    if guard: return guard
+    new_password = request.form.get("new_password", "").strip()
+    confirm_password = request.form.get("confirm_password", "").strip()
+    redirect_to = request.form.get("redirect_to", "students_page")
+    if not new_password or len(new_password) < 6:
+        flash("Password must be at least 6 characters.", "danger")
+        return redirect(url_for(redirect_to))
+    if new_password != confirm_password:
+        flash("Passwords do not match.", "danger")
+        return redirect(url_for(redirect_to))
+    db = open_db()
+    if db:
+        try:
+            import bcrypt as _bcrypt
+            hashed = _bcrypt.hashpw(new_password.encode(), _bcrypt.gensalt()).decode()
+            c = db.cursor(dictionary=True)
+            c.execute("SELECT full_name, role FROM users WHERE id = %s", (user_id,))
+            user = c.fetchone()
+            if not user or user['role'] not in ('student', 'proctor'):
+                flash("User not found or not allowed.", "danger")
+                return redirect(url_for(redirect_to))
+            c.execute("UPDATE users SET password = %s WHERE id = %s", (hashed, user_id))
+            db.commit()
+            flash(f"✅ Password changed for {user['full_name']}.", "success")
+        except Exception as e:
+            flash(f"Error: {e}", "danger")
+        finally:
+            db.close()
+    return redirect(url_for(redirect_to))

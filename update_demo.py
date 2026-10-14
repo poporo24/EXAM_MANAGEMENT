@@ -1,0 +1,308 @@
+import os
+
+html_content = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCA Exam Management System - Live Demonstration Portal (Full Suite)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .step-active { border-color: #668054; background-color: #f4f7f2; }
+        .tab-btn.active { border-bottom: 3px solid #668054; color: #668054; font-weight: 700; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen pb-20">
+
+    <!-- Header Navigation -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-[#668054] text-white flex items-center justify-center font-bold text-xl shadow-sm">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-gray-900 leading-tight">CCA Exam Management System</h1>
+                    <p class="text-xs text-gray-500 font-medium">Comprehensive System Demonstration Guide</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="http://127.0.0.1:9999" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-[#668054] hover:bg-[#526842] text-white text-sm font-semibold rounded-lg shadow transition">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Live App
+                </a>
+                <button onclick="window.print()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                    <i class="fa-solid fa-print mr-1"></i> Print PDF
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-6 mt-8">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
+            <div class="bg-gray-900 px-8 py-10 text-white">
+                <h2 class="text-3xl font-bold mb-4">Complete End-to-End System Showcase</h2>
+                <p class="text-gray-300 max-w-3xl text-lg">This guide covers the absolute entirety of the system's capabilities, spanning all 5 distinct user roles. It demonstrates data onboarding, AI scheduling, conflict resolution, proctor availability, exam execution tracking, and report generation.</p>
+            </div>
+            
+            <div class="p-8">
+                <h3 class="text-xl font-bold text-gray-800 mb-6 border-b pb-2">Demonstration Accounts Matrix</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div class="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">Super Admin</div>
+                        <div class="font-semibold text-gray-900">superadmin@cca.edu.ph</div>
+                        <div class="text-xs text-gray-500 mt-1">Full system & user control</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div class="text-xs font-bold text-orange-600 uppercase tracking-wider mb-1">Admin</div>
+                        <div class="font-semibold text-gray-900">admin@cca.edu.ph</div>
+                        <div class="text-xs text-gray-500 mt-1">Scheduling & Logistics</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div class="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Secretary</div>
+                        <div class="font-semibold text-gray-900">secretary@cca.edu.ph</div>
+                        <div class="text-xs text-gray-500 mt-1">Paper Tracking & Absences</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div class="text-xs font-bold text-[#668054] uppercase tracking-wider mb-1">Proctor</div>
+                        <div class="font-semibold text-gray-900">instructor@cca.edu.ph</div>
+                        <div class="text-xs text-gray-500 mt-1">Views exams & availability</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div class="text-xs font-bold text-purple-600 uppercase tracking-wider mb-1">Student</div>
+                        <div class="font-semibold text-gray-900">student@cca.edu.ph</div>
+                        <div class="text-xs text-gray-500 mt-1">Views personal timetable</div>
+                    </div>
+                </div>
+
+                <div class="space-y-8">
+                    <!-- Stage 1 -->
+                    <div class="flex gap-6">
+                        <div class="flex-shrink-0 w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center font-bold text-xl border-2 border-red-200">1</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Stage 1: Super Admin System Initialization</h3>
+                            <p class="text-gray-600 mb-3"><strong>Actor:</strong> Super Admin &bull; <strong>Goal:</strong> System setup and user management.</p>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                                <li>Log in as <strong>Super Admin</strong>.</li>
+                                <li>Navigate to <strong>User Management</strong>. Show how Super Admins can add and manage all account tiers (Admins, Secretaries, Proctors, Students).</li>
+                                <li>Show how roles dictate exact portal access limits.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Stage 2 -->
+                    <div class="flex gap-6">
+                        <div class="flex-shrink-0 w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold text-xl border-2 border-orange-200">2</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Stage 2: Data Import & Availability Assignment</h3>
+                            <p class="text-gray-600 mb-3"><strong>Actor:</strong> Admin &bull; <strong>Goal:</strong> Bulk onboarding.</p>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                                <li>Log in as <strong>Admin</strong>.</li>
+                                <li>Go to <strong>Dashboard</strong> and demonstrate the robust <strong>CSV Import Modals</strong> for Rooms, Instructors, and Exams.</li>
+                                <li>Point out that the Instructor CSV parser automatically reads the <code>availability</code> column (e.g., "Mon 07:00-12:00") and applies it across the active exam period.</li>
+                                <li>Go to <strong>Faculty</strong>, select an instructor, and click the Calendar icon to show the <strong>Admin Proctor Availability</strong> manager where Admins set exact shift times for proctors.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Stage 3 -->
+                    <div class="flex gap-6">
+                        <div class="flex-shrink-0 w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold text-xl border-2 border-orange-200">3</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Stage 3: Cross-Institute Subject Aliasing</h3>
+                            <p class="text-gray-600 mb-3"><strong>Actor:</strong> Admin &bull; <strong>Goal:</strong> Linking identical courses.</p>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                                <li>Go to the <strong>Subjects</strong> tab.</li>
+                                <li>Explain the CCA curriculum problem: Identical syllabi are taught under different codes (e.g., ICSLIS `IT201` and IBM `BUS105`).</li>
+                                <li>Select both subjects via the checkboxes and click <strong>Link Selected</strong>.</li>
+                                <li>Show how they are now bound in an <strong>Alias Group</strong>, forcing the auto-scheduler to bundle them in the exact same room and time to save resources.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Stage 4 -->
+                    <div class="flex gap-6">
+                        <div class="flex-shrink-0 w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold text-xl border-2 border-orange-200">4</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Stage 4: The AI Auto-Scheduler Engine</h3>
+                            <p class="text-gray-600 mb-3"><strong>Actor:</strong> Admin &bull; <strong>Goal:</strong> Generating the master schedule.</p>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                                <li>Go to the <strong>Schedule</strong> tab.</li>
+                                <li>Click <strong>Run Auto-Scheduler</strong>.</li>
+                                <li>Explain the 4 strict constraints it evaluates during execution:
+                                    <ol class="list-decimal pl-5 mt-1 space-y-1 text-sm text-gray-600">
+                                        <li><strong>Student Wellness:</strong> Max 2 Major subjects per day per section.</li>
+                                        <li><strong>Instructor Neutrality:</strong> Faculty cannot proctor their own taught subjects.</li>
+                                        <li><strong>Accessibility:</strong> PWD instructors are confined to ground floor/accessible rooms.</li>
+                                        <li><strong>Logistics:</strong> Applies a 15-minute travel buffer between different buildings.</li>
+                                        <li><strong>Availability:</strong> Honors the strict time slots set by the Admin in Stage 2.</li>
+                                    </ol>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Stage 5 -->
+                    <div class="flex gap-6">
+                        <div class="flex-shrink-0 w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold text-xl border-2 border-orange-200">5</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Stage 5: Manual Overrides & Live Conflict Detection</h3>
+                            <p class="text-gray-600 mb-3"><strong>Actor:</strong> Admin &bull; <strong>Goal:</strong> Handling exceptions safely.</p>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                                <li>While on the <strong>Schedule</strong> matrix, click an exam to manually Edit it.</li>
+                                <li>Attempt to assign a Proctor to a time slot where they are unavailable, or to a room that is already booked.</li>
+                                <li>Showcase the resulting <strong>Error Modal</strong>, proving the system actively prevents human error during manual adjustments.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Stage 6 -->
+                    <div class="flex gap-6">
+                        <div class="flex-shrink-0 w-12 h-12 bg-[#668054] text-white rounded-full flex items-center justify-center font-bold text-xl border-2 border-[#829c74]">6</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Stage 6: The Proctor Experience</h3>
+                            <p class="text-gray-600 mb-3"><strong>Actor:</strong> Proctor &bull; <strong>Goal:</strong> Viewing assignments.</p>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                                <li>Log out and log in as a <strong>Proctor</strong>.</li>
+                                <li>Show the <strong>Proctor Dashboard</strong> highlighting total assigned hours.</li>
+                                <li>Direct attention to the <strong>My Assigned Availability</strong> widget, showing the proctor the exact dates/times the Administration has cleared them for duty.</li>
+                                <li>Show the button to <strong>Report Absence</strong> in case of emergency.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Stage 7 -->
+                    <div class="flex gap-6">
+                        <div class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xl border-2 border-blue-200">7</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Stage 7: Secretary Paper Lifecycle & Absences</h3>
+                            <p class="text-gray-600 mb-3"><strong>Actor:</strong> Secretary &bull; <strong>Goal:</strong> Operational tracking.</p>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                                <li>Log out and log in as <strong>Secretary</strong>.</li>
+                                <li>Demonstrate the live timeline tracking of exam papers: <span class="bg-gray-200 px-2 py-0.5 rounded text-xs font-bold">Pending</span> &rarr; <span class="bg-blue-200 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">Collected</span> &rarr; <span class="bg-green-200 text-green-800 px-2 py-0.5 rounded text-xs font-bold">Returned</span>.</li>
+                                <li>Show the <strong>Absence Reports</strong> tab where secretaries can assign substitute 'Reliever' proctors dynamically when someone calls in sick.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Stage 8 -->
+                    <div class="flex gap-6">
+                        <div class="flex-shrink-0 w-12 h-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center font-bold text-xl border-2 border-purple-200">8</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Stage 8: Student Portal</h3>
+                            <p class="text-gray-600 mb-3"><strong>Actor:</strong> Student &bull; <strong>Goal:</strong> Accessing schedule.</p>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                                <li>Log out and log in as <strong>Student</strong>.</li>
+                                <li>Show the clean, read-only Timetable.</li>
+                                <li>Demonstrate that students only see exams for their specific section and subjects.</li>
+                                <li>Click the <strong>Download PDF</strong> / Print button.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Stage 9 -->
+                    <div class="flex gap-6">
+                        <div class="flex-shrink-0 w-12 h-12 bg-gray-200 text-gray-700 rounded-full flex items-center justify-center font-bold text-xl border-2 border-gray-300">9</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Stage 9: Reports & Analytics</h3>
+                            <p class="text-gray-600 mb-3"><strong>Actor:</strong> Admin/Super Admin &bull; <strong>Goal:</strong> Auditing and exporting.</p>
+                            <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                                <li>Log back in as <strong>Admin</strong> and go to <strong>Reports</strong>.</li>
+                                <li>Show the Proctor Hours report ensuring fair distribution of workload.</li>
+                                <li>Show Room Utilization efficiency.</li>
+                                <li>Click Export to Excel/CSV to demonstrate external system compatibility (CHED reports).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+with open("system_demo_portal.html", "w", encoding="utf-8") as f:
+    f.write(html_content)
+
+md_content = """# CCA Exam Management System – Complete End-to-End Demonstration Guide
+
+## 🎯 Executive Summary
+The **CCA Exam Management System** is an automated scheduling, resource allocation, and proctor governance platform designed for City College of Angeles (CCA). It provides a full-suite solution across 5 user roles to solve complex academic examination bottlenecks.
+
+## 👥 Demonstration Accounts Matrix
+| Role | Recommended Demo Account | Permissions |
+|---|---|---|
+| **Super Admin** | `superadmin@cca.edu.ph` | Full system control, manages users. |
+| **Admin** | `admin@cca.edu.ph` | Schedules, manages data, resolves conflicts. |
+| **Secretary** | `secretary@cca.edu.ph` | Tracks exam papers and manages proctor absences. |
+| **Proctor** | `instructor@cca.edu.ph` | Views assigned exams and assigned availability. |
+| **Student** | `student@cca.edu.ph` | Views personal examination timetable. |
+
+---
+
+## 🎬 9-Stage Demonstration Flow
+
+### Stage 1: Super Admin System Initialization
+1. Log in as **Super Admin**.
+2. Navigate to **User Management**. Show how to create accounts for all 5 roles.
+3. Explain how roles compartmentalize access to ensure security.
+
+### Stage 2: Data Import & Availability Assignment
+1. Log in as **Admin**.
+2. Go to **Dashboard** -> Showcase **CSV Import Modals**.
+3. Highlight that the Instructor CSV reads `availability` (e.g., "Mon 07:00-12:00") directly.
+4. Go to **Faculty** -> **Proctor Availability**. Show how admins lock in specific availability hours for faculty.
+
+### Stage 3: Cross-Institute Subject Aliasing
+1. Go to **Subjects**.
+2. Explain the curriculum problem: Identical syllabi under different codes (ICSLIS `IT201` vs IBM `BUS105`).
+3. Select both subjects, click **Link Selected**. Show the creation of an **Alias Group**.
+
+### Stage 4: The AI Auto-Scheduler Engine
+1. Go to **Schedule**.
+2. Click **Run Auto-Scheduler**.
+3. Detail the constraints checked instantly:
+   - **Student Wellness:** Max 2 majors/day.
+   - **Instructor Neutrality:** Cannot proctor own subject.
+   - **Accessibility:** PWD instructors restricted to 1st floor.
+   - **Logistics:** 15-minute inter-building travel buffer.
+   - **Availability:** Only assigns within Admin-approved hours.
+
+### Stage 5: Manual Overrides & Live Conflict Detection
+1. On the **Schedule**, click an exam to manually Edit.
+2. Intentionally create a conflict (book a busy room or unavailable proctor).
+3. Show the **Error Modal**, proving the system intercepts human error.
+
+### Stage 6: The Proctor Experience
+1. Log in as **Proctor**.
+2. Show the **Proctor Dashboard**.
+3. Highlight the **My Assigned Availability** widget, showing exactly what the Admin cleared them for.
+4. Show the **Report Absence** button for emergencies.
+
+### Stage 7: Secretary Paper Lifecycle & Absences
+1. Log in as **Secretary**.
+2. Showcase paper tracking: **Pending** -> **Collected** -> **Returned**.
+3. Show the **Absence Reports** tab to assign Relievers when proctors call in sick.
+
+### Stage 8: Student Portal
+1. Log in as **Student**.
+2. Show the personalized **Timetable**, filtered only for their section.
+3. Show the PDF/Print functionality.
+
+### Stage 9: Reports & Analytics
+1. Log back in as **Admin**.
+2. Go to **Reports** to showcase Proctor Hours equity and Room Utilization.
+3. Click **Export** to demonstrate CHED/Administrative reporting compliance.
+"""
+
+with open("DEMONSTRATION_GUIDE.md", "w", encoding="utf-8") as f:
+    f.write(md_content)
+
+print("Created updated demo guides.")

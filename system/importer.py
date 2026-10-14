@@ -32,8 +32,9 @@ def parse_rooms_csv(file_content_bytes):
     return (rows, errors)
 
 def parse_instructors_csv(file_content_bytes):
-    """Expected columns: name, institute_code, building, subjects_taught
+    """Expected columns: name, institute_code, building, subjects_taught, availability
     Returns list of dicts."""
+    import re
     rows = []
     errors = []
     try:
@@ -46,13 +47,30 @@ def parse_instructors_csv(file_content_bytes):
                 if not name:
                     errors.append(f"Row {i+2}: Missing name")
                     continue
+                    
+                # Parse availability string e.g. "Mon 07:00-12:00, Wed"
+                raw_avail = row.get('availability', '').strip()
+                parsed_avail = []
+                if raw_avail:
+                    parts = [p.strip() for p in raw_avail.split(',')]
+                    for p in parts:
+                        match = re.match(r'^([A-Za-z]+)\s*(?:(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2}))?$', p)
+                        if match:
+                            day = match.group(1)[:3].capitalize() # Mon, Tue, Wed
+                            start = match.group(2) or '07:00'
+                            end = match.group(3) or '20:00'
+                            parsed_avail.append({'day': day, 'start': start, 'end': end})
+                        else:
+                            errors.append(f"Row {i+2}: Invalid availability format '{p}'")
+                
                 rows.append({
                     'name': name,
                     'email': row.get('email', '').strip(),
                     'institute_code': row.get('institute_code', '').strip(),
                     'building': row.get('building', '').strip(),
                     'is_pwd': int(row.get('is_pwd', 0) or 0),
-                    'subjects_taught': row.get('subjects_taught', '').strip()
+                    'subjects_taught': row.get('subjects_taught', '').strip(),
+                    'availability': parsed_avail
                 })
             except Exception as e:
                 errors.append(f"Row {i+2}: {str(e)}")

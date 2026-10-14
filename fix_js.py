@@ -1,21 +1,63 @@
-import glob
-import re
+with open("template/super_admin.html", "r", encoding="utf-8") as f:
+    html = f.read()
 
-for filepath in glob.glob('template/*.html'):
-    with open(filepath, 'r', encoding='utf-8') as f:
-        content = f.read()
-    
-    # Fix the toggle logic back to single classes
-    content = content.replace("classList.toggle('md:w-64 w-16')", "classList.toggle('md:w-64')\n          sidebar.classList.toggle('w-0')")
-    content = content.replace("classList.toggle('md:ml-64 ml-0')", "classList.toggle('md:ml-64')")
-    content = content.replace("classList.toggle('md:ml-16 ml-0')", "classList.toggle('md:ml-16')")
-    
-    # Also fix the init logic
-    content = content.replace("sidebar.classList.add('md:w-64 w-16')", "sidebar.classList.add('w-16'); sidebar.classList.remove('md:w-64')")
-    content = content.replace("mainContent.classList.remove('md:ml-64 ml-0')", "mainContent.classList.remove('md:ml-64')")
-    content = content.replace("mainContent.classList.add('md:ml-16 ml-0')", "mainContent.classList.add('md:ml-16')")
-    
-    with open(filepath, 'w', encoding='utf-8') as f:
-        f.write(content)
+old_js = """          function showEditConfirmation() {
+              // Build the full name first
+              updateFullName();
+              
+              var name = document.getElementById('edit_name').value;
+              var email = document.getElementById('edit_email').value;
+              var role = document.getElementById('edit_role').value;
+              
+              var summary = document.getElementById('confirmSummary');
+              summary.innerHTML = 
+                  '<div><span class="font-medium text-gray-700">Name:</span> ' + name + '</div>' +
+                  '<div><span class="font-medium text-gray-700">Email:</span> ' + email + '</div>' +
+                  '<div><span class="font-medium text-gray-700">New Role:</span> <span class="capitalize font-semibold text-purple-700">' + role + '</span></div>';
+              
+              document.getElementById('editConfirmModal').classList.remove('hidden');
+          }
 
-print("Fixed JS toggle logic")
+          function updateFullName() {
+              var firstName = document.getElementById('edit_first_name').value.trim();
+              var lastName = document.getElementById('edit_last_name').value.trim();
+              var middleName = document.getElementById('edit_middle_name').value.trim();
+              var suffix = document.getElementById('edit_suffix').value.trim();
+              var mi = middleName ? middleName[0].toUpperCase() + '.' : '';
+              var parts = [firstName, mi, suffix].filter(Boolean).join(' ');
+              var fullName = lastName ? lastName + ', ' + parts : parts;
+              document.getElementById('edit_name').value = fullName;
+          }
+          ['edit_first_name','edit_last_name','edit_middle_name','edit_suffix'].forEach(function(id) {
+              var el = document.getElementById(id);
+              if(el) el.addEventListener('input', updateFullName);
+          });"""
+
+new_js = """          function showEditConfirmation() {
+              var firstName = document.getElementById('edit_first_name').value.trim();
+              var lastName = document.getElementById('edit_last_name').value.trim();
+              var middleName = document.getElementById('edit_middle_name').value.trim();
+              var suffix = document.getElementById('edit_suffix').value.trim();
+              var mi = middleName ? middleName[0].toUpperCase() + '.' : '';
+              var parts = [firstName, mi, suffix].filter(Boolean).join(' ');
+              var name = lastName ? lastName + ', ' + parts : parts;
+
+              var email = document.getElementById('edit_email').value;
+              var role = document.getElementById('edit_role').value;
+              
+              var summary = document.getElementById('confirmSummary');
+              summary.innerHTML = 
+                  '<div><span class="font-medium text-gray-700">Name:</span> ' + name + '</div>' +
+                  '<div><span class="font-medium text-gray-700">Email:</span> ' + email + '</div>' +
+                  '<div><span class="font-medium text-gray-700">New Role:</span> <span class="capitalize font-semibold text-purple-700">' + role + '</span></div>';
+              
+              document.getElementById('editConfirmModal').classList.remove('hidden');
+          }"""
+
+if old_js in html:
+    html = html.replace(old_js, new_js)
+    with open("template/super_admin.html", "w", encoding="utf-8") as f:
+        f.write(html)
+    print("Fixed JS in super_admin.html")
+else:
+    print("Could not find old_js in super_admin.html")

@@ -200,7 +200,8 @@
                           <p class="text-sm text-gray-500 mt-1">Update your personal account password. This applies to both the system and Firebase.</p>
                       </div>
                       <div class="p-6">
-                          <form method="POST" action="/settings/change_password" class="space-y-4 max-w-md">
+                          <form method="POST" action="/change_my_password" class="space-y-4 max-w-md">
+                              <input type="hidden" name="redirect_to" value="settings_page">
                               <div>
                                   <label class="block text-sm font-medium text-gray-700">Current Password</label>
                                   <div class="relative w-full"><input type="password" name="current_password" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2 pr-10"><div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" onclick="togglePassword(this)">

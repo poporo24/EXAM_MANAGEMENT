@@ -5,7 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Master Schedule Timetable - CCA Exam Management System">
     <title>Schedule - Admin</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    
+
+    <script src="https://cdn.tailwindcss.com">
+        function showSaveConfirmation() {
+            // Check if Sync All is checked to give a stronger warning
+            const syncChecked = document.getElementById('sync_all_sections') && document.getElementById('sync_all_sections').checked;
+            const textEl = document.getElementById('saveConfirmText');
+            
+            if (syncChecked) {
+                textEl.innerHTML = "You are about to modify <b>ALL sections</b> of this subject simultaneously.<br><br>Are you sure you want to proceed?";
+                textEl.classList.add('text-orange-600');
+            } else {
+                textEl.innerHTML = "Are you sure you want to save these schedule changes?";
+                textEl.classList.remove('text-orange-600');
+            }
+            
+            document.getElementById('saveConfirmModal').classList.remove('hidden');
+        }
+
+</script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -160,7 +179,24 @@
                 }
             });
         });
-    </script>
+    
+        function showSaveConfirmation() {
+            // Check if Sync All is checked to give a stronger warning
+            const syncChecked = document.getElementById('sync_all_sections') && document.getElementById('sync_all_sections').checked;
+            const textEl = document.getElementById('saveConfirmText');
+            
+            if (syncChecked) {
+                textEl.innerHTML = "You are about to modify <b>ALL sections</b> of this subject simultaneously.<br><br>Are you sure you want to proceed?";
+                textEl.classList.add('text-orange-600');
+            } else {
+                textEl.innerHTML = "Are you sure you want to save these schedule changes?";
+                textEl.classList.remove('text-orange-600');
+            }
+            
+            document.getElementById('saveConfirmModal').classList.remove('hidden');
+        }
+
+</script>
 </head>
 <body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
 
@@ -235,16 +271,26 @@
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Period Start</label>
                             <input type="date" name="period_start" required
-                                   class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                                   class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Period End</label>
                             <input type="date" name="period_end" required
-                                   class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                                   class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Daily Start</label>
+                            <input type="time" name="day_start" value="07:00" required
+                                   class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Daily End</label>
+                            <input type="time" name="day_end" value="20:00" required
+                                   class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Semester</label>
-                            <select name="exam_semester" required class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                            <select name="exam_semester" required class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
                                 <option value="1st Semester">1st Semester</option>
                                 <option value="2nd Semester">2nd Semester</option>
                                 <option value="Summer">Summer</option>
@@ -252,7 +298,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Exam Term</label>
-                            <select name="exam_term" required class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                            <select name="exam_term" required class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
                                 <option value="Midterm">Midterm</option>
                                 <option value="Finals">Finals</option>
                             </select>
@@ -279,7 +325,7 @@
                     <!-- Action buttons -->
                     <div class="flex gap-2 flex-wrap items-center">
                         <form action="/admin/print_section" method="GET" target="_blank" class="flex gap-2 items-center mr-2">
-                            <select name="section" required class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none shadow-sm" title="Select Section to Print">
+                            <select name="section" required class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none shadow-sm w-48" title="Select Section to Print">
                                 <option value="">Select Section to Print...</option>
                                 {% for s in all_sections %}
                                 <option value="{{ s }}">{{ s }}</option>
@@ -294,10 +340,7 @@
                             <i class="fa-solid fa-layer-group"></i> Batch Print Grid (All Sections)
                         </a>
 
-                        <select onchange="window.location.href='/schedule?section=' + encodeURIComponent(this.value)"
-
-
-                                class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none shadow-sm" title="Filter by Section">
+                        <select onchange="window.location.href='/schedule?section=' + encodeURIComponent(this.value)" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none shadow-sm w-40" title="Filter by Section">
                             <option value="">All Sections</option>
                             {% for s in all_sections %}
                             <option value="{{ s }}" {% if filter_section == s %}selected{% endif %}>{{ s }}</option>
@@ -407,25 +450,60 @@
                                             {% if exam.id in conflict_ids %}
                                                 {% set reasons = conflict_reasons.get(exam.id, []) %}
                                                 {% if 'room' in reasons %}
-                                                    <span class="badge badge-conflict-room"><i class="fa-solid fa-door-open mr-0.5"></i> Room Conflict</span>
+                                                    <div class="group relative inline-flex justify-center">
+    <span class="badge badge-conflict-room"><i class="fa-solid fa-door-open mr-0.5"></i> Room Conflict</span>
+    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
+        Another exam is already scheduled in this room at this time.
+    </div>
+</div>
                                                 {% endif %}
                                                 {% if 'proctor' in reasons %}
-                                                    <span class="badge badge-conflict-proctor"><i class="fa-solid fa-user-xmark mr-0.5"></i> Proctor Conflict</span>
+                                                    <div class="group relative inline-flex justify-center">
+    <span class="badge badge-conflict-proctor"><i class="fa-solid fa-user-xmark mr-0.5"></i> Proctor Conflict</span>
+    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
+        This proctor is already assigned to another room or is unavailable at this time.
+    </div>
+</div>
                                                 {% endif %}
                                                 {% if 'section' in reasons %}
-                                                    <span class="badge badge-conflict-section"><i class="fa-solid fa-users mr-0.5"></i> Section Conflict</span>
+                                                    <div class="group relative inline-flex justify-center">
+    <span class="badge badge-conflict-section"><i class="fa-solid fa-users mr-0.5"></i> Section Conflict</span>
+    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
+        This section has another exam overlapping or less than 1 hour away.
+    </div>
+</div>
                                                 {% endif %}
                                                 {% if 'subject' in reasons %}
-                                                    <span class="badge badge-conflict-subject"><i class="fa-solid fa-book mr-0.5"></i> Subject Conflict</span>
+                                                    <div class="group relative inline-flex justify-center">
+    <span class="badge badge-conflict-subject"><i class="fa-solid fa-book mr-0.5"></i> Subject Conflict</span>
+    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
+        Integrity Risk: Different sections of this subject are taking the exam at different times.
+    </div>
+</div>
                                                 {% endif %}
                                                 {% if 'daily_major' in reasons %}
-                                                    <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;2 Major/day</span>
+                                                    <div class="group relative inline-flex justify-center">
+    <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;2 Major/day</span>
+    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
+        This section is exceeding the limit of 2 Major exams per day.
+    </div>
+</div>
                                                 {% endif %}
                                                 {% if 'daily_minor' in reasons %}
-                                                    <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;3 Minor/day</span>
+                                                    <div class="group relative inline-flex justify-center">
+    <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;3 Minor/day</span>
+    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
+        This section is exceeding the limit of 3 Minor exams per day.
+    </div>
+</div>
                                                 {% endif %}
                                                 {% if 'daily_total' in reasons %}
-                                                    <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;3 Exams/day</span>
+                                                    <div class="group relative inline-flex justify-center">
+    <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;3 Exams/day</span>
+    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
+        This section is exceeding the limit of 3 total exams per day.
+    </div>
+</div>
                                                 {% endif %}
                                             {% else %}
                                                 <span class="badge badge-ok"><i class="fa-solid fa-check mr-0.5"></i> OK</span>
@@ -505,25 +583,60 @@
                                 <td class="px-5 py-3">
                                     <div class="flex flex-wrap gap-1">
                                         {% if 'room' in reasons %}
-                                            <span class="badge badge-conflict-room"><i class="fa-solid fa-door-open mr-0.5"></i>Room</span>
+                                            <div class="group relative inline-flex justify-center">
+    <span class="badge badge-conflict-room"><i class="fa-solid fa-door-open mr-0.5"></i> Room</span>
+    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
+        Another exam is already scheduled in this room at this time.
+    </div>
+</div>
                                         {% endif %}
                                         {% if 'proctor' in reasons %}
-                                            <span class="badge badge-conflict-proctor"><i class="fa-solid fa-user-xmark mr-0.5"></i>Proctor</span>
+                                            <div class="group relative inline-flex justify-center">
+    <span class="badge badge-conflict-proctor"><i class="fa-solid fa-user-xmark mr-0.5"></i> Proctor</span>
+    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
+        This proctor is already assigned to another room or is unavailable at this time.
+    </div>
+</div>
                                         {% endif %}
                                         {% if 'section' in reasons %}
-                                            <span class="badge badge-conflict-section"><i class="fa-solid fa-users mr-0.5"></i>Section</span>
+                                            <div class="group relative inline-flex justify-center">
+    <span class="badge badge-conflict-section"><i class="fa-solid fa-users mr-0.5"></i> Section</span>
+    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
+        This section has another exam overlapping or less than 1 hour away.
+    </div>
+</div>
                                         {% endif %}
                                         {% if 'subject' in reasons %}
-                                            <span class="badge badge-conflict-subject"><i class="fa-solid fa-book mr-0.5"></i>Subject</span>
+                                            <div class="group relative inline-flex justify-center">
+    <span class="badge badge-conflict-subject"><i class="fa-solid fa-book mr-0.5"></i> Subject</span>
+    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
+        Integrity Risk: Different sections of this subject are taking the exam at different times.
+    </div>
+</div>
                                         {% endif %}
                                         {% if 'daily_major' in reasons %}
-                                            <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i>&gt;2 Major/day</span>
+                                            <div class="group relative inline-flex justify-center">
+    <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;2 Major/day</span>
+    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
+        This section is exceeding the limit of 2 Major exams per day.
+    </div>
+</div>
                                         {% endif %}
                                         {% if 'daily_minor' in reasons %}
-                                            <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i>&gt;3 Minor/day</span>
+                                            <div class="group relative inline-flex justify-center">
+    <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;3 Minor/day</span>
+    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
+        This section is exceeding the limit of 3 Minor exams per day.
+    </div>
+</div>
                                         {% endif %}
                                         {% if 'daily_total' in reasons %}
-                                            <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i>&gt;3 Exams/day</span>
+                                            <div class="group relative inline-flex justify-center">
+    <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;3 Exams/day</span>
+    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
+        This section is exceeding the limit of 3 total exams per day.
+    </div>
+</div>
                                         {% endif %}
                                     </div>
                                 </td>
@@ -609,16 +722,27 @@
 
                 <!-- Exam identity chip -->
                 <div class="px-6 pt-4 pb-0">
-                    <div class="flex items-center gap-2 bg-[#eef4ea] border border-[#c3d9b8] rounded-lg px-4 py-2.5">
-                        <i class="fa-solid fa-book-open text-[#668054]"></i>
+                    <div class="flex items-center justify-between gap-2 bg-[#eef4ea] border border-[#c3d9b8] rounded-lg px-4 py-2.5">
+                        <div class="flex items-center gap-2">
+                              <i class="fa-solid fa-book-open text-[#668054]"></i>
                         <div>
                             <p id="edit_subject_label" class="text-sm font-semibold text-gray-800">—</p>
                             <p id="edit_section_label" class="text-xs text-gray-500"></p>
                         </div>
                     </div>
+                              <button type="button" onclick="autoSchedule()" class="shrink-0 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold px-3 py-1.5 rounded-md shadow-sm transition-colors"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Auto-Schedule</button>
+                          </div>
                 </div>
-
-                <!-- Conflict warning -->
+                                  <div class="px-6 mt-3">
+                      <label class="flex items-center gap-2 text-sm text-gray-700 bg-blue-50 border border-blue-200 p-2.5 rounded-lg cursor-pointer">
+                          <input type="checkbox" form="editScheduleForm" id="sync_all_sections" name="sync_all_sections" value="1" class="rounded text-blue-600 focus:ring-blue-500">
+                          <span><i class="fa-solid fa-link text-blue-500 mr-1"></i> Sync Date &amp; Time to <b>ALL</b> sections of this subject</span>
+                      </label>
+                  </div>
+                  <!-- Sister Sections Container -->
+                  <div id="sister_sections_container" class="hidden px-6 mt-3 space-y-3 border-l-2 border-purple-300 ml-2 pl-4">
+                  </div>
+                  <!-- Conflict warning -->
                 <div id="conflictWarning" class="hidden bg-red-50 border-b-2 border-red-400 px-6 py-3 mt-3">
                     <div class="flex items-center gap-2 text-red-700 text-sm font-medium">
                         <i class="fa-solid fa-triangle-exclamation"></i>
@@ -630,11 +754,20 @@
                     <input type="hidden" id="edit_exam_id" name="exam_id">
 
                     <div class="grid grid-cols-2 gap-4">
-                        <div class="col-span-2">
-                            <label class="block text-xs font-semibold text-gray-600 mb-1">Date &amp; Time</label>
+                        <div class="col-span-2 relative">
+                            <div class="flex justify-between items-end mb-1">
+                                <label class="block text-xs font-semibold text-gray-600">Date &amp; Time</label>
+                                <button type="button" onclick="suggestTimes()" class="text-xs text-purple-600 hover:text-purple-800 font-medium">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-Suggest
+                                </button>
+                            </div>
                             <input type="datetime-local" name="exam_datetime" id="edit_datetime" required
                                    onchange="fetchAvailableResources()"
                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                            <div id="suggest_dropdown" class="hidden absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                <div class="px-3 py-2 text-xs font-bold text-gray-500 bg-gray-50 border-b">Suggested Available Slots</div>
+                                <div id="suggest_list"></div>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 mb-1">Duration (hrs)</label>
@@ -695,6 +828,80 @@
     </div>
 
     <script>
+        
+        // Handle Sync All checkbox
+        function escHtml(v) {
+            return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+        const syncCheckbox = document.getElementById('sync_all_sections');
+        if (syncCheckbox) {
+            syncCheckbox.addEventListener('change', async function() {
+                const container = document.getElementById('sister_sections_container');
+                if (this.checked) {
+                    container.classList.remove('hidden');
+                    container.innerHTML = '<p class="text-xs text-gray-500">Loading sections...</p>';
+                    const exam_id = document.getElementById('edit_exam_id').value;
+                    const res = await fetch('/api/sister_sections?exam_id=' + exam_id);
+                    const data = await res.json();
+                    const sections = data.sections || [];
+                    const others = sections.filter(s => !s.is_current);
+                    
+                    if (sections.length > 0) {
+                        let html = `<p class="text-xs font-semibold text-gray-600 mb-2">
+                                        <i class="fa-solid fa-users mr-1"></i>
+                                        ${sections.length} section(s) are taking <b>${escHtml(sections[0].subject_name)}</b> — all will move to the date &amp; time below:
+                                    </p>
+                                    <div class="space-y-2 max-h-72 overflow-y-auto pr-1">`;
+                        sections.forEach(sec => {
+                            const currentInfo = sec.exam_date_time
+                                ? `Currently: ${escHtml(sec.exam_date_time)} · ${escHtml(sec.room_name || 'No room')} · ${escHtml(sec.instructor_name || 'No proctor')}`
+                                : 'Currently: not scheduled';
+                            if (sec.is_current) {
+                                html += `
+                                    <div class="p-2 bg-[#eef4ea] rounded-lg border border-[#c3d9b8]">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs font-bold text-gray-800">${escHtml(sec.section)}</span>
+                                            <span class="text-[10px] font-semibold text-[#4b5e3d] bg-white border border-[#c3d9b8] rounded px-1.5 py-0.5">This section</span>
+                                        </div>
+                                        <p class="text-[11px] text-gray-500 mt-0.5">${currentInfo}</p>
+                                        <p class="text-[11px] text-gray-600 mt-0.5"><i class="fa-solid fa-arrow-down mr-1"></i>Room &amp; Proctor set in the fields below</p>
+                                    </div>`;
+                            } else {
+                                html += `
+                                    <div class="grid grid-cols-2 gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200 sister-section-row" data-id="${sec.id}">
+                                        <div class="col-span-2">
+                                            <span class="text-xs font-bold text-gray-700">${escHtml(sec.section)}</span>
+                                            <p class="text-[11px] text-gray-500">${currentInfo}</p>
+                                        </div>
+                                        <div>
+                                            <select form="editScheduleForm" name="sister_room_${sec.id}" data-current="${sec.room_id || ''}" data-current-label="${escHtml(sec.room_name || '')}" class="sister-room w-full border border-gray-300 rounded px-2 py-1 text-xs outline-none" required>
+                                                <option value="">Select Room</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <select form="editScheduleForm" name="sister_inst_${sec.id}" data-current="${sec.instructor_id || ''}" data-current-label="${escHtml(sec.instructor_name || '')}" class="sister-inst w-full border border-gray-300 rounded px-2 py-1 text-xs outline-none" required>
+                                                <option value="">Select Proctor</option>
+                                            </select>
+                                        </div>
+                                    </div>`;
+                            }
+                        });
+                        html += '</div>';
+                        if (others.length === 0) {
+                            html += '<p class="text-xs text-gray-500 mt-2">No other sections are taking this exam.</p>';
+                        }
+                        container.innerHTML = html;
+                        fetchAvailableResources(); // populate them
+                    } else {
+                        container.innerHTML = '<p class="text-xs text-gray-500">No sections found for this subject.</p>';
+                    }
+                } else {
+                    container.classList.add('hidden');
+                    container.innerHTML = '';
+                }
+            });
+        }
+
         /* ── Sidebar Toggle ─────────────────────────────────────── */
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -727,21 +934,30 @@
         /* ── Modal helpers ──────────────────────────────────────── */
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-        function openEditScheduleModal(exam_id, datetime, room_id, proctor_id, duration) {
+        function openEditScheduleModal(exam_id, datetime, room_id, proctor_id, duration, subject, section) {
             document.getElementById('editScheduleForm').action = '/edit_exam_schedule/' + exam_id;
             document.getElementById('edit_exam_id').value   = exam_id;
             document.getElementById('edit_datetime').value  = datetime;
             document.getElementById('edit_duration').value  = duration;
+            document.getElementById('edit_subject_label').textContent = subject || '—';
+            document.getElementById('edit_section_label').textContent = section ? ('Section: ' + section) : '';
+            document.getElementById('proctor_search').value = '';
+
+            // Reset sync-all UI
+            const syncBox = document.getElementById('sync_all_sections');
+            if (syncBox) syncBox.checked = false;
+            const sisterBox = document.getElementById('sister_sections_container');
+            if (sisterBox) { sisterBox.classList.add('hidden'); sisterBox.innerHTML = ''; }
             
             const roomSelect = document.getElementById('edit_room_id');
             const instSelect = document.getElementById('edit_proctor_id');
+            // Remember current assignment so it survives the dropdown refresh
+            roomSelect.dataset.current = (room_id && room_id !== 'None') ? room_id : '';
+            instSelect.dataset.current = (proctor_id && proctor_id !== 'None') ? proctor_id : '';
             
             if (!datetime) {
                 roomSelect.innerHTML = '<option value="">Please pick a Date & Time first...</option>';
                 instSelect.innerHTML = '<option value="">Please pick a Date & Time first...</option>';
-            } else {
-                roomSelect.value = room_id;
-                instSelect.value = proctor_id;
             }
             
             document.getElementById('conflictWarning').classList.add('hidden');
@@ -768,67 +984,89 @@
         /* ── Conflict check (AJAX) ──────────────────────────────── */
         async function fetchAvailableResources() {
             const exam_id = document.getElementById('edit_exam_id').value;
-            const datetime = document.getElementById('edit_datetime').value;
-            const duration = document.getElementById('edit_duration').value;
-            if (!datetime || !duration) return;
+            const dt = document.getElementById('edit_datetime').value;
+            const dur = document.getElementById('edit_duration').value;
+            if(!dt || !dur) return;
 
-            try {
-                const resp = await fetch('/api/available_resources', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        exam_id, 
-                        exam_datetime: datetime, 
-                        duration_minutes: Math.round(parseFloat(duration) * 60) 
-                    })
-                });
-                const data = await resp.json();
-                
-                // Update Rooms
-                const roomSelect = document.getElementById('edit_room_id');
-                const currentRoom = roomSelect.value;
-                roomSelect.innerHTML = '<option value="">Select Room</option>';
-                data.rooms.forEach(r => {
+            const res = await fetch('/api/available_resources', {
+                method: 'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({exam_id: exam_id, exam_datetime: dt, duration_minutes: Math.round(parseFloat(dur) * 60)})
+            });
+            const data = await res.json();
+            data.rooms = data.rooms || [];
+            data.instructors = data.instructors || [];
+            
+            // Populate main selects
+            const rSel = document.getElementById('edit_room_id');
+            const iSel = document.getElementById('edit_proctor_id');
+            
+            const currR = rSel.value || rSel.dataset.current || '';
+            const currI = iSel.value || iSel.dataset.current || '';
+            
+            rSel.innerHTML = '<option value="">Select Room</option>';
+            data.rooms.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r.id;
+                opt.textContent = `${r.name || r.room_name} (Cap: ${r.capacity})`;
+                rSel.appendChild(opt);
+            });
+            if(currR) rSel.value = currR;
+            
+            iSel.innerHTML = '<option value="">Select Proctor</option>';
+            data.instructors.forEach(i => {
+                const opt = document.createElement('option');
+                opt.value = i.id;
+                opt.textContent = i.name;
+                iSel.appendChild(opt);
+            });
+            if(currI) iSel.value = currI;
+            filterProctorOptions();
+            
+            window.lastAvailableRooms = data.rooms;
+            window.lastAvailableInstructors = data.instructors;
+            
+            // Populate sister selects (keep each section's current room/proctor selected)
+            const fillSister = (sel, items, labelFn) => {
+                const cVal = sel.value || sel.dataset.current || '';
+                sel.innerHTML = sel.classList.contains('sister-room')
+                    ? '<option value="">Select Room</option>'
+                    : '<option value="">Select Proctor</option>';
+                items.forEach(it => {
                     const opt = document.createElement('option');
-                    opt.value = r.id;
-                    opt.text = r.name;
-                    roomSelect.add(opt);
+                    opt.value = it.id; opt.textContent = labelFn(it);
+                    sel.appendChild(opt);
                 });
-                if (data.rooms.some(r => r.id == currentRoom)) {
-                    roomSelect.value = currentRoom;
-                }
-
-                // Update Instructors
-                const instSelect = document.getElementById('edit_proctor_id');
-                const currentInst = instSelect.value;
-                instSelect.innerHTML = '<option value="">Select Proctor</option>';
-                data.instructors.forEach(i => {
+                if (cVal && !items.some(it => String(it.id) === String(cVal)) && sel.dataset.currentLabel
+                        && String(cVal) === String(sel.dataset.current)) {
                     const opt = document.createElement('option');
-                    opt.value = i.id;
-                    opt.text = i.name;
-                    instSelect.add(opt);
-                });
-                if (data.instructors.some(i => i.id == currentInst)) {
-                    instSelect.value = currentInst;
+                    opt.value = cVal; opt.textContent = `${sel.dataset.currentLabel} (current assignment)`;
+                    sel.appendChild(opt);
                 }
-                
-                checkConflict();
-            } catch (e) { console.error('Resource fetch error', e); }
+                if (cVal) sel.value = cVal;
+            };
+            document.querySelectorAll('.sister-room').forEach(sel =>
+                fillSister(sel, data.rooms, r => `${r.name || r.room_name} (Cap: ${r.capacity})`));
+            document.querySelectorAll('.sister-inst').forEach(sel =>
+                fillSister(sel, data.instructors, i => i.name));
+            
+            checkConflict();
         }
-
         async function checkConflict() {
             const exam_id    = document.getElementById('edit_exam_id').value;
             const datetime   = document.getElementById('edit_datetime').value;
             const duration   = document.getElementById('edit_duration').value;
             const room_id    = document.getElementById('edit_room_id').value;
             const proctor_id = document.getElementById('edit_proctor_id').value;
-            if (!datetime || !duration || !room_id || !proctor_id) return;
+            
+            // If date/duration is missing, abort. We can check section conflicts without room/proctor!
+            if (!datetime || !duration) return;
 
             try {
                 const resp = await fetch('/check_edit_conflict', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ exam_id, exam_datetime: datetime, duration_minutes: Math.round(parseFloat(duration) * 60), room_id: parseInt(room_id), instructor_id: parseInt(proctor_id) })
+                    body: JSON.stringify({ exam_id, exam_datetime: datetime, duration_minutes: Math.round(parseFloat(duration) * 60), room_id: parseInt(room_id) || 0, instructor_id: parseInt(proctor_id) || 0 })
                 });
                 const data = await resp.json();
                 const warn  = document.getElementById('conflictWarning');
@@ -849,7 +1087,24 @@
             list.classList.toggle('hidden');
             chevron.style.transform = list.classList.contains('hidden') ? '' : 'rotate(180deg)';
         }
-    </script>
+    
+        function showSaveConfirmation() {
+            // Check if Sync All is checked to give a stronger warning
+            const syncChecked = document.getElementById('sync_all_sections') && document.getElementById('sync_all_sections').checked;
+            const textEl = document.getElementById('saveConfirmText');
+            
+            if (syncChecked) {
+                textEl.innerHTML = "You are about to modify <b>ALL sections</b> of this subject simultaneously.<br><br>Are you sure you want to proceed?";
+                textEl.classList.add('text-orange-600');
+            } else {
+                textEl.innerHTML = "Are you sure you want to save these schedule changes?";
+                textEl.classList.remove('text-orange-600');
+            }
+            
+            document.getElementById('saveConfirmModal').classList.remove('hidden');
+        }
+
+</script>
 
 <!-- ── Reusable Warning Confirmation Modal ────────────────────────────── -->
 <div id="warnModal" class="fixed inset-0 z-[999] hidden overflow-y-auto">
@@ -905,6 +1160,23 @@
             type: 'warning', confirmText: 'Yes, Reset Schedule',
             onConfirm: () => document.getElementById('resetScheduleForm').submit() });
     }
+
+        function showSaveConfirmation() {
+            // Check if Sync All is checked to give a stronger warning
+            const syncChecked = document.getElementById('sync_all_sections') && document.getElementById('sync_all_sections').checked;
+            const textEl = document.getElementById('saveConfirmText');
+            
+            if (syncChecked) {
+                textEl.innerHTML = "You are about to modify <b>ALL sections</b> of this subject simultaneously.<br><br>Are you sure you want to proceed?";
+                textEl.classList.add('text-orange-600');
+            } else {
+                textEl.innerHTML = "Are you sure you want to save these schedule changes?";
+                textEl.classList.remove('text-orange-600');
+            }
+            
+            document.getElementById('saveConfirmModal').classList.remove('hidden');
+        }
+
 </script>
 
 
@@ -915,7 +1187,46 @@ function filterSchedule() {
         card.style.display = card.innerText.toLowerCase().includes(q) ? "" : "none";
     });
 }
+
+        function showSaveConfirmation() {
+            // Check if Sync All is checked to give a stronger warning
+            const syncChecked = document.getElementById('sync_all_sections') && document.getElementById('sync_all_sections').checked;
+            const textEl = document.getElementById('saveConfirmText');
+            
+            if (syncChecked) {
+                textEl.innerHTML = "You are about to modify <b>ALL sections</b> of this subject simultaneously.<br><br>Are you sure you want to proceed?";
+                textEl.classList.add('text-orange-600');
+            } else {
+                textEl.innerHTML = "Are you sure you want to save these schedule changes?";
+                textEl.classList.remove('text-orange-600');
+            }
+            
+            document.getElementById('saveConfirmModal').classList.remove('hidden');
+        }
+
 </script>
+
+    <!-- SAVE CONFIRMATION MODAL -->
+    <div id="saveConfirmModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all">
+            <div class="p-6 text-center">
+                <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto mb-4">
+                    <i class="fa-solid fa-circle-question text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 mb-2">Confirm Changes</h3>
+                <p id="saveConfirmText" class="text-sm text-gray-500 mb-6">Are you sure you want to save these schedule changes?</p>
+                <div class="flex gap-3 justify-center">
+                    <button type="button" onclick="document.getElementById('saveConfirmModal').classList.add('hidden')" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50">Cancel</button>
+                    <button type="button" onclick="document.getElementById('editScheduleForm').submit()" class="px-4 py-2 bg-[#668054] text-white rounded-lg text-sm font-medium hover:bg-[#526643]">Yes, Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        
+    </script>
 </body>
 
 </html>

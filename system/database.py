@@ -631,6 +631,7 @@ def add_instructor(name, institute_id=None, building=None, is_pwd=0, subjects_ta
         cursor.execute("INSERT INTO users (full_name, email, password, role, instructor_id) VALUES (%s, %s, %s, 'proctor', %s)",
                        (name, proctor_email, hashed, instructor_id))
         db.commit()
+        return instructor_id
     finally:
         db.close()
 
@@ -684,10 +685,16 @@ def delete_instructor(instructor_id):
         db.close()
 
 def bulk_import_instructors(rows):
+    from datetime import timedelta as _td
     db = open_db()
     if not db: return (0, ["DB Error"])
     success_count = 0
     error_list = []
+    
+    # Get exam period for date mapping
+    period_start, period_end = get_exam_period()
+    day_map = {'Mon': 0, 'Tue': 1, 'Wed': 2, 'Thu': 3, 'Fri': 4, 'Sat': 5, 'Sun': 6}
+    
     try:
         cursor = db.cursor()
         for i, row in enumerate(rows):
@@ -697,7 +704,29 @@ def bulk_import_instructors(rows):
                     cursor.execute("SELECT id FROM institutes WHERE code=%s", (row['institute_code'],))
                     res = cursor.fetchone()
                     if res: institute_id = res[0]
-                add_instructor(row.get('name'), institute_id, row.get('building'), row.get('is_pwd', 0), row.get('subjects_taught', ''), provided_email=row.get('email', ''))
+                
+                # Add instructor
+                inst_id = add_instructor(row.get('name'), institute_id, row.get('building'), row.get('is_pwd', 0), row.get('subjects_taught', ''), provided_email=row.get('email', ''))
+                
+                # Save availability if present
+                if inst_id and 'availability' in row and row['availability'] and period_start and period_end:
+                    avail_entries = []
+                    for avail in row['availability']:
+                        target_wd = day_map.get(avail['day'])
+                        if target_wd is not None:
+                            # Find all dates in period matching this weekday
+                            curr = period_start
+                            while curr <= period_end:
+                                if curr.weekday() == target_wd:
+                                    avail_entries.append({
+                                        'date': curr.isoformat(),
+                                        'start_time': avail['start'],
+                                        'end_time': avail['end']
+                                    })
+                                curr += _td(days=1)
+                    if avail_entries:
+                        save_proctor_availability(inst_id, avail_entries)
+                
                 success_count += 1
             except Exception as e:
                 error_list.append(f"Row {i+1}: {str(e)}")
@@ -1143,22 +1172,47 @@ def check_edit_conflicts(exam_id, new_room_id, new_instructor_id, new_datetime_s
         new_end = new_start + _td(minutes=duration_minutes)
 
         # Room conflict
-        cursor.execute("SELECT subject_name, section, exam_date_time, duration_minutes FROM exams WHERE room_id=%s AND id!=%s AND status='Scheduled' AND exam_date_time IS NOT NULL", (new_room_id, exam_id))
-        for row in cursor.fetchall():
-            r_start = row['exam_date_time']
-            if isinstance(r_start, str): r_start = _dt.strptime(r_start, '%Y-%m-%d %H:%M:%S')
-            r_end = r_start + _td(minutes=row['duration_minutes'] or 60)
-            if new_start < r_end and r_start < new_end:
-                conflicts.append(f"⚠️ Room conflict: room is already used by '{row['subject_name']}' at {r_start}")
+        if new_room_id:
+            cursor.execute("SELECT subject_name, section, exam_date_time, duration_minutes FROM exams WHERE room_id=%s AND id!=%s AND status='Scheduled' AND exam_date_time IS NOT NULL", (new_room_id, exam_id))
+            for row in cursor.fetchall():
+                r_start = row['exam_date_time']
+                if isinstance(r_start, str): r_start = _dt.strptime(r_start, '%Y-%m-%d %H:%M:%S')
+                r_end = r_start + _td(minutes=row['duration_minutes'] or 60)
+                if new_start < r_end and r_start < new_end:
+                    conflicts.append(f"⚠️ Room conflict: room is already used by '{row['subject_name']}' at {r_start}")
 
         # Proctor/instructor conflict
-        cursor.execute("SELECT subject_name, section, exam_date_time, duration_minutes FROM exams WHERE instructor_id=%s AND id!=%s AND status='Scheduled' AND exam_date_time IS NOT NULL", (new_instructor_id, exam_id))
-        for row in cursor.fetchall():
-            r_start = row['exam_date_time']
-            if isinstance(r_start, str): r_start = _dt.strptime(r_start, '%Y-%m-%d %H:%M:%S')
-            r_end = r_start + _td(minutes=row['duration_minutes'] or 60)
-            if new_start < r_end and r_start < new_end:
-                conflicts.append(f"⚠️ Instructor conflict: proctor is already assigned to '{row['subject_name']}' at {r_start}")
+        if new_instructor_id:
+            cursor.execute("SELECT subject_name, section, exam_date_time, duration_minutes FROM exams WHERE instructor_id=%s AND id!=%s AND status='Scheduled' AND exam_date_time IS NOT NULL", (new_instructor_id, exam_id))
+            for row in cursor.fetchall():
+                r_start = row['exam_date_time']
+                if isinstance(r_start, str): r_start = _dt.strptime(r_start, '%Y-%m-%d %H:%M:%S')
+                r_end = r_start + _td(minutes=row['duration_minutes'] or 60)
+                if new_start < r_end and r_start < new_end:
+                    conflicts.append(f"⚠️ Instructor conflict: proctor is already assigned to '{row['subject_name']}' at {r_start}")
+
+
+
+
+
+        # Subject conflict: check if sister sections are scheduled at different times
+        cursor.execute("SELECT subject_name FROM exams WHERE id=%s", (exam_id,))
+        sub_row = cursor.fetchone()
+        if sub_row and sub_row.get('subject_name'):
+            subj_name = sub_row['subject_name'].strip().lower()
+            if subj_name:
+                cursor.execute(
+                    "SELECT section, exam_date_time FROM exams WHERE LOWER(TRIM(subject_name))=%s AND id!=%s AND status='Scheduled' AND exam_date_time IS NOT NULL",
+                    (subj_name, exam_id)
+                )
+                for row in cursor.fetchall():
+                    s_time = row['exam_date_time']
+                    if isinstance(s_time, str): s_time = _dt.strptime(s_time, '%Y-%m-%d %H:%M:%S')
+                    # We just check if the new_start is exactly the same as the sister section
+                    if new_start != s_time:
+                        conflicts.append(f"? Integrity Risk: Section '{row['section']}' is taking this exam at {s_time}. (Use 'Sync ALL' to avoid this).")
+                        # Only add this conflict warning once to avoid spam
+                        break
 
         # Section conflict: same section cannot have two exams at the same time
         # + per-section daily exam limits (max 2 major, max 3 minor, max 3 total)
@@ -1222,7 +1276,7 @@ def check_edit_conflicts(exam_id, new_room_id, new_instructor_id, new_datetime_s
         db.close()
     return conflicts
 
-def apply_exam_edit(exam_id, new_room_id, new_instructor_id, new_datetime_str):
+def apply_exam_edit(exam_id, new_room_id, new_instructor_id, new_datetime_str, sync_all=False, form_data=None):
     from datetime import datetime as _dt
     db = open_db()
     if not db: return False
@@ -1234,7 +1288,6 @@ def apply_exam_edit(exam_id, new_room_id, new_instructor_id, new_datetime_str):
         except ValueError:
             new_dt = _dt.strptime(new_datetime_str, '%Y-%m-%d %H:%M:%S')
 
-        # ── Capture BEFORE state (old proctor, section, subject) ──────────
         cursor_r.execute(
             "SELECT subject_name, section, instructor_id, room_id, exam_date_time FROM exams WHERE id=%s",
             (exam_id,)
@@ -1245,11 +1298,30 @@ def apply_exam_edit(exam_id, new_room_id, new_instructor_id, new_datetime_str):
         subject  = old.get('subject_name') or 'Exam'
         dt_str   = new_dt.strftime('%b %d, %Y %I:%M %p')
 
-        # ── Apply update ───────────────────────────────────────────────────
+        sister_ids = []
+        if sync_all and subject:
+            cursor_r.execute("SELECT id FROM exams WHERE UPPER(REPLACE(subject_name,' ',''))=UPPER(REPLACE(%s,' ','')) AND id!=%s", (subject, exam_id))
+            sister_ids = [r['id'] for r in cursor_r.fetchall()]
+
         cursor.execute(
             "UPDATE exams SET room_id=%s, instructor_id=%s, exam_date_time=%s, status='Scheduled' WHERE id=%s",
             (new_room_id, new_instructor_id, new_dt, exam_id)
         )
+        
+        if sync_all and sister_ids:
+            for sid in sister_ids:
+                s_room = form_data.get(f'sister_room_{sid}') if form_data else None
+                s_inst = form_data.get(f'sister_inst_{sid}') if form_data else None
+                if s_room and s_inst:
+                    cursor.execute(
+                        "UPDATE exams SET exam_date_time=%s, room_id=%s, instructor_id=%s, status='Scheduled' WHERE id=%s",
+                        (new_dt, s_room, s_inst, sid)
+                    )
+                else:
+                    cursor.execute(
+                        "UPDATE exams SET exam_date_time=%s, status='Scheduled' WHERE id=%s",
+                        (new_dt, sid)
+                    )
         db.commit()
 
         # ── Notify OLD proctor if they were replaced ───────────────────────
@@ -1386,9 +1458,11 @@ def save_exam_term(exam_term, exam_semester):
     if not db: return
     try:
         cursor = db.cursor()
-        cursor.execute("UPDATE exam_settings SET exam_term = %s, exam_semester = %s WHERE id = 1", (exam_term, exam_semester))
-        if cursor.rowcount == 0:
-            cursor.execute("INSERT INTO exam_settings (id, exam_term, exam_semester) VALUES (1, %s, %s)", (exam_term, exam_semester))
+        cursor.execute(
+            "INSERT INTO exam_settings (id, exam_term, exam_semester) VALUES (1, %s, %s) "
+            "ON DUPLICATE KEY UPDATE exam_term=VALUES(exam_term), exam_semester=VALUES(exam_semester)",
+            (exam_term, exam_semester)
+        )
         db.commit()
     finally:
         db.close()
@@ -1660,6 +1734,17 @@ def get_proctor_absence_report(date_from=None, date_to=None):
     finally:
         db.close()
 
+def clear_absence_reports():
+    db = open_db()
+    if not db: return False
+    try:
+        cursor = db.cursor()
+        cursor.execute("DELETE FROM proctor_absence")
+        db.commit()
+        return True
+    finally:
+        db.close()
+
 def get_absence_stats():
     db = open_db()
     if not db: return {'total_absences': 0, 'instructors_with_absences': 0}
@@ -1682,6 +1767,17 @@ def create_notification(user_id, title, message):
         cursor = db.cursor()
         cursor.execute("INSERT INTO notifications (user_id, title, message, created_at, is_read) VALUES (%s, %s, %s, NOW(), 0)", (user_id, title, message))
         db.commit()
+    finally:
+        db.close()
+
+def clear_all_notifications(user_id):
+    db = open_db()
+    if not db: return False
+    try:
+        cursor = db.cursor()
+        cursor.execute("DELETE FROM notifications WHERE user_id=%s", (user_id,))
+        db.commit()
+        return True
     finally:
         db.close()
 
@@ -1918,3 +2014,295 @@ def get_user_by_email(email):
         return cursor.fetchone()
     finally:
         db.close()
+
+
+def get_suggested_times(exam_id, duration_minutes, room_id=0, proctor_id=0):
+    from datetime import datetime as _dt, timedelta as _td, date as _date, time as _time
+    db_conn = open_db()
+    if not db_conn: return []
+    try:
+        cursor = db_conn.cursor(dictionary=True)
+        # Get section for this exam
+        cursor.execute("SELECT section, subject_type FROM exams WHERE id=%s", (exam_id,))
+        this_exam = cursor.fetchone()
+        section = this_exam['section'].strip() if this_exam and this_exam.get('section') else None
+        is_major = (this_exam.get('subject_type') or 'Major') == 'Major' if this_exam else True
+
+        # Find the earliest scheduled exam to know when "Exam Week" is, or use today
+        cursor.execute("SELECT MIN(exam_date_time) as min_dt FROM exams WHERE status='Scheduled' AND exam_date_time IS NOT NULL")
+        min_row = cursor.fetchone()
+        if min_row and min_row['min_dt']:
+            start_date = min_row['min_dt']
+            if isinstance(start_date, str):
+                start_date = _dt.strptime(start_date, '%Y-%m-%d %H:%M:%S').date()
+            else:
+                start_date = start_date.date()
+        else:
+            start_date = _dt.today().date()
+            
+        if start_date < _dt.today().date():
+            start_date = _dt.today().date()
+
+        suggestions = []
+        days_to_scan = 14
+        
+        # We need check_edit_conflicts function logic, but we can't easily call it in a loop without hitting the DB 100 times.
+        # Let's fetch all scheduled exams ONCE into memory to make scanning ultra-fast!
+        cursor.execute("SELECT id, section, room_id, instructor_id, exam_date_time, duration_minutes, subject_type FROM exams WHERE status='Scheduled' AND exam_date_time IS NOT NULL AND id!=%s", (exam_id,))
+        all_exams = cursor.fetchall()
+        for ex in all_exams:
+            if isinstance(ex['exam_date_time'], str):
+                ex['exam_date_time'] = _dt.strptime(ex['exam_date_time'], '%Y-%m-%d %H:%M:%S')
+                
+        # Also get proctor availability if a proctor is specified
+        proctor_avail = get_proctor_availability()
+
+        for day_offset in range(days_to_scan):
+            current_date = start_date + _td(days=day_offset)
+            # Skip Sundays
+            if current_date.weekday() == 6: continue
+            
+            # Scan from 7 AM to 5 PM
+            for hour in range(7, 18):
+                # We will check top of the hour and half past
+                for minute in (0, 30):
+                    slot_start = _dt.combine(current_date, _time(hour, minute))
+                    slot_end = slot_start + _td(minutes=duration_minutes)
+                    
+                    if slot_end.time() > _time(20, 0): # Don't go past 8 PM
+                        continue
+                        
+                    conflict = False
+                    day_major = 0
+                    day_minor = 0
+                    
+                    for ex in all_exams:
+                        ex_start = ex['exam_date_time']
+                        ex_end = ex_start + _td(minutes=ex['duration_minutes'] or 60)
+                        
+                        # 1. Section conflict
+                        my_sections = []
+                        if section: my_sections.append(section)
+                        if ex['section'] and ex['section'] in my_sections:
+                            # Time overlap with 1 hr break
+                            buf_start = slot_start - _td(hours=1)
+                            buf_end = slot_end + _td(hours=1)
+                            if buf_start < ex_end and ex_start < buf_end:
+                                conflict = True
+                                break
+                            # Daily limits
+                            if ex_start.date() == current_date:
+                                if (ex.get('subject_type') or 'Major') == 'Major': day_major += 1
+                                else: day_minor += 1
+                        
+                        # 2. Room conflict
+                        if room_id and ex['room_id'] == room_id:
+                            if slot_start < ex_end and ex_start < slot_end:
+                                conflict = True
+                                break
+                                
+                        # 3. Proctor conflict
+                        if proctor_id and ex['instructor_id'] == proctor_id:
+                            if slot_start < ex_end and ex_start < slot_end:
+                                conflict = True
+                                break
+                                
+                    if conflict: continue
+                    
+                    # Section daily limits
+                    if section:
+                        minor_limit = 4 - day_major
+                        if is_major and day_major >= 3: conflict = True
+                        if not is_major and day_minor >= minor_limit: conflict = True
+                        if day_major + day_minor >= 3: conflict = True
+                    if conflict: continue
+                    
+                    # 4. Proctor Availability explicitly declared
+                    if proctor_id:
+                        avail_entries = proctor_avail.get(proctor_id)
+                        if avail_entries:
+                            has_entry = False
+                            time_match = False
+                            for ent in avail_entries:
+                                if ent['date'] == current_date:
+                                    has_entry = True
+                                    if slot_start.time() >= ent['start_time'] and slot_end.time() <= ent['end_time']:
+                                        time_match = True
+                                        break
+                            if has_entry and not time_match:
+                                conflict = True
+                    if conflict: continue
+                    
+                    # It's a valid slot!
+                    suggestions.append({
+                        'datetime': slot_start.strftime('%Y-%m-%dT%H:%M'),
+                        'label': slot_start.strftime('%a, %b %d, %Y - %I:%M %p')
+                    })
+                    
+                    # Only return up to 10 suggestions to avoid overwhelming the UI
+                    if len(suggestions) >= 10:
+                        return suggestions
+                        
+        return suggestions
+    finally:
+        db_conn.close()
+
+
+def get_full_auto_schedule(exam_id, duration_minutes, sync_all=False):
+    from datetime import datetime as _dt, timedelta as _td, date as _date, time as _time
+    import random
+    db_conn = open_db()
+    if not db_conn: return None
+    try:
+        cursor = db_conn.cursor(dictionary=True)
+        # Get section for this exam
+        cursor.execute("SELECT subject_name, section, subject_type, institute_id FROM exams WHERE id=%s", (exam_id,))
+        this_exam = cursor.fetchone()
+        if not this_exam: return None
+        
+        section = this_exam['section'].strip() if this_exam.get('section') else None
+        subject_name = this_exam['subject_name']
+        is_major = (this_exam.get('subject_type') or 'Major') == 'Major'
+        institute_id = this_exam.get('institute_id')
+        
+        sister_sections = []
+        if sync_all and subject_name:
+            cursor.execute("SELECT id, section FROM exams WHERE UPPER(REPLACE(subject_name,' ',''))=UPPER(REPLACE(%s,' ','')) AND id!=%s", (subject_name, exam_id))
+            sister_sections = cursor.fetchall()
+        
+        total_sections_needed = 1 + len(sister_sections)
+
+        # Find the start date
+        cursor.execute("SELECT MIN(exam_date_time) as min_dt FROM exams WHERE status='Scheduled' AND exam_date_time IS NOT NULL")
+        min_row = cursor.fetchone()
+        if min_row and min_row['min_dt']:
+            start_date = min_row['min_dt']
+            if isinstance(start_date, str):
+                start_date = _dt.strptime(start_date, '%Y-%m-%d %H:%M:%S').date()
+            else:
+                start_date = start_date.date()
+        else:
+            start_date = _dt.today().date()
+            
+        if start_date < _dt.today().date():
+            start_date = _dt.today().date()
+
+        days_to_scan = 14
+        
+        # Load all exams
+        cursor.execute("SELECT id, section, room_id, instructor_id, exam_date_time, duration_minutes, subject_type FROM exams WHERE status='Scheduled' AND exam_date_time IS NOT NULL AND id!=%s", (exam_id,))
+        all_exams = cursor.fetchall()
+        for ex in all_exams:
+            if isinstance(ex['exam_date_time'], str):
+                ex['exam_date_time'] = _dt.strptime(ex['exam_date_time'], '%Y-%m-%d %H:%M:%S')
+                
+        # Load all rooms and proctors
+        cursor.execute("SELECT id, room_name, capacity FROM rooms ORDER BY room_name")
+        all_rooms = cursor.fetchall()
+        
+        # Prefer proctors from the same institute if possible, but load all
+        cursor.execute("SELECT id, name, institute_id FROM instructors WHERE status='Active' ORDER BY name")
+        all_insts = cursor.fetchall()
+        
+        proctor_avail = get_proctor_availability()
+
+        for day_offset in range(days_to_scan):
+            current_date = start_date + _td(days=day_offset)
+            if current_date.weekday() == 6: continue # skip Sunday
+            
+            for hour in range(7, 18):
+                for minute in (0, 30):
+                    slot_start = _dt.combine(current_date, _time(hour, minute))
+                    slot_end = slot_start + _td(minutes=duration_minutes)
+                    
+                    if slot_end.time() > _time(20, 0): continue
+                        
+                    section_conflict = False
+                    day_major = 0
+                    day_minor = 0
+                    
+                    busy_rooms = set()
+                    busy_insts = set()
+                    
+                    for ex in all_exams:
+                        ex_start = ex['exam_date_time']
+                        ex_end = ex_start + _td(minutes=ex['duration_minutes'] or 60)
+                        
+                        # Time overlap checks
+                        buf_start = slot_start - _td(hours=1)
+                        buf_end = slot_end + _td(hours=1)
+                        
+                        overlap_strict = (slot_start < ex_end and ex_start < slot_end)
+                        overlap_buffer = (buf_start < ex_end and ex_start < buf_end)
+                        
+                        my_sections = []
+                        if section: my_sections.append(section)
+                        my_sections.extend([s['section'] for s in sister_sections if s['section']])
+                        
+                        if ex['section'] and ex['section'] in my_sections:
+                            if overlap_buffer:
+                                section_conflict = True
+                                break
+                            if ex_start.date() == current_date:
+                                if (ex.get('subject_type') or 'Major') == 'Major': day_major += 1
+                                else: day_minor += 1
+                                
+                        if overlap_strict:
+                            if ex['room_id']: busy_rooms.add(ex['room_id'])
+                            if ex['instructor_id']: busy_insts.add(ex['instructor_id'])
+                                
+                    if section_conflict: continue
+                    
+                    if section:
+                        minor_limit = 4 - day_major
+                        if is_major and day_major >= 3: continue
+                        if not is_major and day_minor >= minor_limit: continue
+                        if day_major + day_minor >= 3: continue
+                    
+                    # Find a free room
+                    free_rooms = [r for r in all_rooms if r['id'] not in busy_rooms]
+                    if not free_rooms: continue
+                    
+                    # Find a free proctor
+                    free_insts = []
+                    for i in all_insts:
+                        if i['id'] in busy_insts: continue
+                        
+                        # Check explicitly declared availability
+                        avail_entries = proctor_avail.get(i['id'])
+                        if avail_entries:
+                            has_entry = False
+                            time_match = False
+                            for ent in avail_entries:
+                                if ent['date'] == current_date:
+                                    has_entry = True
+                                    if slot_start.time() >= ent['start_time'] and slot_end.time() <= ent['end_time']:
+                                        time_match = True
+                                        break
+                            if has_entry and not time_match:
+                                continue # declared unavailable
+                        
+                        free_insts.append(i)
+                        
+                    if len(free_insts) < total_sections_needed or len(free_rooms) < total_sections_needed: continue
+                    
+                    # We found a slot!
+                    # Pick a room (just the first available one, or random to distribute load)
+                    chosen_room = random.choice(free_rooms)['id']
+                    
+                    # Pick a proctor (prefer same institute)
+                    same_inst = [i for i in free_insts if i['institute_id'] == institute_id]
+                    if same_inst:
+                        chosen_proctor = random.choice(same_inst)['id']
+                    else:
+                        chosen_proctor = random.choice(free_insts)['id']
+                        
+                    return {
+                        'datetime': slot_start.strftime('%Y-%m-%dT%H:%M'),
+                        'room_id': chosen_room,
+                        'instructor_id': chosen_proctor
+                    }
+                    
+        return None
+    finally:
+        db_conn.close()

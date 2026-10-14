@@ -336,6 +336,8 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                     
                         scheduled.append({
                             'exam_id': e['id'],
+                            'subject_name': e.get('subject_name', 'Unknown Subject'),
+                            'section': e.get('section', ''),
                             'room_id': r['id'],
                             'instructor_id': i['id'],
                             'instructor_name': i['name'],

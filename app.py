@@ -1,5 +1,5 @@
 """
-app.py — CCA Exam Management System v2
+app.py â€” CCA Exam Management System v2
 Full 50-feature implementation.
 Run:  python app.py
 """
@@ -55,9 +55,9 @@ from system.database import (
     get_exam_collection_status, mark_exam_collected, mark_exam_returned,
     get_collection_stats,
     # absence
-    record_proctor_absence, get_proctor_absence_report, get_absence_stats,
+    record_proctor_absence, get_proctor_absence_report, get_absence_stats, clear_absence_reports,
     # notifications
-    create_notification, get_notifications, get_unread_count,
+    create_notification, get_notifications, get_unread_count, clear_all_notifications,
     mark_notification_read, mark_all_read, create_notification_for_role,
     # reports
     get_scheduling_report, get_assignment_report, get_student_exam_load_report,
@@ -67,7 +67,7 @@ from system.database import (
 from system.scheduler import run_scheduler
 from system.logic import verify_login, is_super_admin, hash_password
 
-# ── FLASK APP ─────────────────────────────────────────────────────────────────
+# â”€â”€ FLASK APP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 import firebase_admin
@@ -82,7 +82,7 @@ except ValueError:
 app = Flask(__name__, template_folder='template')
 app.secret_key = "cca_exam_management_secret_key_v2"
 
-# ── MAIL ──────────────────────────────────────────────────────────────────────
+# â”€â”€ MAIL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _configure_mail():
     try:
@@ -120,7 +120,7 @@ def send_email_notification(to_email, subject, body):
             print(f"[Mail Error] {e}")
     threading.Thread(target=_send, daemon=True).start()
 
-# ── HELPERS ───────────────────────────────────────────────────────────────────
+# â”€â”€ HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def require_login():
     if 'user_id' not in session:
@@ -154,7 +154,7 @@ def _get_unread(user_id):
     except Exception:
         return 0
 
-# ── AUTH ──────────────────────────────────────────────────────────────────────
+# â”€â”€ AUTH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/")
 def index():
@@ -267,7 +267,7 @@ def login():
     firebase_token = request.form.get("firebase_token")
     if firebase_token:
         try:
-            decoded_token = fb_auth.verify_id_token(firebase_token)
+            decoded_token = fb_auth.verify_id_token(firebase_token, clock_skew_seconds=60)
             email = decoded_token.get('email')
             
             user = get_user_by_email(email)
@@ -323,7 +323,15 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# ── REGISTER ──────────────────────────────────────────────────────────────────
+# â”€â”€ REGISTER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+@app.route("/terms")
+def terms_page():
+    return render_template("terms.html")
+
+@app.route("/privacy")
+def privacy_page():
+    return render_template("privacy.html")
 
 @app.route("/register", methods=["GET"])
 def register_page():
@@ -438,7 +446,7 @@ def dashboard():
                            unread_count=unread,
                            pending_count=pending_count)
 
-# ── ADD ROUTES ────────────────────────────────────────────────────────────────
+# â”€â”€ ADD ROUTES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/add_room", methods=["POST"])
 def create_room():
@@ -502,9 +510,9 @@ def add_instructor_route():
         except Exception as e:
             errors.append(str(e))
     if deleted:
-        flash(f"✅ {deleted} instructor(s) deleted successfully.", "success")
+        flash(f" {deleted} instructor(s) deleted successfully.", "success")
     if errors:
-        flash(f"⚠️ {len(errors)} instructor(s) could not be deleted: " + "; ".join(errors), "warning")
+        flash(f" {len(errors)} instructor(s) could not be deleted: " + "; ".join(errors), "warning")
     return redirect(url_for('faculty_page'))
 
 @app.route("/delete_exam/<int:id>")
@@ -520,10 +528,10 @@ def remove_all_exams():
     guard = require_role('admin')
     if guard: return guard
     count = delete_all_exams()
-    flash(f'✅ All {count} exam(s) deleted successfully.', 'success')
+    flash(f' All {count} exam(s) deleted successfully.', 'success')
     return redirect(url_for('dashboard') + '#exams')
 
-# ── SCHEDULE ──────────────────────────────────────────────────────────────────
+# â”€â”€ SCHEDULE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/generate_schedule", methods=["POST"])
 def generate_schedule():
@@ -532,6 +540,9 @@ def generate_schedule():
 
     period_start_str = request.form.get("period_start")
     period_end_str   = request.form.get("period_end")
+    day_start_str    = request.form.get("day_start")
+    day_end_str      = request.form.get("day_end")
+    
     exam_term = request.form.get("exam_term", "Midterm")
     exam_semester = request.form.get("exam_semester", "1st Semester")
     save_exam_term(exam_term, exam_semester)
@@ -547,6 +558,25 @@ def generate_schedule():
         return redirect(url_for('schedule_view'))
 
     save_exam_period(period_start, period_end)
+    
+    settings = get_system_settings()
+    if day_start_str and day_end_str:
+        save_system_settings(
+            day_start=day_start_str,
+            day_end=day_end_str,
+            slot_interval_min=settings.get('slot_interval_min', 60),
+            max_proctor_hrs=settings.get('max_consecutive_proctor_hrs', 3.0),
+            travel_buffer_min=settings.get('travel_buffer_min', 15),
+            smtp_host=settings.get('smtp_host', ''),
+            smtp_port=settings.get('smtp_port', 587),
+            smtp_user=settings.get('smtp_user', ''),
+            smtp_password=settings.get('smtp_password', ''),
+            smtp_from=settings.get('smtp_from', ''),
+            smtp_use_tls=settings.get('smtp_use_tls', 1),
+            major_duration_hrs=settings.get('major_duration_hrs', 2.0),
+            minor_duration_hrs=settings.get('minor_duration_hrs', 1.0)
+        )
+        settings = get_system_settings() # reload
 
     pending     = get_pending_exams()
     rooms       = get_all_rooms()
@@ -556,13 +586,13 @@ def generate_schedule():
     settings    = get_system_settings()
 
     if not rooms:
-        flash("⚠️ No rooms found. Add at least one room first.", "warning")
+        flash(" No rooms found. Add at least one room first.", "warning")
         return redirect(url_for('schedule_view'))
     if not instructors:
-        flash("⚠️ No active instructors found.", "warning")
+        flash(" No active instructors found.", "warning")
         return redirect(url_for('schedule_view'))
     if not pending:
-        flash("ℹ️ No pending exams to schedule.", "info")
+        flash(" No pending exams to schedule.", "info")
         return redirect(url_for('schedule_view'))
 
     result = run_scheduler(
@@ -599,9 +629,9 @@ def generate_schedule():
                     dt_str = dt.strftime('%B %d, %Y at %I:%M %p') if dt else 'TBD'
                     send_email_notification(
                         row['email'],
-                        f"CCA Exam Proctoring Assignment — {row['subject_name']}",
+                        f"CCA Exam Proctoring Assignment â€” {row['subject_name']}",
                         f"Dear {row['full_name']},\n\nYou have been assigned to proctor:\n"
-                        f"Subject: {row['subject_name']} ({row['section'] or '—'})\n"
+                        f"Subject: {row['subject_name']} ({row['section'] or 'â€”'})\n"
                         f"Date/Time: {dt_str}\n\nPlease log in to view full details.\n\n"
                         f"CCA Exam Management System"
                     )
@@ -610,7 +640,7 @@ def generate_schedule():
         finally:
             db.close()
 
-    flash(f"✅ Scheduled {len(result['scheduled'])} exam(s). "
+    flash(f" Scheduled {len(result['scheduled'])} exam(s). "
           f"{len(result['failed'])} could not be placed.", "success")
     return redirect(url_for('schedule_view'))
 
@@ -677,10 +707,15 @@ def resolve_conflicts_route():
     session['last_failed'] = result['failed']
     session['last_scheduled_count'] = len(result['scheduled'])
     
+    resolved_info = ""
+    if result['scheduled']:
+        resolved_details = [f"{e.get('subject_name')} ({e.get('section')})" for e in result['scheduled']]
+        resolved_info = " Resolved: " + ", ".join(resolved_details)
+
     if failed_ids:
-        flash(f"Auto-resolve completed, but {len(failed_ids)} exam(s) could still not be scheduled.", "warning")
+        flash(f"Auto-resolve completed, but {len(failed_ids)} exam(s) could still not be scheduled.{resolved_info}", "warning")
     else:
-        flash("✅ All conflicts have been successfully auto-resolved!", "success")
+        flash(f"All conflicts have been successfully auto-resolved!{resolved_info}", "success")
         
     return redirect(url_for('schedule_view'))
 
@@ -741,7 +776,7 @@ def schedule_view():
             if subj_a and subj_a == subj_b and a['_dt'] != b['_dt']:
                 _add_conflict(a['id'], 'subject'); _add_conflict(b['id'], 'subject')
 
-    # ── Per-section daily limit violations ───────────────────────────────────
+    # â”€â”€ Per-section daily limit violations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     # Group scheduled exams by (section, date)
     from collections import defaultdict as _dd
     sec_day_exams = _dd(list)   # (section, date_str) -> [exam, ...]
@@ -812,6 +847,33 @@ def schedule_view():
                            exam_term=get_exam_term()[0],
                            exam_semester=get_exam_term()[1])
 
+@app.route("/api/auto_schedule_exam", methods=["POST"])
+def api_auto_schedule_exam():
+    guard = require_role('admin')
+    if guard: return jsonify({})
+    data = request.get_json(force=True)
+    exam_id = int(data.get('exam_id', 0))
+    duration = int(data.get('duration_minutes', 60))
+    sync_all = bool(data.get('sync_all', False))
+    
+    from system.database import get_full_auto_schedule
+    result = get_full_auto_schedule(exam_id, duration, sync_all=sync_all)
+    return jsonify(result or {})
+
+@app.route("/api/suggest_times", methods=["POST"])
+def api_suggest_times():
+    guard = require_role('admin')
+    if guard: return jsonify([])
+    data = request.get_json(force=True)
+    exam_id = int(data.get('exam_id', 0))
+    duration = int(data.get('duration_minutes', 60))
+    room_id = int(data.get('room_id', 0))
+    proctor_id = int(data.get('instructor_id', 0))
+    
+    from system.database import get_suggested_times
+    suggestions = get_suggested_times(exam_id, duration, room_id, proctor_id)
+    return jsonify({'suggestions': suggestions})
+
 @app.route("/api/available_resources", methods=["POST"])
 def available_resources():
     guard = require_role('admin')
@@ -825,6 +887,41 @@ def available_resources():
         return jsonify({'rooms': [], 'instructors': []})
     res = get_available_resources(exam_id, dt_str, duration)
     return jsonify(res)
+
+
+@app.route("/api/sister_sections", methods=["GET"])
+def get_sister_sections():
+    guard = require_role('admin')
+    if guard:
+        return jsonify({'error': 'Not authorised'}), 403
+    exam_id = request.args.get('exam_id', type=int)
+    from system.database import open_db
+    db = open_db()
+    if not db:
+        return jsonify({'sections': []})
+    try:
+        c = db.cursor(dictionary=True)
+        c.execute("SELECT subject_name FROM exams WHERE id=%s", (exam_id,))
+        ex = c.fetchone()
+        if not ex or not ex.get('subject_name'): return jsonify({'sections': []})
+        # All sections taking this exam (including the one being edited)
+        c.execute("""
+            SELECT e.id, e.subject_name, e.section, e.room_id, e.instructor_id, e.exam_date_time,
+                   r.room_name, i.name AS instructor_name
+            FROM exams e
+            LEFT JOIN rooms r       ON r.id = e.room_id
+            LEFT JOIN instructors i ON i.id = e.instructor_id
+            WHERE UPPER(REPLACE(e.subject_name,' ',''))=UPPER(REPLACE(%s,' ',''))
+            ORDER BY e.section
+        """, (ex['subject_name'],))
+        rows = c.fetchall()
+        for r in rows:
+            r['is_current'] = (r['id'] == exam_id)
+            dt = r.get('exam_date_time')
+            r['exam_date_time'] = dt.strftime('%b %d, %Y %I:%M %p') if dt else None
+        return jsonify({'sections': rows})
+    finally:
+        db.close()
 
 @app.route("/check_edit_conflict", methods=["POST"])
 def check_edit_conflict():
@@ -849,12 +946,14 @@ def edit_exam_schedule(exam_id):
     new_dt_str   = request.form.get('exam_datetime', '')
     duration     = int(float(request.form.get('duration_hours', 1)) * 60)
     force        = request.form.get('force_save') == '1'
+    sync_all     = request.form.get('sync_all_sections') in ['on', '1']
+    
     if not force:
         conflicts = check_edit_conflicts(exam_id, new_room_id, new_inst_id, new_dt_str, duration)
         if conflicts:
             flash('Edit blocked: ' + ' | '.join(conflicts), 'danger')
             return redirect(url_for('schedule_view'))
-    ok = apply_exam_edit(exam_id, new_room_id, new_inst_id, new_dt_str)
+    ok = apply_exam_edit(exam_id, new_room_id, new_inst_id, new_dt_str, sync_all=sync_all, form_data=request.form)
     if ok:
         flash('Exam schedule updated.', 'success')
         # Also send email to the proctor as an extra channel
@@ -872,7 +971,7 @@ def edit_exam_schedule(exam_id):
                         dt_str = new_dt_str.replace('T', ' ')
                         send_email_notification(
                             row['email'],
-                            f"CCA Exam Schedule Updated — {exam['subject_name']}",
+                            f"CCA Exam Schedule Updated â€” {exam['subject_name']}",
                             f"Dear {row['full_name']},\n\nYour proctoring assignment has been updated:\n"
                             f"Subject: {exam['subject_name']}\nNew Date/Time: {dt_str}\n\n"
                             f"CCA Exam Management System"
@@ -884,7 +983,7 @@ def edit_exam_schedule(exam_id):
     return redirect(url_for('schedule_view'))
 
 
-# ── INSTITUTES ────────────────────────────────────────────────────────────────
+# â”€â”€ INSTITUTES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/institutes")
 def institutes_page():
@@ -940,7 +1039,7 @@ def delete_institute_route(id):
         flash("Institute deleted.", "success")
     return redirect(url_for('institutes_page'))
 
-# ── SUBJECTS ──────────────────────────────────────────────────────────────────
+# â”€â”€ SUBJECTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/subjects/link_content", methods=["POST"])
 def link_content_route():
@@ -1057,9 +1156,9 @@ def bulk_delete_subjects():
         except Exception as e:
             errors.append(str(e))
     if deleted:
-        flash(f"✅ {deleted} subject(s) deleted successfully.", "success")
+        flash(f" {deleted} subject(s) deleted successfully.", "success")
     if errors:
-        flash(f"⚠️ {len(errors)} subject(s) could not be deleted: " + "; ".join(errors), "warning")
+        flash(f" {len(errors)} subject(s) could not be deleted: " + "; ".join(errors), "warning")
     return redirect(url_for('subjects_page'))
 
 
@@ -1083,7 +1182,7 @@ def import_subjects_route():
     flash(f"Imported {ok} subject(s). {len(errors)} error(s).", "success" if not errors else "warning")
     return redirect(url_for('subjects_page'))
 
-# ── FACULTY MANAGEMENT ────────────────────────────────────────────────────────
+# â”€â”€ FACULTY MANAGEMENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/faculty")
 def faculty_page():
@@ -1176,7 +1275,7 @@ def admin_proctor_availability(id):
     saved_dates = get_proctor_availability_for(id)
     return render_template("admin_availability.html", instructor=instructor, saved_dates=saved_dates)
 
-# ── IMPORT ────────────────────────────────────────────────────────────────────
+# â”€â”€ IMPORT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/import/rooms", methods=["POST"])
 def import_rooms():
@@ -1265,7 +1364,7 @@ def bulk_delete_exams_route():
         flash(f"{len(errors)} exam(s) could not be deleted.", "warning")
     return redirect(url_for('dashboard') + '#exams')
 
-# ── EXPORT ────────────────────────────────────────────────────────────────────
+# â”€â”€ EXPORT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/export/schedule.pdf")
 def export_schedule_pdf():
@@ -1322,7 +1421,15 @@ def export_collection_pdf():
     return send_file(io.BytesIO(pdf_bytes), mimetype='application/pdf',
                      as_attachment=True, download_name='collection_report.pdf')
 
-# ── REPORTS ───────────────────────────────────────────────────────────────────
+# â”€â”€ REPORTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+@app.route("/reports/clear_absence", methods=["POST"])
+def clear_absence_reports_route():
+    guard = require_role('admin', 'secretary')
+    if guard: return guard
+    clear_absence_reports()
+    flash("Proctor absence reports cleared.", "success")
+    return redirect(url_for('reports_page'))
 
 @app.route("/reports")
 def reports_page():
@@ -1341,7 +1448,7 @@ def reports_page():
                            date_from=date_from, date_to=date_to,
                            unread_count=unread)
 
-# ── SETTINGS ──────────────────────────────────────────────────────────────────
+# â”€â”€ SETTINGS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/settings")
 def settings_page():
@@ -1453,7 +1560,7 @@ def test_email():
     try:
         _configure_mail()
         msg = MailMessage(
-            subject="CCA Exam Management — Test Email",
+            subject="CCA Exam Management â€” Test Email",
             recipients=[to],
             body="This is a test email from the CCA Exam Management System. SMTP is configured correctly."
         )
@@ -1463,7 +1570,7 @@ def test_email():
         flash(f"Failed to send email: {e}", "danger")
     return redirect(url_for('settings_page'))
 
-# ── CHANGE PASSWORD (Admin) ───────────────────────────────────────────────────
+# â”€â”€ CHANGE PASSWORD (Admin) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/admin/change_password/<int:user_id>", methods=["POST"])
 def admin_change_password(user_id):
@@ -1491,14 +1598,14 @@ def admin_change_password(user_id):
                 return redirect(url_for(redirect_to))
             c.execute("UPDATE users SET password = %s WHERE id = %s", (hashed, user_id))
             db.commit()
-            flash(f"✅ Password changed for {user['full_name']}.", "success")
+            flash(f" Password changed for {user['full_name']}.", "success")
         except Exception as e:
             flash(f"Error: {e}", "danger")
         finally:
             db.close()
     return redirect(url_for(redirect_to))
 
-# ── STUDENTS (Admin-accessible) ───────────────────────────────────────────────
+# â”€â”€ STUDENTS (Admin-accessible) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/students")
 def students_page():
@@ -1521,7 +1628,7 @@ def admin_approve_student(id):
     guard = require_role('admin')
     if guard: return guard
     approve_student(id)
-    flash("✅ Student account approved. They have been notified.", "success")
+    flash(" Student account approved. They have been notified.", "success")
     return redirect(url_for('students_page'))
 
 @app.route("/students/reject/<int:id>", methods=["POST"])
@@ -1548,7 +1655,7 @@ def admin_reactivate_student(id):
     guard = require_role('admin')
     if guard: return guard
     approve_student(id)   # approve_student sets is_active=1 and notifies
-    flash("✅ Student account reactivated.", "success")
+    flash(" Student account reactivated.", "success")
     return redirect(url_for('students_page'))
 
 @app.route("/students/bulk_action", methods=["POST"])
@@ -1566,19 +1673,19 @@ def students_bulk_action():
         return redirect(url_for('students_page'))
     if action == 'deactivate':
         bulk_deactivate_students(user_ids)
-        flash(f"⛔ {len(user_ids)} student(s) deactivated.", "warning")
+        flash(f" {len(user_ids)} student(s) deactivated.", "warning")
     elif action == 'delete':
         bulk_delete_students(user_ids)
-        flash(f"🗑 {len(user_ids)} student(s) deleted.", "danger")
+        flash(f" {len(user_ids)} student(s) deleted.", "danger")
     elif action == 'approve':
         for uid in user_ids:
             approve_student(uid)
-        flash(f"✅ {len(user_ids)} student(s) approved.", "success")
+        flash(f" {len(user_ids)} student(s) approved.", "success")
     else:
         flash("Unknown action.", "danger")
     return redirect(url_for('students_page'))
 
-# ── SUPER ADMIN ───────────────────────────────────────────────────────────────
+# â”€â”€ SUPER ADMIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/super_admin")
 def super_admin_page():
@@ -1755,7 +1862,7 @@ def super_reset_password(id):
     if not session.get('is_super_admin'):
         flash("Access denied.", "danger")
         return redirect(url_for('dashboard'))
-    new_password = request.form.get("new_password", "").strip()
+    new_password = request.form.get("new_password", "password123").strip()
     if not new_password or len(new_password) < 6:
         flash("Password must be at least 6 characters.", "danger")
         return redirect(url_for('super_admin_page'))
@@ -1764,17 +1871,25 @@ def super_reset_password(id):
         try:
             import bcrypt as _bcrypt
             hashed = _bcrypt.hashpw(new_password.encode(), _bcrypt.gensalt()).decode()
-            c = db.cursor()
+            c = db.cursor(dictionary=True)
+            c.execute("SELECT email FROM users WHERE id = %s", (id,))
+            user = c.fetchone()
+            if user and user.get('email'):
+                try:
+                    fb_user = fb_auth.get_user_by_email(user['email'])
+                    fb_auth.update_user(fb_user.uid, password=new_password)
+                except Exception as e:
+                    print(f"Firebase update error: {e}")
             c.execute("UPDATE users SET password = %s WHERE id = %s", (hashed, id))
             db.commit()
-            flash("Password reset successfully.", "success")
+            flash("Password reset to default (password123) successfully.", "success")
         except Exception as e:
             flash(f"Error: {e}", "danger")
         finally:
             db.close()
     return redirect(url_for('super_admin_page'))
 
-# ── PROCTOR DASHBOARD ─────────────────────────────────────────────────────────
+# â”€â”€ PROCTOR DASHBOARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/proctor")
 def proctor_dashboard():
@@ -1832,7 +1947,7 @@ def proctor_report_absence():
         f"{session['full_name']} reported an absence for exam #{exam_id}. Reason: {reason or 'Not specified'}.")
     return redirect(url_for('proctor_dashboard'))
 
-# ── RELIEVERS ─────────────────────────────────────────────────────────────────
+# â”€â”€ RELIEVERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/relievers")
 def relievers_page():
@@ -1870,7 +1985,7 @@ def add_reliever_route():
                 row = c.fetchone()
                 if row:
                     send_email_notification(row['email'],
-                        "CCA — You have been assigned as a Reliever",
+                        "CCA â€” You have been assigned as a Reliever",
                         f"Dear {row['full_name']},\n\nYou have been assigned as a reliever proctor for exam #{exam_id}.\n"
                         f"Reason: {reason or 'Not specified'}\n\nPlease log in for details.\n\nCCA Exam Management System")
             finally:
@@ -1887,7 +2002,7 @@ def remove_reliever_route(id):
     flash("Reliever removed.", "success")
     return redirect(url_for('faculty_page'))
 
-# ── SECRETARY ─────────────────────────────────────────────────────────────────
+# â”€â”€ SECRETARY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/secretary")
 def secretary_dashboard():
@@ -1968,14 +2083,14 @@ def secretary_change_password():
             new_hashed = _bcrypt.hashpw(new_password.encode(), _bcrypt.gensalt()).decode()
             c.execute("UPDATE users SET password = %s WHERE id = %s", (new_hashed, session['user_id']))
             db.commit()
-            flash("✅ Password changed successfully.", "success")
+            flash(" Password changed successfully.", "success")
         except Exception as e:
             flash(f"Error: {e}", "danger")
         finally:
             db.close()
     return redirect(url_for('secretary_dashboard'))
 
-# ── PROCTOR ABSENCE (Admin view) ──────────────────────────────────────────────
+# â”€â”€ PROCTOR ABSENCE (Admin view) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/admin/report_absence", methods=["POST"])
 def admin_report_absence():
@@ -1991,7 +2106,15 @@ def admin_report_absence():
         flash("Select instructor and exam.", "warning")
     return redirect(url_for('reports_page'))
 
-# ── NOTIFICATIONS ─────────────────────────────────────────────────────────────
+# â”€â”€ NOTIFICATIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+@app.route("/notifications/clear_all", methods=["POST"])
+def clear_all_notifications_route():
+    guard = require_login()
+    if guard: return guard
+    clear_all_notifications(session['user_id'])
+    flash("All notifications cleared.", "success")
+    return redirect(url_for('notifications_page'))
 
 @app.route("/notifications")
 def notifications_page():
@@ -2017,7 +2140,7 @@ def mark_all_notifs_read():
     flash("All notifications marked as read.", "success")
     return redirect(url_for('notifications_page'))
 
-# ── CHANGE OWN PASSWORD (Proctor / Student) ───────────────────────────────────
+# â”€â”€ CHANGE OWN PASSWORD (Proctor / Student) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/change_my_password", methods=["POST"])
 def change_my_password():
@@ -2029,6 +2152,7 @@ def change_my_password():
     safe_redirects = {
         'proctor': 'proctor_dashboard',
         'student': 'student_timetable',
+        'admin': 'settings_page',
     }
     fallback = safe_redirects.get(role, 'login')
     redirect_target = redirect_to if redirect_to in safe_redirects.values() else fallback
@@ -2050,14 +2174,14 @@ def change_my_password():
             c.execute("UPDATE users SET password = %s WHERE id = %s",
                       (hashed, session['user_id']))
             db.commit()
-            flash("✅ Password updated successfully.", "success")
+            flash(" Password updated successfully.", "success")
         except Exception as e:
             flash(f"Error updating password: {e}", "danger")
         finally:
             db.close()
     return redirect(url_for(redirect_target))
 
-# ── STUDENT TIMETABLE ─────────────────────────────────────────────────────────
+# â”€â”€ STUDENT TIMETABLE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 
@@ -2186,7 +2310,7 @@ def student_timetable():
                            institute_name=institute_name,
                            unread_count=unread)
 
-# ── MISC ──────────────────────────────────────────────────────────────────────
+# â”€â”€ MISC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/clear-session")
 def clear_session():
@@ -2195,8 +2319,16 @@ def clear_session():
     response.delete_cookie('session')
     return response
 
-# ── RUN ───────────────────────────────────────────────────────────────────────
+# â”€â”€ RUN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 if __name__ == "__main__":
     app.run(debug=True, host="127.0.0.1", port=9999)
+
+
+
+
+
+
+
+
 

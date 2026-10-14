@@ -1,0 +1,30 @@
+@app.route("/change_my_password", methods=["POST"])
+def change_my_password():
+    guard = require_login()
+    if guard: return guard
+    role = session.get('role')
+    redirect_to = request.form.get("redirect_to", "")
+    # Determine safe redirect target based on role
+    safe_redirects = {
+        'proctor': 'proctor_dashboard',
+        'student': 'student_timetable',
+    }
+    fallback = safe_redirects.get(role, 'login')
+    redirect_target = redirect_to if redirect_to in safe_redirects.values() else fallback
+
+    new_password     = request.form.get("new_password", "").strip()
+    confirm_password = request.form.get("confirm_password", "").strip()
+    if not new_password or len(new_password) < 6:
+        flash("Password must be at least 6 characters.", "danger")
+        return redirect(url_for(redirect_target))
+    if new_password != confirm_password:
+        flash("Passwords do not match.", "danger")
+        return redirect(url_for(redirect_target))
+    db = open_db()
+    if db:
+        try:
+            import bcrypt as _bcrypt
+            hashed = _bcrypt.hashpw(new_password.encode(), _bcrypt.gensalt()).decode()
+            c = db.cursor()
+            c.execute("UPDATE users SET password = %s WHERE id = %s",
+                      (hashed, session['user_id']))

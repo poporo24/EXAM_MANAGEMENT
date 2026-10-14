@@ -1,0 +1,55 @@
+
+> def resolve_conflicts_route():
+      guard = require_role('admin')
+      if guard: return guard
+      
+      conflict_ids_str = request.form.get("conflict_ids", "")
+      if not conflict_ids_str:
+          flash("No conflicts to resolve.", "info")
+          return redirect(url_for('schedule_view'))
+          
+      try:
+          exam_ids = [int(x.strip()) for x in conflict_ids_str.split(",") if x.strip()]
+      except ValueError:
+          flash("Invalid conflict IDs.", "danger")
+          return redirect(url_for('schedule_view'))
+          
+      if not exam_ids:
+          return redirect(url_for('schedule_view'))
+          
+      # Unschedule the conflicting exams
+      unschedule_exams(exam_ids)
+      
+      # Run the scheduler again, which will now try to place these newly unscheduled exams
+      # while keeping all other scheduled exams locked
+      period_start, period_end = get_exam_period()
+      if not period_start or not period_end:
+          flash("Exam period not set.", "warning")
+          return redirect(url_for('schedule_view'))
+          
+      pending = get_pending_exams()
+      rooms = get_all_rooms()
+      instructors = get_active_instructors()
+      booked = get_already_scheduled_slots()
+      proctor_av = get_proctor_availability()
+      settings = get_system_settings()
+      
+      result = run_scheduler(
+          pending_exams=pending,
+          rooms=rooms,
+          instructors=instructors,
+          booked_slots=booked,
+          period_start=period_start,
+          period_end=period_end,
+          proctor_availability=proctor_av,
+          settings=settings
+      )
+      
+      failed_ids = [f['exam_id'] for f in result['failed']]
+      apply_schedule_results(result['scheduled'], failed_ids)
+      
+      session['last_failed'] = result['failed']
+      session['last_scheduled_count'] = len(result['scheduled'])
+
+
+

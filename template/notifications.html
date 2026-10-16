@@ -150,18 +150,28 @@
                 {% if notifications and notifications|length > 0 %}
                     <div class="divide-y divide-gray-100">
                         {% for notif in notifications %}
-                        <div id="notif-{{ notif.id }}" onclick="markRead('{{ notif.id }}')" class="p-4 sm:px-6 hover:bg-gray-50 cursor-pointer transition-colors {% if not notif.is_read %}bg-blue-50/30{% endif %} flex items-start">
+                        {% set is_absence = 'Absence' in notif.title %}
+                        <div id="notif-{{ notif.id }}" onclick="markRead('{{ notif.id }}')" class="p-4 sm:px-6 hover:bg-gray-50 cursor-pointer transition-colors {% if not notif.is_read %}{% if is_absence %}bg-red-50/40{% else %}bg-blue-50/30{% endif %}{% endif %} flex items-start">
                             <div class="flex-shrink-0 mt-1 mr-4">
                                 {% if not notif.is_read %}
-                                    <div class="h-2.5 w-2.5 rounded-full bg-blue-500" id="dot-{{ notif.id }}"></div>
+                                    <div class="h-3 w-3 rounded-full {% if is_absence %}bg-red-500{% else %}bg-blue-500{% endif %} animate-pulse" id="dot-{{ notif.id }}"></div>
                                 {% else %}
                                     <div class="h-2.5 w-2.5 rounded-full bg-gray-300"></div>
                                 {% endif %}
                             </div>
                             <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium text-gray-900 {% if not notif.is_read %}font-bold{% endif %}">{{ notif.title }}</p>
-                                <p class="text-sm text-gray-500 mt-1">{{ notif.message }}</p>
-                                <p class="text-xs text-gray-400 mt-2">{{ notif.created_at }}</p>
+                                <div class="flex items-center gap-2">
+                                    {% if is_absence %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700">
+                                        <i class="fa-solid fa-triangle-exclamation mr-1"></i> Absence
+                                    </span>
+                                    {% endif %}
+                                    <p class="text-sm font-medium text-gray-900 {% if not notif.is_read %}font-bold{% endif %}">{{ notif.title }}</p>
+                                </div>
+                                <p class="text-sm text-gray-600 mt-1.5 leading-relaxed">{{ notif.message }}</p>
+                                <p class="text-xs text-gray-400 mt-2 flex items-center">
+                                    <i class="fa-regular fa-clock mr-1 text-gray-300"></i> {{ notif.created_at }}
+                                </p>
                             </div>
                         </div>
                         {% endfor %}

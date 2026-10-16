@@ -350,15 +350,6 @@ def delete_user(id):
         cursor = db.cursor()
         cursor.execute("DELETE FROM users WHERE id=%s", (id,))
         db.commit()
-        
-        # Also delete from Firebase Auth so they can re-register if rejected
-        try:
-            from firebase_admin import auth as fb_auth
-            fb_user = fb_auth.get_user_by_email(email)
-            fb_auth.delete_user(fb_user.uid)
-        except Exception:
-            pass # Ignore if not found in Firebase
-            
         return None
     except Exception as e:
         return str(e)
@@ -1492,11 +1483,63 @@ def save_proctor_availability(instructor_id, entries):
         cursor.execute("DELETE FROM proctor_availability WHERE instructor_id=%s", (instructor_id,))
         for entry in entries:
             if isinstance(entry, dict):
+                d = str(entry.get('date', '')).strip()
+                if not d: continue
+                st = str(entry.get('start_time', '07:00')).strip() or '07:00'
+                et = str(entry.get('end_time', '20:00')).strip() or '20:00'
                 cursor.execute("INSERT INTO proctor_availability (instructor_id, available_date, start_time, end_time) VALUES (%s, %s, %s, %s)",
-                               (instructor_id, entry['date'], entry.get('start_time', '07:00'), entry.get('end_time', '20:00')))
+                               (instructor_id, d, st, et))
             else:
+                d = str(entry).strip()
+                if not d: continue
                 cursor.execute("INSERT INTO proctor_availability (instructor_id, available_date, start_time, end_time) VALUES (%s, %s, '07:00', '20:00')",
-                               (instructor_id, entry))
+                               (instructor_id, d))
+        db.commit()
+    finally:
+        db.close()
+
+def bulk_save_proctor_availability(instructor_ids, entries, mode='replace'):
+    """Save availability entries for multiple instructors.
+       mode: 'replace' to overwrite all existing availability,
+             'append' to keep existing and add new dates (updating times if date already present).
+    """
+    db = open_db()
+    if not db or not instructor_ids: return
+    try:
+        cursor = db.cursor()
+        valid_entries = []
+        for e in entries:
+            if isinstance(e, dict):
+                d = str(e.get('date', '')).strip()
+                if not d: continue
+                st = str(e.get('start_time', '07:00')).strip() or '07:00'
+                et = str(e.get('end_time', '20:00')).strip() or '20:00'
+                valid_entries.append({'date': d, 'start_time': st, 'end_time': et})
+            elif isinstance(e, str) and e.strip():
+                valid_entries.append({'date': e.strip(), 'start_time': '07:00', 'end_time': '20:00'})
+
+        for raw_id in instructor_ids:
+            try:
+                iid = int(raw_id)
+            except (ValueError, TypeError):
+                continue
+
+            if mode == 'replace':
+                cursor.execute("DELETE FROM proctor_availability WHERE instructor_id=%s", (iid,))
+                for ve in valid_entries:
+                    cursor.execute(
+                        "INSERT INTO proctor_availability (instructor_id, available_date, start_time, end_time) VALUES (%s, %s, %s, %s)",
+                        (iid, ve['date'], ve['start_time'], ve['end_time'])
+                    )
+            elif mode == 'append':
+                for ve in valid_entries:
+                    cursor.execute("SELECT id FROM proctor_availability WHERE instructor_id=%s AND available_date=%s", (iid, ve['date']))
+                    row = cursor.fetchone()
+                    if row:
+                        cursor.execute("UPDATE proctor_availability SET start_time=%s, end_time=%s WHERE id=%s", (ve['start_time'], ve['end_time'], row[0]))
+                    else:
+                        cursor.execute("INSERT INTO proctor_availability (instructor_id, available_date, start_time, end_time) VALUES (%s, %s, %s, %s)",
+                                       (iid, ve['date'], ve['start_time'], ve['end_time']))
         db.commit()
     finally:
         db.close()
@@ -1620,24 +1663,28 @@ def get_exam_collection_status(institute_id=None):
         if institute_id:
             cursor.execute("""
                 SELECT e.id as exam_id, e.subject_name, e.section, e.exam_date_time,
+                       e.instructor_id, e.instructor_name, r.room_name,
                        e.institute_id,
                        c.collected_by_instructor_id, c.collected_at, c.returned_at, c.notes,
                        inst.name as institute_name
                 FROM exams e
                 LEFT JOIN exam_collection c ON e.id = c.exam_id
                 LEFT JOIN institutes inst ON e.institute_id = inst.id
+                LEFT JOIN rooms r ON e.room_id = r.id
                 WHERE e.status = 'Scheduled' AND e.institute_id = %s
                 ORDER BY e.exam_date_time ASC
             """, (institute_id,))
         else:
             cursor.execute("""
                 SELECT e.id as exam_id, e.subject_name, e.section, e.exam_date_time,
+                       e.instructor_id, e.instructor_name, r.room_name,
                        e.institute_id,
                        c.collected_by_instructor_id, c.collected_at, c.returned_at, c.notes,
                        inst.name as institute_name
                 FROM exams e
                 LEFT JOIN exam_collection c ON e.id = c.exam_id
                 LEFT JOIN institutes inst ON e.institute_id = inst.id
+                LEFT JOIN rooms r ON e.room_id = r.id
                 WHERE e.status = 'Scheduled'
                 ORDER BY e.exam_date_time ASC
             """)
@@ -1650,11 +1697,31 @@ def mark_exam_collected(exam_id, collected_by_instructor_id, notes=''):
     if not db: return
     try:
         cursor = db.cursor()
+        valid_instructor_id = None
+        if collected_by_instructor_id:
+            try:
+                candidate_id = int(collected_by_instructor_id)
+                cursor.execute("SELECT id FROM instructors WHERE id = %s", (candidate_id,))
+                if cursor.fetchone():
+                    valid_instructor_id = candidate_id
+            except (ValueError, TypeError):
+                valid_instructor_id = None
+        
+        # If no instructor specified, fall back to the exam's assigned instructor if available
+        if not valid_instructor_id:
+            cursor.execute("SELECT instructor_id FROM exams WHERE id = %s", (exam_id,))
+            row = cursor.fetchone()
+            if row and row[0]:
+                valid_instructor_id = row[0]
+
         cursor.execute("""
             INSERT INTO exam_collection (exam_id, collected_by_instructor_id, collected_at, notes)
             VALUES (%s, %s, NOW(), %s)
-            ON DUPLICATE KEY UPDATE collected_by_instructor_id=VALUES(collected_by_instructor_id), collected_at=NOW(), notes=VALUES(notes)
-        """, (exam_id, collected_by_instructor_id, notes))
+            ON DUPLICATE KEY UPDATE
+                collected_by_instructor_id = VALUES(collected_by_instructor_id),
+                collected_at = NOW(),
+                notes = VALUES(notes)
+        """, (exam_id, valid_instructor_id, notes))
         db.commit()
     finally:
         db.close()
@@ -1664,7 +1731,13 @@ def mark_exam_returned(exam_id, notes=''):
     if not db: return
     try:
         cursor = db.cursor()
-        cursor.execute("UPDATE exam_collection SET returned_at=NOW(), notes=CONCAT(IFNULL(notes,''), '\n', %s) WHERE exam_id=%s", (notes, exam_id))
+        cursor.execute("""
+            INSERT INTO exam_collection (exam_id, returned_at, notes)
+            VALUES (%s, NOW(), %s)
+            ON DUPLICATE KEY UPDATE
+                returned_at = NOW(),
+                notes = CONCAT(IFNULL(notes,''), '\n', VALUES(notes))
+        """, (exam_id, notes))
         db.commit()
     finally:
         db.close()

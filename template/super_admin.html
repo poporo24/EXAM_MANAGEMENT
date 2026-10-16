@@ -70,6 +70,7 @@
 <body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
 
     <!-- Sidebar -->
+    {% set active_page = 'super_admin' %}
     {% include 'admin_sidebar.html' %}
 
     <!-- Main Content -->
@@ -151,10 +152,27 @@
 
             <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden mb-8">
 
-                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-                    <h2 class="font-semibold text-gray-800">System Users</h2>
-                    <div class="flex gap-4">
-                        <select id="roleFilter" onchange="filterUsers()" class="block w-48 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#668054] focus:border-[#668054] sm:text-sm rounded-md border">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <h2 class="font-semibold text-gray-800 text-lg">System Users</h2>
+                        <span id="userCountBadge" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-800">
+                            Showing {{ users|length }} of {{ users|length }}
+                        </span>
+                    </div>
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                        <!-- Search Bar -->
+                        <div class="relative w-full sm:w-72">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                <i class="fa-solid fa-magnifying-glass text-sm"></i>
+                            </div>
+                            <input type="text" id="userSearchInput" oninput="filterUsers()" placeholder="Search name, email, section..." 
+                                class="w-full pl-9 pr-8 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#668054] focus:border-transparent transition-all shadow-sm">
+                            <button type="button" id="clearUserSearchBtn" onclick="clearUserSearch()" class="hidden absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none" title="Clear search">
+                                <i class="fa-solid fa-xmark text-sm"></i>
+                            </button>
+                        </div>
+                        <!-- Role Filter -->
+                        <select id="roleFilter" onchange="filterUsers()" class="block w-full sm:w-44 pl-3 pr-8 py-2 text-sm border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#668054] focus:border-transparent rounded-lg border bg-white shadow-sm">
                             <option value="all">All Roles</option>
                             {% for r in roles %}
                             <option value="{{ r }}">{{ r|title }}</option>
@@ -228,6 +246,19 @@
                                 </td>
                             </tr>
                             {% endfor %}
+                            <!-- Empty state row when search/filter yields 0 matches -->
+                            <tr id="noUsersMatchRow" class="hidden">
+                                <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                                    <div class="flex flex-col items-center justify-center">
+                                        <i class="fa-solid fa-user-slash text-4xl text-gray-300 mb-3"></i>
+                                        <p class="text-base font-medium text-gray-700">No users match your search criteria</p>
+                                        <p class="text-xs text-gray-400 mt-1">Try adjusting your search query or selecting a different role filter.</p>
+                                        <button type="button" onclick="resetUserSearch()" class="mt-3 inline-flex items-center px-3 py-1.5 text-xs font-medium text-[#668054] bg-[#668054]/10 hover:bg-[#668054]/20 rounded-md transition-colors">
+                                            <i class="fa-solid fa-rotate-left mr-1.5"></i> Reset Search & Filters
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -362,16 +393,67 @@
         });
 
         function filterUsers() {
-            const role = document.getElementById('roleFilter').value;
+            const roleSelect = document.getElementById('roleFilter');
+            const role = roleSelect ? roleSelect.value.toLowerCase() : 'all';
+            const searchInput = document.getElementById('userSearchInput');
+            const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
+            const clearBtn = document.getElementById('clearUserSearchBtn');
+            if (clearBtn) {
+                if (query.length > 0) clearBtn.classList.remove('hidden');
+                else clearBtn.classList.add('hidden');
+            }
+
             const rows = document.querySelectorAll('.user-row');
-            
+            let visibleCount = 0;
+            const totalCount = rows.length;
+
             rows.forEach(row => {
-                if (role === 'all' || row.dataset.role === role) {
+                const userRole = (row.dataset.role || '').toLowerCase();
+                const textContent = row.textContent.toLowerCase();
+
+                const roleMatch = (role === 'all' || userRole === role);
+                const queryMatch = (query === '' || textContent.includes(query));
+
+                if (roleMatch && queryMatch) {
                     row.style.display = '';
+                    visibleCount++;
                 } else {
                     row.style.display = 'none';
                 }
             });
+
+            // Update badge counter
+            const countBadge = document.getElementById('userCountBadge');
+            if (countBadge) {
+                countBadge.textContent = `Showing ${visibleCount} of ${totalCount}`;
+            }
+
+            // Toggle empty state
+            const noMatchRow = document.getElementById('noUsersMatchRow');
+            if (noMatchRow) {
+                if (visibleCount === 0 && totalCount > 0) {
+                    noMatchRow.classList.remove('hidden');
+                } else {
+                    noMatchRow.classList.add('hidden');
+                }
+            }
+        }
+
+        function clearUserSearch() {
+            const searchInput = document.getElementById('userSearchInput');
+            if (searchInput) {
+                searchInput.value = '';
+                searchInput.focus();
+            }
+            filterUsers();
+        }
+
+        function resetUserSearch() {
+            const searchInput = document.getElementById('userSearchInput');
+            if (searchInput) searchInput.value = '';
+            const roleFilter = document.getElementById('roleFilter');
+            if (roleFilter) roleFilter.value = 'all';
+            filterUsers();
         }
 
         function closeModal(id) {
@@ -435,7 +517,7 @@
                 </div>
                 <h3 class="text-lg leading-6 font-medium text-gray-900 mt-4">Update Superadmin Email</h3>
                 <div class="mt-2 px-2 py-3 text-left">
-                    <p class="text-xs text-gray-500 mb-4 text-center">Change your email address so you can receive Firebase password reset links. Must be a @cca.edu.ph address.</p>
+                    <p class="text-xs text-gray-500 mb-4 text-center">Change your email address so you can receive password reset links. Must be a @cca.edu.ph address.</p>
                     <form action="/super_admin/update_email" method="POST" id="updateEmailForm">
                         <label class="block text-sm font-medium text-gray-700">New Email Address</label>
                         <input type="email" name="new_email" required pattern=".*@cca\.edu\.ph$" title="Must be @cca.edu.ph" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-[#668054] focus:border-[#668054] sm:text-sm" placeholder="your.name@cca.edu.ph">

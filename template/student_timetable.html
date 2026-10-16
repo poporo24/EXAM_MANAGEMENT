@@ -173,8 +173,8 @@
         </div>
         <div class="print-title-section">
             <h1>EXAM SCHEDULE</h1>
-            <p>{{ exam_term }} Examination</p>
-            <p>{{ exam_semester }}, School Year: 2025-2026</p>
+            <p>{{ exam_term or 'Midterm' }} Examination</p>
+            <p>{% if exam_semester %}{{ exam_semester }}, {% endif %}School Year: 2025-2026</p>
         </div>
     </div>
     
@@ -250,28 +250,41 @@
 <!-- Change Password Modal -->
 <div id="studentPwModal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.55); align-items:center; justify-content:center;">
     <div style="background:#fff; border-radius:16px; width:100%; max-width:420px; margin:20px; box-shadow:0 20px 60px rgba(0,0,0,0.3); overflow:hidden;">
-        <div style="background:var(--green-dark); padding:20px 24px; display:flex; align-items:center; gap:12px;">
-            <i class="fa-solid fa-key" style="color:#fff; font-size:20px;"></i>
-            <h3 style="color:#fff; font-size:17px; font-weight:700; margin:0;">Change My Password</h3>
+        <div style="background:var(--green-dark); padding:16px 20px; display:flex; align-items:center; justify-content:space-between;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <i class="fa-solid fa-key" style="color:#fff; font-size:16px;"></i>
+                <h3 style="color:#fff; font-size:16px; font-weight:700; margin:0;">Change My Password</h3>
+            </div>
+            <button type="button" onclick="closeStudentPwModal()" style="background:none; border:none; color:rgba(255,255,255,0.7); cursor:pointer; font-size:18px; padding:0 4px; line-height:1;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
         </div>
         <form action="/change_my_password" method="POST" style="padding:24px;" onsubmit="return validateStudentPw(this)">
             <input type="hidden" name="redirect_to" value="student_timetable">
             <p style="font-size:13px; color:var(--gray-500); margin-bottom:16px;">Choose a strong password for your account.</p>
-            <div style="margin-bottom:14px;">
+            <div style="margin-bottom:16px;">
                 <label style="display:block; font-size:13px; font-weight:600; color:var(--gray-700); margin-bottom:6px;">New Password</label>
-                <div class="relative w-full"><input class="pr-10" type="password" name="new_password" required minlength="6"
-                       style="width:100%; padding:10px 12px; border:1px solid var(--gray-200); border-radius:8px; font-size:14px; outline:none; box-sizing:border-box;"
-                       placeholder="At least 6 characters"><div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" onclick="togglePassword(this)">
-    <i class="fa-regular fa-eye text-gray-400 hover:text-gray-600"></i>
-</div></div>
+                <div style="position:relative; width:100%;">
+                    <input type="password" name="new_password" id="student_new_pw" required minlength="6"
+                           style="width:100%; padding:10px 40px 10px 12px; border:1px solid var(--gray-200); border-radius:8px; font-size:14px; outline:none; box-sizing:border-box;"
+                           placeholder="At least 6 characters">
+                    <button type="button" onclick="toggleStudentPassword('student_new_pw', 'icon_new_pw')"
+                            style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--gray-400); cursor:pointer; padding:6px; display:flex; align-items:center; justify-content:center;">
+                        <i id="icon_new_pw" class="fa-regular fa-eye"></i>
+                    </button>
+                </div>
             </div>
-            <div style="margin-bottom:20px;">
+            <div style="margin-bottom:22px;">
                 <label style="display:block; font-size:13px; font-weight:600; color:var(--gray-700); margin-bottom:6px;">Confirm Password</label>
-                <div class="relative w-full"><input class="pr-10" type="password" name="confirm_password" required minlength="6"
-                       style="width:100%; padding:10px 12px; border:1px solid var(--gray-200); border-radius:8px; font-size:14px; outline:none; box-sizing:border-box;"
-                       placeholder="Repeat new password"><div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" onclick="togglePassword(this)">
-    <i class="fa-regular fa-eye text-gray-400 hover:text-gray-600"></i>
-</div></div>
+                <div style="position:relative; width:100%;">
+                    <input type="password" name="confirm_password" id="student_confirm_pw" required minlength="6"
+                           style="width:100%; padding:10px 40px 10px 12px; border:1px solid var(--gray-200); border-radius:8px; font-size:14px; outline:none; box-sizing:border-box;"
+                           placeholder="Repeat new password">
+                    <button type="button" onclick="toggleStudentPassword('student_confirm_pw', 'icon_confirm_pw')"
+                            style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--gray-400); cursor:pointer; padding:6px; display:flex; align-items:center; justify-content:center;">
+                        <i id="icon_confirm_pw" class="fa-regular fa-eye"></i>
+                    </button>
+                </div>
             </div>
             <div style="display:flex; gap:10px; justify-content:flex-end;">
                 <button type="button" onclick="closeStudentPwModal()"
@@ -430,6 +443,20 @@
         if (pw.length < 6) { alert('Password must be at least 6 characters.'); return false; }
         return true;
     }
+    function toggleStudentPassword(inputId, iconId) {
+        const input = document.getElementById(inputId);
+        const icon = document.getElementById(iconId);
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+
     // Close modal on backdrop click
     document.getElementById('studentPwModal').addEventListener('click', function(e) {
         if (e.target === this) closeStudentPwModal();

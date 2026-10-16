@@ -63,15 +63,19 @@
                 <i class="fa-solid fa-clipboard-list w-6 text-center text-lg"></i>
                 <span class="ml-3 nav-text font-medium">My Exams</span>
             </a>
-            <a href="/notifications" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group" title="Notifications">
+            <a href="/notifications" class="flex items-center px-4 py-3 group {% if active_page == 'notifications' %}bg-green-50 text-[#668054] border-r-4 border-[#668054]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#668054]{% endif %}" title="Notifications">
                 <i class="fa-solid fa-bell w-6 text-center text-lg relative">
                     {% if unread_count and unread_count > 0 %}
-                    <span class="absolute top-0 right-0 -mt-1 -mr-1 flex h-2 w-2">
-                        <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    <span class="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
                     </span>
                     {% endif %}
                 </i>
-                <span class="ml-3 nav-text font-medium">Notifications</span>
+                <span class="ml-3 nav-text font-medium flex-1">Notifications</span>
+                {% if unread_count and unread_count > 0 %}
+                <span class="nav-text ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ unread_count }}</span>
+                {% endif %}
             </a>
         </nav>
 
@@ -100,6 +104,17 @@
     <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
         <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
             <h1 class="text-xl font-semibold text-gray-800">Proctor Dashboard</h1>
+            <div class="flex items-center gap-3">
+                <a href="/notifications" class="text-gray-500 hover:text-[#668054] relative p-2 rounded-full hover:bg-gray-100 transition-colors" title="Notifications">
+                    <i class="fa-regular fa-bell text-xl"></i>
+                    {% if unread_count and unread_count > 0 %}
+                    <span class="absolute top-1 right-1 flex h-4 w-4">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-4 w-4 bg-red-500 text-white text-[10px] font-bold items-center justify-center">{{ unread_count }}</span>
+                    </span>
+                    {% endif %}
+                </a>
+            </div>
         </header>
 
         <div class="p-8">
@@ -360,15 +375,33 @@
                     <h3 class="text-lg font-semibold text-gray-900"><i class="fa-solid fa-key text-[#668054] mr-2"></i>Change Password</h3>
                     <button onclick="closeModal('change-password-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
                 </div>
-                <form action="/change_my_password" method="POST" id="changePwForm" class="px-6 py-5 space-y-4">
+                <form action="/change_my_password" method="POST" id="changePwForm" class="px-6 py-5 space-y-4" onsubmit="return validatePwForm(this)">
                     <input type="hidden" name="redirect_to" value="proctor_dashboard">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">New Password <span class="text-gray-400 font-normal">(min. 6 characters)</span></label>
-                        <input type="password" name="new_password" required minlength="6" class="block w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#668054] focus:border-[#668054]" placeholder="Enter new password">
+                        <div class="relative w-full">
+                            <input type="password" name="new_password" required minlength="6" 
+                                class="block w-full border border-gray-300 rounded-lg py-2 pl-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#668054] focus:border-[#668054]" 
+                                placeholder="Enter new password">
+                            <button type="button" onclick="togglePassword(this)" 
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
+                                title="Toggle password visibility">
+                                <i class="fa-regular fa-eye text-base"></i>
+                            </button>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-                        <input type="password" name="confirm_password" required minlength="6" class="block w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#668054] focus:border-[#668054]" placeholder="Confirm new password">
+                        <div class="relative w-full">
+                            <input type="password" name="confirm_password" required minlength="6" 
+                                class="block w-full border border-gray-300 rounded-lg py-2 pl-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#668054] focus:border-[#668054]" 
+                                placeholder="Confirm new password">
+                            <button type="button" onclick="togglePassword(this)" 
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
+                                title="Toggle password visibility">
+                                <i class="fa-regular fa-eye text-base"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="pt-4 flex justify-end space-x-3">
                         <button type="button" onclick="closeModal('change-password-modal')" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Cancel</button>

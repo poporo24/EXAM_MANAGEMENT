@@ -152,16 +152,20 @@
                 <form id="facultyBulkForm" action="/faculty/bulk_delete" method="POST">
 
                 <!-- Bulk action toolbar -->
-                <div id="facultyBulkToolbar" class="hidden px-6 py-3 bg-red-50 border-b border-red-200 flex items-center justify-between">
-                    <span class="text-sm font-semibold text-red-700">
-                        <i class="fa-solid fa-circle-check mr-1"></i>
-                        <span id="facultyBulkCount">0</span> instructor(s) selected
+                <div id="facultyBulkToolbar" class="hidden px-6 py-3 bg-gray-50 border-b border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <span class="text-sm font-semibold text-gray-800">
+                        <i class="fa-solid fa-circle-check text-[#668054] mr-1"></i>
+                        <span id="facultyBulkCount" class="font-bold text-[#668054]">0</span> instructor(s) selected
                     </span>
-                    <div class="flex items-center gap-2">
-                        <button type="button" onclick="clearFacultySelection()" class="text-sm text-gray-600 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-100">Clear</button>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" onclick="clearFacultySelection()" class="text-xs text-gray-600 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-100 transition-colors">Clear</button>
+                        <button type="button" onclick="openBulkAvailabilityModal()"
+                            class="inline-flex items-center gap-2 text-xs font-semibold text-white bg-[#668054] hover:bg-[#526843] rounded-md px-3.5 py-1.5 shadow-sm transition-colors">
+                            <i class="fa-solid fa-calendar-plus"></i> Set Availability for Selected
+                        </button>
                         <button type="submit"
                             onclick="return confirm('Delete the selected instructors? This cannot be undone.')"
-                            class="inline-flex items-center gap-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md px-4 py-1.5 transition-colors">
+                            class="inline-flex items-center gap-2 text-xs font-medium text-red-600 hover:text-white hover:bg-red-600 border border-red-300 rounded-md px-3 py-1.5 transition-colors">
                             <i class="fa-solid fa-trash"></i> Delete Selected
                         </button>
                     </div>
@@ -189,7 +193,7 @@
                                 {% for ins in instructors %}
                                 <tr class="hover:bg-gray-50">
                                     <td class="pl-6 pr-2 py-4 w-10">
-                                        <input type="checkbox" name="instructor_ids" value="{{ ins.id }}"
+                                        <input type="checkbox" name="instructor_ids" value="{{ ins.id }}" data-name="{{ ins.name }}"
                                             class="faculty-row-checkbox h-4 w-4 text-[#668054] border-gray-300 rounded cursor-pointer"
                                             onchange="updateFacultyToolbar()">
                                     </td>
@@ -615,15 +619,321 @@
     </div>
 
 
+    <!-- ── Bulk Availability Modal ────────────────────────────────────── -->
+    <div id="bulkAvailabilityModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4 py-6">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeBulkAvailabilityModal()"></div>
+            <div class="relative bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 z-10 max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between pb-4 border-b border-gray-200">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                            <i class="fa-solid fa-calendar-check text-[#668054]"></i>
+                            Set Availability for Selected Faculty
+                        </h3>
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            Applying availability to <span id="bulkModalCount" class="font-bold text-[#668054]">0</span> selected instructor(s).
+                        </p>
+                    </div>
+                    <button type="button" onclick="closeBulkAvailabilityModal()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                </div>
+
+                <!-- Selected Faculty Preview Tags -->
+                <div class="my-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Selected Faculty:</span>
+                        <span id="bulkNamesCountBadge" class="text-[11px] text-gray-500"></span>
+                    </div>
+                    <div id="bulkSelectedNamesList" class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <form id="bulkAvailabilityForm" action="/admin/bulk_proctor_availability" method="POST">
+                    <!-- Hidden Container for Selected Instructor IDs -->
+                    <div id="bulkFacultyIdsContainer"></div>
+
+                    <!-- Quick Toolbar -->
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <div class="text-xs font-semibold text-gray-700">Availability Dates:</div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            {% if exam_start and exam_end %}
+                            <button type="button" onclick="fillBulkExamPeriod()" class="inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded text-[#668054] bg-[#668054]/10 hover:bg-[#668054]/20 transition-colors">
+                                <i class="fa-solid fa-bolt mr-1"></i> Auto-Fill Exam Period ({{ exam_start }} - {{ exam_end }})
+                            </button>
+                            {% endif %}
+                            <button type="button" onclick="toggleBulkRangeGenerator()" class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors">
+                                <i class="fa-solid fa-calendar-days mr-1 text-blue-600"></i> Date Range
+                            </button>
+                            <button type="button" onclick="addBulkAvailabilityRow()" class="inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded text-white bg-[#668054] hover:bg-[#526843] transition-colors">
+                                <i class="fa-solid fa-plus mr-1"></i> Add Date
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Date Range Generator for Bulk Modal -->
+                    <div id="bulkRangeGeneratorPanel" class="hidden mb-4 p-3.5 bg-blue-50/60 rounded-lg border border-blue-100">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-semibold text-blue-900 uppercase tracking-wide">
+                                <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Generate Range
+                            </span>
+                            <button type="button" onclick="toggleBulkRangeGenerator()" class="text-xs text-gray-400 hover:text-gray-600">Close</button>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-2.5 items-end">
+                            <div>
+                                <label class="block text-[11px] font-medium text-gray-700 mb-1">From Date</label>
+                                <input type="date" id="bulkRangeStartDate" value="{{ exam_start or '' }}" class="w-full text-xs border-gray-300 rounded border p-1.5 focus:ring-[#668054]">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-medium text-gray-700 mb-1">To Date</label>
+                                <input type="date" id="bulkRangeEndDate" value="{{ exam_end or '' }}" class="w-full text-xs border-gray-300 rounded border p-1.5 focus:ring-[#668054]">
+                            </div>
+                            <div class="grid grid-cols-2 gap-1.5">
+                                <div>
+                                    <label class="block text-[11px] font-medium text-gray-700 mb-1">Start</label>
+                                    <input type="time" id="bulkRangeStartTime" value="07:00" class="w-full text-xs border-gray-300 rounded border p-1.5 focus:ring-[#668054]">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-medium text-gray-700 mb-1">End</label>
+                                    <input type="time" id="bulkRangeEndTime" value="18:00" class="w-full text-xs border-gray-300 rounded border p-1.5 focus:ring-[#668054]">
+                                </div>
+                            </div>
+                            <div>
+                                <button type="button" onclick="applyBulkDateRange()" class="w-full py-1.5 px-2 text-xs font-semibold rounded text-white bg-blue-600 hover:bg-blue-700 transition-colors">
+                                    Generate Days
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Date Rows Table -->
+                    <div class="border border-gray-200 rounded-lg overflow-hidden mb-4">
+                        <div class="px-4 py-2 bg-gray-100 text-xs font-semibold text-gray-600 uppercase grid grid-cols-12 gap-2">
+                            <div class="col-span-5">Date</div>
+                            <div class="col-span-3">Start Time</div>
+                            <div class="col-span-3">End Time</div>
+                            <div class="col-span-1 text-center">Action</div>
+                        </div>
+                        <div id="bulkAvailabilityRowsContainer" class="p-3 space-y-2 max-h-60 overflow-y-auto bg-gray-50/30">
+                            <!-- Populated with rows -->
+                        </div>
+                        <div id="bulkNoRowsNotice" class="hidden py-8 text-center text-gray-400 text-xs">
+                            No dates added yet. Click "+ Add Date" or "Auto-Fill Exam Period".
+                        </div>
+                    </div>
+
+                    <!-- Action Mode (Replace vs Append) -->
+                    <div class="mb-5 p-3.5 bg-gray-50 rounded-lg border border-gray-200">
+                        <div class="text-xs font-semibold text-gray-700 mb-2">Update Mode:</div>
+                        <div class="space-y-2">
+                            <label class="flex items-start gap-2 cursor-pointer">
+                                <input type="radio" name="availability_mode" value="replace" checked class="mt-0.5 text-[#668054] focus:ring-[#668054]">
+                                <div>
+                                    <span class="text-xs font-semibold text-gray-800">Replace existing availability (Recommended)</span>
+                                    <span class="block text-[11px] text-gray-500">Overwrites all previous availability for the selected instructors with this new schedule.</span>
+                                </div>
+                            </label>
+                            <label class="flex items-start gap-2 cursor-pointer">
+                                <input type="radio" name="availability_mode" value="append" class="mt-0.5 text-[#668054] focus:ring-[#668054]">
+                                <div>
+                                    <span class="text-xs font-semibold text-gray-800">Append to existing availability</span>
+                                    <span class="block text-[11px] text-gray-500">Keeps existing dates and adds new ones (or updates times if the date already exists).</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                        <button type="button" onclick="closeBulkAvailabilityModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-xs font-semibold text-white bg-[#668054] hover:bg-[#526843] shadow-sm transition-colors">
+                            <i class="fa-solid fa-check mr-1.5"></i> Save &amp; Apply Availability
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
 <script>
+const BULK_EXAM_START = "{{ exam_start or '' }}";
+const BULK_EXAM_END   = "{{ exam_end or '' }}";
+
 function filterTable(inputId, rowSelector) {
     const q = document.getElementById(inputId).value.toLowerCase();
     document.querySelectorAll(rowSelector).forEach(r => {
         r.style.display = r.innerText.toLowerCase().includes(q) ? "" : "none";
     });
 }
+
+function openBulkAvailabilityModal() {
+    const checkedBoxes = Array.from(document.querySelectorAll('.faculty-row-checkbox:checked'));
+    if (checkedBoxes.length === 0) {
+        alert('Please select at least one instructor.');
+        return;
+    }
+
+    // Populate hidden inputs
+    const idsContainer = document.getElementById('bulkFacultyIdsContainer');
+    idsContainer.innerHTML = '';
+    const namesList = document.getElementById('bulkSelectedNamesList');
+    namesList.innerHTML = '';
+
+    checkedBoxes.forEach(cb => {
+        const hid = document.createElement('input');
+        hid.type = 'hidden';
+        hid.name = 'instructor_ids';
+        hid.value = cb.value;
+        idsContainer.appendChild(hid);
+
+        const nameTag = document.createElement('span');
+        nameTag.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs bg-white text-gray-700 border border-gray-200 shadow-2xs';
+        nameTag.textContent = cb.dataset.name || `ID #${cb.value}`;
+        namesList.appendChild(nameTag);
+    });
+
+    document.getElementById('bulkModalCount').textContent = checkedBoxes.length;
+    document.getElementById('bulkNamesCountBadge').textContent = `${checkedBoxes.length} instructor(s)`;
+
+    // Ensure at least one row exists if empty
+    const rowsContainer = document.getElementById('bulkAvailabilityRowsContainer');
+    if (rowsContainer.children.length === 0) {
+        if (BULK_EXAM_START && BULK_EXAM_END) {
+            fillBulkExamPeriod();
+        } else {
+            addBulkAvailabilityRow();
+        }
+    }
+
+    updateBulkRowCount();
+    document.getElementById('bulkAvailabilityModal').classList.remove('hidden');
+}
+
+function closeBulkAvailabilityModal() {
+    document.getElementById('bulkAvailabilityModal').classList.add('hidden');
+}
+
+function toggleBulkRangeGenerator() {
+    document.getElementById('bulkRangeGeneratorPanel').classList.toggle('hidden');
+}
+
+function createBulkRowElement(dateVal = '', startTimeVal = '07:00', endTimeVal = '18:00') {
+    const row = document.createElement('div');
+    row.className = 'grid grid-cols-12 gap-2 items-center bulk-av-row bg-white p-2 rounded border border-gray-200 shadow-2xs';
+    row.innerHTML = `
+        <div class="col-span-5">
+            <input type="date" name="available_dates" value="${dateVal}" required 
+                class="w-full text-xs border-gray-300 rounded border p-1.5 focus:ring-[#668054]">
+        </div>
+        <div class="col-span-3">
+            <input type="time" name="start_times" value="${startTimeVal}" required 
+                class="w-full text-xs border-gray-300 rounded border p-1.5 focus:ring-[#668054]">
+        </div>
+        <div class="col-span-3">
+            <input type="time" name="end_times" value="${endTimeVal}" required 
+                class="w-full text-xs border-gray-300 rounded border p-1.5 focus:ring-[#668054]">
+        </div>
+        <div class="col-span-1 flex items-center justify-center gap-1">
+            <button type="button" onclick="this.closest('.bulk-av-row').remove(); updateBulkRowCount();" title="Remove date" class="text-red-500 hover:text-red-700 p-1">
+                <i class="fa-solid fa-times text-xs"></i>
+            </button>
+        </div>
+    `;
+    return row;
+}
+
+function addBulkAvailabilityRow(dateVal = '', startTimeVal = '07:00', endTimeVal = '18:00') {
+    const container = document.getElementById('bulkAvailabilityRowsContainer');
+    if (!dateVal) {
+        const dateInputs = container.querySelectorAll('input[name="available_dates"]');
+        if (dateInputs.length > 0) {
+            const lastVal = dateInputs[dateInputs.length - 1].value;
+            if (lastVal) {
+                const nextD = new Date(lastVal);
+                nextD.setDate(nextD.getDate() + 1);
+                dateVal = nextD.toISOString().split('T')[0];
+            }
+        } else if (BULK_EXAM_START) {
+            dateVal = BULK_EXAM_START;
+        }
+    }
+    container.appendChild(createBulkRowElement(dateVal, startTimeVal, endTimeVal));
+    updateBulkRowCount();
+}
+
+function updateBulkRowCount() {
+    const container = document.getElementById('bulkAvailabilityRowsContainer');
+    const notice = document.getElementById('bulkNoRowsNotice');
+    if (notice) {
+        notice.classList.toggle('hidden', container.children.length > 0);
+    }
+}
+
+function fillBulkExamPeriod() {
+    if (!BULK_EXAM_START || !BULK_EXAM_END) {
+        alert('No exam period configured.');
+        return;
+    }
+    const start = new Date(BULK_EXAM_START);
+    const end   = new Date(BULK_EXAM_END);
+    if (start > end) return;
+
+    const existing = new Set();
+    document.querySelectorAll('#bulkAvailabilityRowsContainer input[name="available_dates"]').forEach(i => {
+        if (i.value) existing.add(i.value);
+    });
+
+    const container = document.getElementById('bulkAvailabilityRowsContainer');
+    let curr = new Date(start);
+    while (curr <= end) {
+        const dStr = curr.toISOString().split('T')[0];
+        if (!existing.has(dStr)) {
+            container.appendChild(createBulkRowElement(dStr, '07:00', '18:00'));
+            existing.add(dStr);
+        }
+        curr.setDate(curr.getDate() + 1);
+    }
+    updateBulkRowCount();
+}
+
+function applyBulkDateRange() {
+    const startVal = document.getElementById('bulkRangeStartDate').value;
+    const endVal   = document.getElementById('bulkRangeEndDate').value;
+    const stVal    = document.getElementById('bulkRangeStartTime').value || '07:00';
+    const etVal    = document.getElementById('bulkRangeEndTime').value || '18:00';
+
+    if (!startVal || !endVal) {
+        alert('Please select start and end dates.');
+        return;
+    }
+    const start = new Date(startVal);
+    const end   = new Date(endVal);
+    if (start > end) {
+        alert('Start date cannot be after end date.');
+        return;
+    }
+
+    const existing = new Set();
+    document.querySelectorAll('#bulkAvailabilityRowsContainer input[name="available_dates"]').forEach(i => {
+        if (i.value) existing.add(i.value);
+    });
+
+    const container = document.getElementById('bulkAvailabilityRowsContainer');
+    let curr = new Date(start);
+    while (curr <= end) {
+        const dStr = curr.toISOString().split('T')[0];
+        if (!existing.has(dStr)) {
+            container.appendChild(createBulkRowElement(dStr, stVal, etVal));
+            existing.add(dStr);
+        }
+        curr.setDate(curr.getDate() + 1);
+    }
+    updateBulkRowCount();
+    document.getElementById('bulkRangeGeneratorPanel').classList.add('hidden');
+}
 </script>
 </body>
 
 </html>
+
 

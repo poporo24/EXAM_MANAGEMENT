@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Manage Proctor Availability - CCA Exam Management System">
-    <title>Manage Availability - Admin</title>
+    <title>Manage Availability - {{ instructor.name }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -15,34 +15,14 @@
     </style>
 
     <style>
-        /* Mobile Responsive Overrides */
         @media (max-width: 768px) {
             #sidebar { width: 4rem !important; z-index: 50; }
             #main-content { margin-left: 4rem !important; width: calc(100% - 4rem) !important; }
             .nav-text { display: none !important; }
-            
-            /* Make ALL tables horizontally scrollable */
-            table { display: block !important; width: 100% !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+            table { display: block !important; width: 100% !important; overflow-x: auto !important; }
             th, td { white-space: nowrap !important; }
-            
-            /* Make modals scrollable if they overflow */
-            .fixed.inset-0 > div { padding: 1rem; overflow-y: auto; max-height: 100vh; }
         }
     </style>
-
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            // Automatically wrap all tables to make them horizontally scrollable on small screens
-            document.querySelectorAll("table").forEach(function(table) {
-                if (!table.parentElement.classList.contains("overflow-x-auto")) {
-                    const wrapper = document.createElement("div");
-                    wrapper.className = "overflow-x-auto w-full";
-                    table.parentNode.insertBefore(wrapper, table);
-                    wrapper.appendChild(table);
-                }
-            });
-        });
-    </script>
 </head>
 <body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
 
@@ -50,48 +30,248 @@
     {% set active_page = 'faculty' %}
     {% include 'admin_sidebar.html' %}
 
-    <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
+    <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen pb-16">
         <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
-            <h1 class="text-xl font-semibold text-gray-800">Manage Availability</h1>
+            <div class="flex items-center gap-3">
+                <button type="button" onclick="toggleSidebar()" class="text-gray-500 hover:text-gray-700 focus:outline-none">
+                    <i class="fa-solid fa-bars text-lg"></i>
+                </button>
+                <h1 class="text-xl font-semibold text-gray-800">Manage Proctor Availability</h1>
+            </div>
             <div class="flex items-center gap-4">
-                <a href="/faculty" class="text-sm font-medium text-gray-600 hover:text-gray-900"><i class="fa-solid fa-arrow-left mr-1"></i> Back to Instructors</a>
+                <a href="/faculty" class="inline-flex items-center text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors">
+                    <i class="fa-solid fa-arrow-left mr-1.5"></i> Back to Faculty
+                </a>
             </div>
         </header>
 
-        <div class="max-w-3xl mx-auto py-8 px-4">
-            <div class="mb-6 flex items-center justify-between">
-                <h2 class="text-2xl font-bold text-gray-800">{{ instructor.name }}</h2>
+        <div class="max-w-4xl mx-auto py-8 px-4">
+            
+            <!-- Faculty Information Card -->
+            <div class="bg-white shadow-sm rounded-xl border border-gray-200 p-6 mb-6">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-2xl font-bold text-gray-900">{{ instructor.name }}</h2>
+                            {% if instructor.is_pwd %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800" title="PWD Faculty">
+                                <i class="fa-solid fa-wheelchair mr-1"></i> PWD
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="text-sm text-gray-500 mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
+                            <span><i class="fa-solid fa-building text-gray-400 mr-1"></i> {{ instructor.institute_name or 'No Institute' }}</span>
+                            <span><i class="fa-solid fa-location-dot text-gray-400 mr-1"></i> Building: {{ instructor.building or 'Main Building' }}</span>
+                            <span><i class="fa-solid fa-clock text-gray-400 mr-1"></i> Total Proctor Hours: {{ instructor.total_hours or 0 }} hrs</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span id="dateCounterBadge" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-[#668054]/10 text-[#668054]">
+                            <i class="fa-solid fa-calendar-check mr-1.5"></i>
+                            <span id="dateCounterText">{{ saved_dates|length }} date(s) configured</span>
+                        </span>
+                    </div>
+                </div>
             </div>
 
-            <div class="bg-white shadow-sm rounded-xl border border-gray-200 p-6">
-                <form action="/admin/proctor_availability/{{ instructor.id }}" method="POST">
-                    <div id="availabilityContainer" class="space-y-4 mb-4">
+            <!-- Main Availability Form -->
+            <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden mb-6">
+                
+                <!-- Quick Tools & Generator Bar -->
+                <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-800">Availability Schedule</h3>
+                        <p class="text-xs text-gray-500">Configure the specific dates and hours this proctor is available for exams.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        {% if exam_start and exam_end %}
+                        <button type="button" onclick="fillExamPeriod()" class="inline-flex items-center px-3 py-1.5 border border-[#668054] text-xs font-semibold rounded-lg text-[#668054] bg-[#668054]/10 hover:bg-[#668054]/20 transition-colors shadow-sm" title="Add all days in exam period ({{ exam_start }} to {{ exam_end }})">
+                            <i class="fa-solid fa-bolt mr-1.5"></i> Auto-Fill Exam Period ({{ exam_start }} - {{ exam_end }})
+                        </button>
+                        {% endif %}
+                        <button type="button" onclick="toggleRangeGenerator()" class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-sm">
+                            <i class="fa-solid fa-calendar-days mr-1.5 text-blue-600"></i> Add Date Range
+                        </button>
+                        <button type="button" onclick="addAvailabilityRow()" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-semibold rounded-lg text-white bg-[#668054] hover:bg-[#526843] transition-colors shadow-sm">
+                            <i class="fa-solid fa-plus mr-1.5"></i> Add Date
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Collapsible Date Range Generator Panel -->
+                <div id="rangeGeneratorPanel" class="hidden px-6 py-4 bg-blue-50/50 border-b border-blue-100">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-semibold text-blue-900 uppercase tracking-wider">
+                            <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Quick Date Range Generator
+                        </span>
+                        <button type="button" onclick="toggleRangeGenerator()" class="text-xs text-gray-400 hover:text-gray-600">Close</button>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">From Date</label>
+                            <input type="date" id="rangeStartDate" value="{{ exam_start or '' }}" class="block w-full text-xs border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">To Date</label>
+                            <input type="date" id="rangeEndDate" value="{{ exam_end or '' }}" class="block w-full text-xs border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 mb-1">Start Time</label>
+                                <input type="time" id="rangeStartTime" value="07:00" class="block w-full text-xs border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 mb-1">End Time</label>
+                                <input type="time" id="rangeEndTime" value="18:00" class="block w-full text-xs border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
+                            </div>
+                        </div>
+                        <div>
+                            <button type="button" onclick="applyDateRange()" class="w-full inline-flex justify-center items-center py-2 px-3 border border-transparent text-xs font-semibold rounded-md text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-colors">
+                                <i class="fa-solid fa-plus-circle mr-1.5"></i> Generate Days
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="availabilityForm" action="/admin/proctor_availability/{{ instructor.id }}" method="POST">
+                    
+                    <!-- Table Header -->
+                    <div class="px-6 py-3 bg-gray-100/70 border-b border-gray-200 grid grid-cols-12 gap-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        <div class="col-span-12 sm:col-span-5">Available Date</div>
+                        <div class="col-span-6 sm:col-span-3">Start Time</div>
+                        <div class="col-span-6 sm:col-span-3">End Time</div>
+                        <div class="col-span-12 sm:col-span-1 text-right sm:text-center">Action</div>
+                    </div>
+
+                    <!-- Availability Rows Container -->
+                    <div id="availabilityContainer" class="p-6 space-y-3">
                         {% if saved_dates %}
                             {% for av in saved_dates %}
-                            <div class="flex gap-2 items-center av-row">
-                                <input type="date" name="available_dates" value="{{ av.date }}" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
-                                <input type="time" name="start_times" value="{{ av.start_time }}" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
-                                <input type="time" name="end_times" value="{{ av.end_time }}" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
-                                <button type="button" onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 p-2"><i class="fa-solid fa-times"></i></button>
+                            <div class="grid grid-cols-12 gap-3 items-center av-row bg-white hover:bg-gray-50/50 p-2 rounded-lg border border-gray-100 shadow-xs">
+                                <div class="col-span-12 sm:col-span-5">
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                            <i class="fa-regular fa-calendar text-xs"></i>
+                                        </div>
+                                        <input type="date" name="available_dates" value="{{ av.date }}" required 
+                                            class="block w-full pl-8 pr-3 py-2 text-sm border-gray-300 rounded-lg border focus:ring-2 focus:ring-[#668054] focus:border-transparent">
+                                    </div>
+                                </div>
+                                <div class="col-span-6 sm:col-span-3">
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                            <i class="fa-regular fa-clock text-xs"></i>
+                                        </div>
+                                        <input type="time" name="start_times" value="{{ av.start_time }}" required 
+                                            class="block w-full pl-8 pr-3 py-2 text-sm border-gray-300 rounded-lg border focus:ring-2 focus:ring-[#668054] focus:border-transparent">
+                                    </div>
+                                </div>
+                                <div class="col-span-6 sm:col-span-3">
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                            <i class="fa-solid fa-clock-rotate-left text-xs"></i>
+                                        </div>
+                                        <input type="time" name="end_times" value="{{ av.end_time }}" required 
+                                            class="block w-full pl-8 pr-3 py-2 text-sm border-gray-300 rounded-lg border focus:ring-2 focus:ring-[#668054] focus:border-transparent">
+                                    </div>
+                                </div>
+                                <div class="col-span-12 sm:col-span-1 flex items-center justify-end sm:justify-center gap-1">
+                                    <button type="button" onclick="duplicateRow(this)" title="Duplicate date for next day" class="text-blue-500 hover:text-blue-700 p-2 rounded-md hover:bg-blue-50 transition-colors">
+                                        <i class="fa-solid fa-clone text-xs"></i>
+                                    </button>
+                                    <button type="button" onclick="removeRow(this)" title="Remove date" class="text-red-500 hover:text-red-700 p-2 rounded-md hover:bg-red-50 transition-colors">
+                                        <i class="fa-solid fa-trash-can text-xs"></i>
+                                    </button>
+                                </div>
                             </div>
                             {% endfor %}
-                        {% else %}
-                            <div class="flex gap-2 items-center av-row">
-                                <input type="date" name="available_dates" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
-                                <input type="time" name="start_times" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
-                                <input type="time" name="end_times" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
-                                <button type="button" onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 p-2"><i class="fa-solid fa-times"></i></button>
-                            </div>
                         {% endif %}
                     </div>
-                    
-                    <div class="flex justify-between items-center mt-6 border-t border-gray-100 pt-4">
-                        <button type="button" onclick="addAvailabilityRow()" class="text-sm font-medium text-[#668054] hover:text-[#829c74]">
-                            <i class="fa-solid fa-plus mr-1"></i> Add Date
-                        </button>
-                        <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[#668054] hover:bg-[#829c74] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#668054]">
-                            Save Availability
-                        </button>
+
+                    <!-- Empty State Placeholder -->
+                    <div id="noDatesPlaceholder" class="{% if saved_dates %}hidden{% endif %} px-6 py-12 text-center text-gray-400">
+                        <i class="fa-regular fa-calendar-xmark text-4xl mb-3 text-gray-300"></i>
+                        <p class="text-sm font-medium text-gray-600">No availability dates set yet</p>
+                        <p class="text-xs text-gray-400 mt-1">Click "Add Date" above or use "Auto-Fill Exam Period" to generate the schedule.</p>
+                        <div class="mt-4 flex justify-center gap-2">
+                            {% if exam_start and exam_end %}
+                            <button type="button" onclick="fillExamPeriod()" class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-[#668054] bg-[#668054]/10 hover:bg-[#668054]/20 rounded-md transition-colors">
+                                <i class="fa-solid fa-bolt mr-1.5"></i> Use Exam Period
+                            </button>
+                            {% endif %}
+                            <button type="button" onclick="addAvailabilityRow()" class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
+                                <i class="fa-solid fa-plus mr-1.5"></i> Add First Date
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Multi-Faculty Batch Propagation (User Request) -->
+                    <div class="px-6 py-5 bg-gray-50 border-t border-gray-200">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-users-gear text-[#668054]"></i>
+                                <h4 class="text-sm font-semibold text-gray-800">Apply to Other Faculty Members</h4>
+                            </div>
+                            <button type="button" onclick="toggleMultiFacultySection()" id="toggleMultiFacultyBtn" class="text-xs text-[#668054] hover:underline font-medium">
+                                Show Options
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-500 mb-3">Save time by applying this identical availability schedule to multiple instructors at the same time.</p>
+                        
+                        <div id="multiFacultyContainer" class="hidden space-y-3 pt-2 border-t border-gray-200">
+                            {% if same_dept_instructors %}
+                            <label class="flex items-center gap-2 cursor-pointer p-2.5 bg-white rounded-lg border border-gray-200 hover:bg-green-50/50 transition-colors">
+                                <input type="checkbox" name="apply_to_same_dept" value="1" id="sameDeptCheckbox" class="h-4 w-4 text-[#668054] border-gray-300 rounded focus:ring-[#668054]">
+                                <div>
+                                    <span class="text-sm font-semibold text-gray-800">Apply to all active faculty in {{ instructor.institute_name or 'this Institute' }}</span>
+                                    <span class="block text-xs text-gray-500">Includes {{ same_dept_instructors|length }} other instructor(s) in this department.</span>
+                                </div>
+                            </label>
+                            {% endif %}
+
+                            <!-- Specific Faculty Selection Accordion -->
+                            <details class="group bg-white rounded-lg border border-gray-200">
+                                <summary class="flex justify-between items-center font-medium cursor-pointer list-none p-3 text-xs text-gray-700 group-hover:text-gray-900">
+                                    <span>Or select specific instructors from other institutes (<span id="extraCountText">0 selected</span>)</span>
+                                    <span class="transition group-open:rotate-180">
+                                        <i class="fa-solid fa-chevron-down text-xs"></i>
+                                    </span>
+                                </summary>
+                                <div class="p-3 border-t border-gray-100 max-h-48 overflow-y-auto space-y-1">
+                                    <div class="mb-2">
+                                        <input type="text" id="facultySearchFilter" oninput="filterExtraFaculty()" placeholder="Filter faculty by name..." class="w-full text-xs border-gray-200 rounded p-1.5 border">
+                                    </div>
+                                    {% for other in all_instructors %}
+                                    <label class="flex items-center gap-2 py-1 px-1.5 hover:bg-gray-50 rounded text-xs text-gray-700 cursor-pointer extra-faculty-label">
+                                        <input type="checkbox" name="also_apply_ids" value="{{ other.id }}" onchange="updateExtraCount()" class="extra-faculty-cb h-3.5 w-3.5 text-[#668054] border-gray-300 rounded focus:ring-[#668054]">
+                                        <span class="font-medium text-gray-800">{{ other.name }}</span>
+                                        <span class="text-gray-400 text-[11px]">({{ other.institute_name or 'N/A' }})</span>
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+
+                    <!-- Footer Controls -->
+                    <div class="px-6 py-4 bg-white border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <button type="button" onclick="addAvailabilityRow()" class="text-sm font-semibold text-[#668054] hover:text-[#526843] transition-colors">
+                                <i class="fa-solid fa-plus-circle mr-1"></i> Add Another Date
+                            </button>
+                            <span class="text-gray-300">|</span>
+                            <button type="button" onclick="clearAllRows()" class="text-xs text-red-500 hover:text-red-700 transition-colors">
+                                <i class="fa-solid fa-trash mr-1"></i> Clear All Dates
+                            </button>
+                        </div>
+                        <div class="flex items-center gap-3 w-full sm:w-auto">
+                            <a href="/faculty" class="w-full sm:w-auto text-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                                Cancel
+                            </a>
+                            <button type="submit" class="w-full sm:w-auto inline-flex justify-center items-center px-5 py-2 border border-transparent shadow-sm text-sm font-semibold rounded-lg text-white bg-[#668054] hover:bg-[#526843] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#668054] transition-colors">
+                                <i class="fa-solid fa-floppy-disk mr-2"></i> Save Availability
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -99,6 +279,9 @@
     </main>
 
     <script>
+        const EXAM_START = "{{ exam_start or '' }}";
+        const EXAM_END   = "{{ exam_end or '' }}";
+
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const mainContent = document.getElementById('main-content');
@@ -107,32 +290,235 @@
             mainContent.classList.toggle('ml-64');
             mainContent.classList.toggle('ml-16');
             
-            const headers = document.querySelectorAll('.sidebar-header-container');
-            headers.forEach(h => {
-                if (sidebar.classList.contains('w-16')) {
-                    h.classList.remove('justify-between');
-                    h.classList.add('justify-center');
-                } else {
-                    h.classList.add('justify-between');
-                    h.classList.remove('justify-center');
-                }
-            });
-            const navTexts = document.querySelectorAll('.nav-text');
-            navTexts.forEach(el => el.classList.toggle('hidden'));
+            sidebar.querySelectorAll('.nav-text').forEach(el => el.classList.toggle('hidden'));
         }
 
-        function addAvailabilityRow() {
-            const container = document.getElementById('availabilityContainer');
-            const row = document.createElement('div');
-            row.className = 'flex gap-2 items-center av-row mt-4';
-            row.innerHTML = 
-                <input type="date" name="available_dates" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
-                <input type="time" name="start_times" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
-                <input type="time" name="end_times" required class="block w-full sm:text-sm border-gray-300 rounded-md border p-2 focus:ring-[#668054]">
-                <button type="button" onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 p-2"><i class="fa-solid fa-times"></i></button>
-            ;
-            container.appendChild(row);
+        function toggleRangeGenerator() {
+            const panel = document.getElementById('rangeGeneratorPanel');
+            panel.classList.toggle('hidden');
         }
+
+        function toggleMultiFacultySection() {
+            const container = document.getElementById('multiFacultyContainer');
+            const btn = document.getElementById('toggleMultiFacultyBtn');
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                btn.textContent = 'Hide Options';
+            } else {
+                container.classList.add('hidden');
+                btn.textContent = 'Show Options';
+            }
+        }
+
+        function updateRowCount() {
+            const rows = document.querySelectorAll('.av-row');
+            const counterText = document.getElementById('dateCounterText');
+            const placeholder = document.getElementById('noDatesPlaceholder');
+            
+            if (counterText) {
+                counterText.textContent = `${rows.length} date(s) configured`;
+            }
+            if (placeholder) {
+                if (rows.length === 0) {
+                    placeholder.classList.remove('hidden');
+                } else {
+                    placeholder.classList.add('hidden');
+                }
+            }
+        }
+
+        function createRowElement(dateVal = '', startTimeVal = '07:00', endTimeVal = '18:00') {
+            const row = document.createElement('div');
+            row.className = 'grid grid-cols-12 gap-3 items-center av-row bg-white hover:bg-gray-50/50 p-2 rounded-lg border border-gray-100 shadow-xs';
+            row.innerHTML = `
+                <div class="col-span-12 sm:col-span-5">
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                            <i class="fa-regular fa-calendar text-xs"></i>
+                        </div>
+                        <input type="date" name="available_dates" value="${dateVal}" required 
+                            class="block w-full pl-8 pr-3 py-2 text-sm border-gray-300 rounded-lg border focus:ring-2 focus:ring-[#668054] focus:border-transparent">
+                    </div>
+                </div>
+                <div class="col-span-6 sm:col-span-3">
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                            <i class="fa-regular fa-clock text-xs"></i>
+                        </div>
+                        <input type="time" name="start_times" value="${startTimeVal}" required 
+                            class="block w-full pl-8 pr-3 py-2 text-sm border-gray-300 rounded-lg border focus:ring-2 focus:ring-[#668054] focus:border-transparent">
+                    </div>
+                </div>
+                <div class="col-span-6 sm:col-span-3">
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                            <i class="fa-solid fa-clock-rotate-left text-xs"></i>
+                        </div>
+                        <input type="time" name="end_times" value="${endTimeVal}" required 
+                            class="block w-full pl-8 pr-3 py-2 text-sm border-gray-300 rounded-lg border focus:ring-2 focus:ring-[#668054] focus:border-transparent">
+                    </div>
+                </div>
+                <div class="col-span-12 sm:col-span-1 flex items-center justify-end sm:justify-center gap-1">
+                    <button type="button" onclick="duplicateRow(this)" title="Duplicate date for next day" class="text-blue-500 hover:text-blue-700 p-2 rounded-md hover:bg-blue-50 transition-colors">
+                        <i class="fa-solid fa-clone text-xs"></i>
+                    </button>
+                    <button type="button" onclick="removeRow(this)" title="Remove date" class="text-red-500 hover:text-red-700 p-2 rounded-md hover:bg-red-50 transition-colors">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                    </button>
+                </div>
+            `;
+            return row;
+        }
+
+        function addAvailabilityRow(dateVal = '', startTimeVal = '07:00', endTimeVal = '18:00') {
+            const container = document.getElementById('availabilityContainer');
+            // If date is not provided, default to tomorrow or after the latest entered date
+            if (!dateVal) {
+                const dateInputs = container.querySelectorAll('input[name="available_dates"]');
+                if (dateInputs.length > 0) {
+                    const lastDateVal = dateInputs[dateInputs.length - 1].value;
+                    if (lastDateVal) {
+                        const nextD = new Date(lastDateVal);
+                        nextD.setDate(nextD.getDate() + 1);
+                        dateVal = nextD.toISOString().split('T')[0];
+                    }
+                } else if (EXAM_START) {
+                    dateVal = EXAM_START;
+                }
+            }
+            const row = createRowElement(dateVal, startTimeVal, endTimeVal);
+            container.appendChild(row);
+            updateRowCount();
+        }
+
+        function removeRow(btn) {
+            const row = btn.closest('.av-row');
+            if (row) {
+                row.remove();
+                updateRowCount();
+            }
+        }
+
+        function duplicateRow(btn) {
+            const row = btn.closest('.av-row');
+            if (!row) return;
+            const dateInput = row.querySelector('input[name="available_dates"]');
+            const startInput = row.querySelector('input[name="start_times"]');
+            const endInput = row.querySelector('input[name="end_times"]');
+            
+            let nextDateStr = '';
+            if (dateInput && dateInput.value) {
+                const d = new Date(dateInput.value);
+                d.setDate(d.getDate() + 1);
+                nextDateStr = d.toISOString().split('T')[0];
+            }
+            const st = startInput ? startInput.value : '07:00';
+            const et = endInput ? endInput.value : '18:00';
+            
+            const newRow = createRowElement(nextDateStr, st, et);
+            row.parentNode.insertBefore(newRow, row.nextSibling);
+            updateRowCount();
+        }
+
+        function clearAllRows() {
+            if (confirm('Are you sure you want to remove all configured availability dates?')) {
+                const container = document.getElementById('availabilityContainer');
+                container.innerHTML = '';
+                updateRowCount();
+            }
+        }
+
+        function fillExamPeriod() {
+            if (!EXAM_START || !EXAM_END) {
+                alert('No active exam period configured in the system.');
+                return;
+            }
+            const start = new Date(EXAM_START);
+            const end   = new Date(EXAM_END);
+            if (start > end) {
+                alert('Invalid exam period dates.');
+                return;
+            }
+
+            const existingDates = new Set();
+            document.querySelectorAll('input[name="available_dates"]').forEach(i => {
+                if (i.value) existingDates.add(i.value);
+            });
+
+            const container = document.getElementById('availabilityContainer');
+            let curr = new Date(start);
+            let addedCount = 0;
+
+            while (curr <= end) {
+                const dateStr = curr.toISOString().split('T')[0];
+                if (!existingDates.has(dateStr)) {
+                    container.appendChild(createRowElement(dateStr, '07:00', '18:00'));
+                    existingDates.add(dateStr);
+                    addedCount++;
+                }
+                curr.setDate(curr.getDate() + 1);
+            }
+            updateRowCount();
+        }
+
+        function applyDateRange() {
+            const startVal = document.getElementById('rangeStartDate').value;
+            const endVal   = document.getElementById('rangeEndDate').value;
+            const stVal    = document.getElementById('rangeStartTime').value || '07:00';
+            const etVal    = document.getElementById('rangeEndTime').value || '18:00';
+
+            if (!startVal || !endVal) {
+                alert('Please select both a Start Date and an End Date.');
+                return;
+            }
+            const start = new Date(startVal);
+            const end   = new Date(endVal);
+            if (start > end) {
+                alert('From Date cannot be later than To Date.');
+                return;
+            }
+
+            const existingDates = new Set();
+            document.querySelectorAll('input[name="available_dates"]').forEach(i => {
+                if (i.value) existingDates.add(i.value);
+            });
+
+            const container = document.getElementById('availabilityContainer');
+            let curr = new Date(start);
+            let added = 0;
+
+            while (curr <= end) {
+                const dStr = curr.toISOString().split('T')[0];
+                if (!existingDates.has(dStr)) {
+                    container.appendChild(createRowElement(dStr, stVal, etVal));
+                    existingDates.add(dStr);
+                    added++;
+                }
+                curr.setDate(curr.getDate() + 1);
+            }
+
+            updateRowCount();
+            document.getElementById('rangeGeneratorPanel').classList.add('hidden');
+        }
+
+        function updateExtraCount() {
+            const checked = document.querySelectorAll('.extra-faculty-cb:checked');
+            const text = document.getElementById('extraCountText');
+            if (text) {
+                text.textContent = `${checked.length} selected`;
+            }
+        }
+
+        function filterExtraFaculty() {
+            const q = (document.getElementById('facultySearchFilter').value || '').toLowerCase();
+            document.querySelectorAll('.extra-faculty-label').forEach(label => {
+                label.style.display = label.textContent.toLowerCase().includes(q) ? 'flex' : 'none';
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateRowCount();
+        });
     </script>
 </body>
 </html>

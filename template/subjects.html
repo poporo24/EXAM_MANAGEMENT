@@ -148,7 +148,18 @@
                         <span class="ml-4 flex-shrink-0 text-xs text-gray-400 bg-gray-100 rounded-full px-3 py-1 mt-1 hidden lg:inline-block">e.g. Major in CITE = Minor in CABE</span>
                     </div>
 
-                    <form action="/subjects/link_content" method="POST" id="linkForm" class="mt-4">
+                    <!-- Search input for alias list -->
+                    <div class="relative mt-3 mb-2">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                            <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                        </div>
+                        <input type="text" id="aliasSearchInput" onkeyup="filterAliasSubjects()" placeholder="Search subjects by code, name, or institute..." class="w-full pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#668054] focus:border-[#668054] transition-colors">
+                        <button type="button" id="clearAliasSearch" onclick="clearAliasSearchInput()" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+                            <i class="fa-solid fa-times-circle text-sm"></i>
+                        </button>
+                    </div>
+
+                    <form action="/subjects/link_content" method="POST" id="linkForm" class="mt-2">
                         <div class="link-panel grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4 pr-1" id="subjectCheckboxList">
                             {% for sub in subjects %}
                             <div>
@@ -244,14 +255,33 @@
 
             <!-- ALL SUBJECTS TABLE -->
             <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex flex-wrap justify-between items-center gap-4">
                     <div>
                         <h2 class="font-semibold text-gray-800">All Subjects</h2>
-                        <p class="text-xs text-gray-500 mt-0.5">{{ subjects | length }} subject{{ 's' if subjects | length != 1 else '' }} total</p>
+                        <p class="text-xs text-gray-500 mt-0.5" id="subjectCountText">{{ subjects | length }} subject{{ 's' if subjects | length != 1 else '' }} total</p>
                     </div>
-                    <button onclick="openModal('addSubjectModal')" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#668054] hover:bg-[#829c74]">
-                        <i class="fa-solid fa-plus mr-2"></i> Add Subject
-                    </button>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                            </div>
+                            <input type="text" id="searchAllSubjects" onkeyup="filterSubjectsTable()" placeholder="Search code, name, institute..."
+                                   class="w-64 pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#668054] transition-colors">
+                            <button type="button" id="clearTableSearch" onclick="clearTableSearchInput()" class="hidden absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600">
+                                <i class="fa-solid fa-times-circle text-xs"></i>
+                            </button>
+                        </div>
+                        <select id="filterInstitute" onchange="filterSubjectsTable()" class="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#668054]">
+                            <option value="">All Institutes</option>
+                            {% for inst in institutes %}
+                            <option value="{{ inst.name }}">{{ inst.code or inst.name }}</option>
+                            {% endfor %}
+                            <option value="Common Subject">Common Subjects</option>
+                        </select>
+                        <button onclick="openModal('addSubjectModal')" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#668054] hover:bg-[#829c74]">
+                            <i class="fa-solid fa-plus mr-2"></i> Add Subject
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Bulk delete form wraps the table -->
@@ -504,6 +534,66 @@
         document.querySelectorAll('.subject-checkbox').forEach(cb => {
             cb.addEventListener('change', updateLinkButton);
         });
+
+        /* ── Alias Search Filter ───────────────────────── */
+        function filterAliasSubjects() {
+            const q = document.getElementById('aliasSearchInput').value.toLowerCase().trim();
+            const clearBtn = document.getElementById('clearAliasSearch');
+            if (clearBtn) clearBtn.classList.toggle('hidden', !q);
+
+            const items = document.querySelectorAll('#subjectCheckboxList > div');
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = (!q || text.includes(q)) ? '' : 'none';
+            });
+        }
+
+        function clearAliasSearchInput() {
+            const inp = document.getElementById('aliasSearchInput');
+            if (inp) {
+                inp.value = '';
+                filterAliasSubjects();
+                inp.focus();
+            }
+        }
+
+        /* ── All Subjects Table Filter ──────────────────── */
+        function filterSubjectsTable() {
+            const q = document.getElementById('searchAllSubjects').value.toLowerCase().trim();
+            const inst = document.getElementById('filterInstitute').value.toLowerCase().trim();
+            const clearBtn = document.getElementById('clearTableSearch');
+            if (clearBtn) clearBtn.classList.toggle('hidden', !q);
+
+            const rows = document.querySelectorAll('#subjectTableBody tr.subject-row');
+            let visible = 0;
+
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                const matchQ = !q || text.includes(q);
+                const matchInst = !inst || text.includes(inst);
+                const show = matchQ && matchInst;
+                row.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+
+            const countEl = document.getElementById('subjectCountText');
+            if (countEl) {
+                if (!q && !inst) {
+                    countEl.textContent = `${rows.length} subjects total`;
+                } else {
+                    countEl.textContent = `Showing ${visible} of ${rows.length} subjects`;
+                }
+            }
+        }
+
+        function clearTableSearchInput() {
+            const inp = document.getElementById('searchAllSubjects');
+            if (inp) {
+                inp.value = '';
+                filterSubjectsTable();
+                inp.focus();
+            }
+        }
 
         /* ── Bulk delete helpers ───────────────────────── */
         function updateBulkToolbar() {

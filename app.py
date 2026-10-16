@@ -46,6 +46,7 @@ from system.database import (
     save_exam_period, save_exam_term, get_exam_term, get_exam_period, save_exam_term, get_exam_term,
     # proctor availability
     get_proctor_availability, get_proctor_availability_for, save_proctor_availability,
+    bulk_save_proctor_availability,
     get_proctor_exams,
     # timetable
     get_public_timetable,
@@ -69,15 +70,6 @@ from system.logic import verify_login, is_super_admin, hash_password
 
 # â”€â”€ FLASK APP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-
-import firebase_admin
-from firebase_admin import credentials, auth as fb_auth
-
-try:
-    cred = credentials.Certificate('firebase_credentials.json')
-    firebase_admin.initialize_app(cred)
-except ValueError:
-    pass # Already initialized
 
 app = Flask(__name__, template_folder='template')
 app.secret_key = "cca_exam_management_secret_key_v2"
@@ -124,8 +116,24 @@ def send_email_notification(to_email, subject, body):
 
 def require_login():
     if 'user_id' not in session:
-        return redirect(url_for('index'))
+        return redirect(url_for('login'))
     return None
+
+def require_super_admin():
+    guard = require_login()
+    if guard:
+        return guard
+    if not session.get('is_super_admin'):
+        flash("Access denied. Super Admin privileges required.", "danger")
+        return _redirect_by_role()
+    return None
+
+@app.after_request
+def add_cache_control_headers(response):
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 def require_role(*roles):
     redir = require_login()
@@ -153,6 +161,13 @@ def _get_unread(user_id):
         return get_unread_count(user_id)
     except Exception:
         return 0
+
+@app.context_processor
+def inject_notifications_unread():
+    uid = session.get('user_id')
+    if uid:
+        return {'unread_count': _get_unread(uid)}
+    return {'unread_count': 0}
 
 # â”€â”€ AUTH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -264,39 +279,6 @@ def login():
         return render_template("login.html", sections=sections)
 
     
-    firebase_token = request.form.get("firebase_token")
-    if firebase_token:
-        try:
-            decoded_token = fb_auth.verify_id_token(firebase_token, clock_skew_seconds=60)
-            email = decoded_token.get('email')
-            
-            user = get_user_by_email(email)
-            if not user:
-                flash("User not found in system.", "error")
-                return redirect(url_for('login'))
-                
-            if not user.get('is_active', 1):
-                flash("Your account is pending admin approval. You will be notified once it is activated.", "warning")
-                return redirect(url_for('login'))
-                
-            session['user_id']        = user['id']
-            session['full_name']      = user['full_name']
-            session['role']           = user.get('role', 'student')
-            session['email']          = user['email']
-            session['section']        = user.get('section', '')
-            session['institute_id']   = user.get('institute_id')
-            session['instructor_id']  = user.get('instructor_id')
-            session['is_super_admin'] = bool(user.get('is_super_admin', 0))
-            
-            return _redirect_by_role()
-        except Exception as e:
-            flash(f"Invalid login session: {str(e)}", "error")
-            return redirect(url_for('login'))
-
-        all_exams = get_schedule_results()
-        sections = sorted(list(set(e.get('section', '').strip() for e in all_exams if e.get('section', '').strip() and e.get('status') == 'Scheduled')))
-        return render_template("login.html", sections=sections)
-
     # POST - process credentials
     email    = request.form.get("email", "").strip()
     password = request.form.get("password", "").strip()
@@ -309,6 +291,7 @@ def login():
         session['user_id']        = user['id']
         session['full_name']      = user['full_name']
         session['role']           = user.get('role', 'student')
+        session['email']          = user.get('email', email)
         session['instructor_id']  = user.get('instructor_id')
         session['is_super_admin'] = bool(user.get('is_super_admin', 0))
         session['section']        = user.get('section', '')
@@ -392,26 +375,7 @@ def register_submit():
     if user_exists:
         flash("That email is already registered.", "danger")
         return redirect(url_for('register_page'))
-        
-    # Try creating user in Firebase FIRST so we catch Firebase duplicates
-    try:
-        from firebase_admin import auth as fb_auth
-        fb_auth.create_user(email=email, password=password, display_name=full_name)
-    except fb_auth.EmailAlreadyExistsError:
-        # User is in Firebase but not in MySQL (orphaned due to past rejection).
-        # Safe to delete and recreate.
-        try:
-            fb_user = fb_auth.get_user_by_email(email)
-            fb_auth.delete_user(fb_user.uid)
-            fb_auth.create_user(email=email, password=password, display_name=full_name)
-        except Exception as e:
-            flash("That email is already registered in the cloud auth system.", "danger")
-            return redirect(url_for('register_page'))
-    except Exception as e:
-        flash(f"Cloud Auth Error: {str(e)}", "danger")
-        return redirect(url_for('register_page'))
-
-    # Create user in local MySQL
+            # Create user in local MySQL
     result = register_user(full_name, email, password, role, section=section, institute_id=institute_id)
                            
     if result == 'ok':
@@ -499,6 +463,24 @@ def add_instructor_route():
     )
     flash("Instructor added.", "success")
     return redirect(url_for('faculty_page'))
+
+@app.route("/delete_instructor/<int:id>")
+@app.route("/faculty/<int:id>/delete")
+def remove_instructor(id):
+    guard = require_role('admin')
+    if guard: return guard
+    err = delete_instructor(id)
+    if err:
+        flash(f"Could not delete instructor: {err}", "danger")
+    else:
+        flash("Instructor deleted successfully.", "success")
+    return redirect(url_for('faculty_page'))
+
+@app.route("/faculty/bulk_delete", methods=["POST"])
+def faculty_bulk_delete():
+    guard = require_role('admin')
+    if guard: return guard
+    ids = request.form.getlist("instructor_ids")
     deleted, errors = 0, []
     for sid in ids:
         try:
@@ -510,10 +492,11 @@ def add_instructor_route():
         except Exception as e:
             errors.append(str(e))
     if deleted:
-        flash(f" {deleted} instructor(s) deleted successfully.", "success")
+        flash(f"{deleted} instructor(s) deleted successfully.", "success")
     if errors:
-        flash(f" {len(errors)} instructor(s) could not be deleted: " + "; ".join(errors), "warning")
+        flash(f"{len(errors)} instructor(s) could not be deleted: " + "; ".join(errors), "warning")
     return redirect(url_for('faculty_page'))
+
 
 @app.route("/delete_exam/<int:id>")
 def remove_exam(id):
@@ -1193,10 +1176,16 @@ def faculty_page():
     subjects       = get_all_subjects()
     period_summary = get_all_proctor_hours_summary()
     unread         = _get_unread(session['user_id'])
+    
+    period_start, period_end = get_exam_period()
+    exam_start = period_start.strftime('%Y-%m-%d') if period_start else ''
+    exam_end   = period_end.strftime('%Y-%m-%d') if period_end else ''
+    
     return render_template("faculty.html",
                            instructors=instructors, institutes=institutes,
                            subjects=subjects, period_summary=period_summary,
-                           unread_count=unread)
+                           unread_count=unread,
+                           exam_start=exam_start, exam_end=exam_end)
 
 @app.route("/faculty/<int:id>/edit", methods=["POST"])
 def faculty_edit(id):
@@ -1251,7 +1240,7 @@ def admin_proctor_availability(id):
     # Get instructor info
     db = open_db()
     cursor = db.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM instructors WHERE id = %s", (id,))
+    cursor.execute("SELECT i.*, inst.name as institute_name FROM instructors i LEFT JOIN institutes inst ON i.institute_id = inst.id WHERE i.id = %s", (id,))
     instructor = cursor.fetchone()
     db.close()
     
@@ -1265,15 +1254,87 @@ def admin_proctor_availability(id):
         end_times   = request.form.getlist("end_times")
         entries = []
         for i, d in enumerate(dates):
-            st = start_times[i] if i < len(start_times) else '07:00'
-            et = end_times[i] if i < len(end_times) else '20:00'
-            entries.append({'date': d, 'start_time': st, 'end_time': et})
+            d_str = str(d).strip()
+            if not d_str: continue
+            st = start_times[i].strip() if i < len(start_times) and start_times[i].strip() else '07:00'
+            et = end_times[i].strip() if i < len(end_times) and end_times[i].strip() else '20:00'
+            entries.append({'date': d_str, 'start_time': st, 'end_time': et})
+            
         save_proctor_availability(id, entries)
-        flash(f"Availability saved for {instructor['name']}.", "success")
+        
+        # Check if also applying to additional instructors
+        also_apply_ids = request.form.getlist("also_apply_ids")
+        if request.form.get("apply_to_same_dept") == "1" and instructor.get('institute_id'):
+            db = open_db()
+            cursor = db.cursor(dictionary=True)
+            cursor.execute("SELECT id FROM instructors WHERE institute_id = %s AND id != %s AND status = 'Active'", (instructor['institute_id'], id))
+            dept_insts = cursor.fetchall()
+            db.close()
+            also_apply_ids.extend([str(r['id']) for r in dept_insts])
+            
+        if also_apply_ids:
+            unique_extra_ids = list(set([i for i in also_apply_ids if str(i) != str(id)]))
+            if unique_extra_ids:
+                bulk_save_proctor_availability(unique_extra_ids, entries, mode='replace')
+                flash(f"Availability saved for {instructor['name']} and {len(unique_extra_ids)} other instructor(s).", "success")
+            else:
+                flash(f"Availability saved for {instructor['name']}.", "success")
+        else:
+            flash(f"Availability saved for {instructor['name']}.", "success")
+            
         return redirect(url_for('faculty_page'))
 
     saved_dates = get_proctor_availability_for(id)
-    return render_template("admin_availability.html", instructor=instructor, saved_dates=saved_dates)
+    period_start, period_end = get_exam_period()
+    exam_start = period_start.strftime('%Y-%m-%d') if period_start else ''
+    exam_end   = period_end.strftime('%Y-%m-%d') if period_end else ''
+    
+    all_instructors = get_all_instructors()
+    same_dept_instructors = [
+        ins for ins in all_instructors 
+        if ins['id'] != id and ins.get('institute_id') == instructor.get('institute_id') and ins.get('status') == 'Active'
+    ]
+    
+    return render_template("admin_availability.html", 
+                           instructor=instructor, 
+                           saved_dates=saved_dates,
+                           exam_start=exam_start,
+                           exam_end=exam_end,
+                           same_dept_instructors=same_dept_instructors,
+                           all_instructors=[ins for ins in all_instructors if ins['id'] != id and ins.get('status') == 'Active'])
+
+@app.route("/admin/bulk_proctor_availability", methods=["POST"])
+def admin_bulk_proctor_availability():
+    guard = require_role('admin')
+    if guard: return guard
+    
+    instructor_ids = request.form.getlist("instructor_ids")
+    if not instructor_ids:
+        raw_ids = request.form.get("instructor_ids_csv", "")
+        if raw_ids:
+            instructor_ids = [i.strip() for i in raw_ids.split(",") if i.strip()]
+            
+    if not instructor_ids:
+        flash("No instructors selected for availability update.", "warning")
+        return redirect(url_for('faculty_page'))
+        
+    dates       = request.form.getlist("available_dates")
+    start_times = request.form.getlist("start_times")
+    end_times   = request.form.getlist("end_times")
+    mode        = request.form.get("availability_mode", "replace") # 'replace' or 'append'
+    
+    entries = []
+    for i, d in enumerate(dates):
+        d_str = str(d).strip()
+        if not d_str: continue
+        st = start_times[i].strip() if i < len(start_times) and start_times[i].strip() else '07:00'
+        et = end_times[i].strip() if i < len(end_times) and end_times[i].strip() else '20:00'
+        entries.append({'date': d_str, 'start_time': st, 'end_time': et})
+        
+    bulk_save_proctor_availability(instructor_ids, entries, mode=mode)
+    action_desc = "appended to" if mode == "append" else "set for"
+    flash(f"Availability successfully {action_desc} {len(instructor_ids)} selected instructor(s).", "success")
+    return redirect(url_for('faculty_page'))
 
 # â”€â”€ IMPORT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -1401,6 +1462,7 @@ def export_schedule_pdf():
                      as_attachment=True, download_name='exam_schedule.pdf')
 
 @app.route("/export/absence_report.pdf")
+@app.route("/export/assignment_report.pdf")
 def export_absence_pdf():
     guard = require_role('admin', 'secretary')
     if guard: return guard
@@ -1689,9 +1751,8 @@ def students_bulk_action():
 
 @app.route("/super_admin")
 def super_admin_page():
-    if not session.get('is_super_admin'):
-        flash("Access denied.", "danger")
-        return redirect(url_for('dashboard'))
+    guard = require_super_admin()
+    if guard: return guard
     users            = get_all_users()
     pending_students = get_pending_users()
     institutes       = get_all_institutes()
@@ -1705,18 +1766,16 @@ def super_admin_page():
 
 @app.route("/super_admin/approve_student/<int:id>", methods=["POST"])
 def approve_student_route(id):
-    if not session.get('is_super_admin'):
-        flash("Access denied.", "danger")
-        return redirect(url_for('dashboard'))
+    guard = require_super_admin()
+    if guard: return guard
     approve_student(id)
     flash("Student account approved and notified.", "success")
     return redirect(url_for('super_admin_page'))
 
 @app.route("/super_admin/reject_student/<int:id>", methods=["POST"])
 def reject_student_route(id):
-    if not session.get('is_super_admin'):
-        flash("Access denied.", "danger")
-        return redirect(url_for('dashboard'))
+    guard = require_super_admin()
+    if guard: return guard
     err = delete_user(id)
     if err:
         flash(f"Could not reject: {err}", "danger")
@@ -1726,9 +1785,8 @@ def reject_student_route(id):
 
 @app.route("/super_admin/edit_user/<int:id>", methods=["POST"])
 def super_edit_user(id):
-    if not session.get('is_super_admin'):
-        flash("Access denied.", "danger")
-        return redirect(url_for('dashboard'))
+    guard = require_super_admin()
+    if guard: return guard
     try:
         # Construct full name from 4 fields if they exist, otherwise fallback to "name"
         last = request.form.get("last_name", "").strip()
@@ -1772,21 +1830,6 @@ def super_edit_user(id):
 
         # Update local DB
         update_user(id, full_name, email, role, section, institute_id, is_sa)
-
-        # Sync email & name to Firebase
-        if old_email:
-            try:
-                from firebase_admin import auth as fb_auth
-                try:
-                    fb_user = fb_auth.get_user_by_email(old_email)
-                    # Update both email and display_name
-                    fb_auth.update_user(fb_user.uid, email=email, display_name=full_name)
-                except fb_auth.UserNotFoundError:
-                    # If they don't exist in Firebase, maybe create them?
-                    pass
-            except Exception as fb_err:
-                print(f"Firebase sync error: {fb_err}")
-
         flash(f"User '{full_name}' updated successfully to role '{role}'.", "success")
     except Exception as e:
         flash(f"Error updating user: {str(e)}", "danger")
@@ -1795,9 +1838,8 @@ def super_edit_user(id):
 
 @app.route("/super_admin/update_email", methods=["POST"])
 def super_update_email():
-    if not session.get('is_super_admin'):
-        flash("Access denied.", "danger")
-        return redirect(url_for('dashboard'))
+    guard = require_super_admin()
+    if guard: return guard
     
     new_email = request.form.get("new_email", "").strip()
     if not new_email.endswith("@cca.edu.ph"):
@@ -1815,24 +1857,11 @@ def super_update_email():
                 flash("That email is already in use.", "danger")
                 return redirect(url_for('super_admin_page'))
                 
-            # Get current email to find Firebase user
+            # Get current email to verify user exists
             c.execute("SELECT email FROM users WHERE id = %s", (user_id,))
             current_user = c.fetchone()
             
             if current_user:
-                # 1. Update Firebase
-                from firebase_admin import auth as fb_auth
-                try:
-                    fb_user = fb_auth.get_user_by_email(current_user['email'])
-                    fb_auth.update_user(fb_user.uid, email=new_email)
-                except fb_auth.UserNotFoundError:
-                    # If not in firebase for some reason, create them? Or skip.
-                    pass
-                except Exception as fb_err:
-                    flash(f"Cloud Sync Error: {fb_err}", "danger")
-                    return redirect(url_for('super_admin_page'))
-                
-                # 2. Update Local DB
                 c.execute("UPDATE users SET email = %s WHERE id = %s", (new_email, user_id))
                 db.commit()
                 flash("Superadmin email has been successfully updated! Password resets will now go to this new address.", "success")
@@ -1844,9 +1873,8 @@ def super_update_email():
 
 @app.route("/super_admin/delete_user/<int:id>", methods=["POST"])
 def super_delete_user(id):
-    if not session.get('is_super_admin'):
-        flash("Access denied.", "danger")
-        return redirect(url_for('dashboard'))
+    guard = require_super_admin()
+    if guard: return guard
     if id == session.get('user_id'):
         flash("Cannot delete your own account.", "danger")
         return redirect(url_for('super_admin_page'))
@@ -1859,9 +1887,8 @@ def super_delete_user(id):
 
 @app.route("/super_admin/reset_password/<int:id>", methods=["POST"])
 def super_reset_password(id):
-    if not session.get('is_super_admin'):
-        flash("Access denied.", "danger")
-        return redirect(url_for('dashboard'))
+    guard = require_super_admin()
+    if guard: return guard
     new_password = request.form.get("new_password", "password123").strip()
     if not new_password or len(new_password) < 6:
         flash("Password must be at least 6 characters.", "danger")
@@ -1872,14 +1899,6 @@ def super_reset_password(id):
             import bcrypt as _bcrypt
             hashed = _bcrypt.hashpw(new_password.encode(), _bcrypt.gensalt()).decode()
             c = db.cursor(dictionary=True)
-            c.execute("SELECT email FROM users WHERE id = %s", (id,))
-            user = c.fetchone()
-            if user and user.get('email'):
-                try:
-                    fb_user = fb_auth.get_user_by_email(user['email'])
-                    fb_auth.update_user(fb_user.uid, password=new_password)
-                except Exception as e:
-                    print(f"Firebase update error: {e}")
             c.execute("UPDATE users SET password = %s WHERE id = %s", (hashed, id))
             db.commit()
             flash("Password reset to default (password123) successfully.", "success")
@@ -1941,10 +1960,13 @@ def proctor_report_absence():
         return redirect(url_for('proctor_dashboard'))
     record_proctor_absence(instructor_id, int(exam_id), reason, session['user_id'])
     flash("Absence reported.", "info")
-    # Notify admin
-    create_notification_for_role('admin',
-        f"Proctor Absence: {session['full_name']}",
-        f"{session['full_name']} reported an absence for exam #{exam_id}. Reason: {reason or 'Not specified'}.")
+    exam = get_exam_by_id(int(exam_id)) if exam_id else {}
+    exam_label = f"{exam.get('subject_name', '')} ({exam.get('section', '')})" if exam else f"exam #{exam_id}"
+    # Notify admin and secretary roles
+    title = f"Proctor Absence: {session.get('full_name', 'Proctor')}"
+    msg   = f"{session.get('full_name', 'Proctor')} reported an absence for {exam_label}. Reason: {reason or 'Not specified'}."
+    create_notification_for_role('admin', title, msg)
+    create_notification_for_role('secretary', title, msg)
     return redirect(url_for('proctor_dashboard'))
 
 # â”€â”€ RELIEVERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -2102,6 +2124,16 @@ def admin_report_absence():
     if instructor_id and exam_id:
         record_proctor_absence(int(instructor_id), int(exam_id), reason, session['user_id'])
         flash("Absence recorded.", "info")
+        
+        ins = get_instructor_by_id(int(instructor_id)) if instructor_id else {}
+        ins_name = ins.get('name', 'Instructor') if ins else 'Instructor'
+        exam = get_exam_by_id(int(exam_id)) if exam_id else {}
+        exam_label = f"{exam.get('subject_name', '')} ({exam.get('section', '')})" if exam else f"exam #{exam_id}"
+        
+        title = f"Proctor Absence: {ins_name}"
+        msg = f"{ins_name} was reported absent for {exam_label}. Reason: {reason or 'Not specified'}."
+        create_notification_for_role('admin', title, msg)
+        create_notification_for_role('secretary', title, msg)
     else:
         flash("Select instructor and exam.", "warning")
     return redirect(url_for('reports_page'))
@@ -2300,7 +2332,9 @@ def student_timetable():
         for i in all_inst:
             if i['id'] == institute_id:
                 institute_name = i['name']
-                break
+    term_tuple = get_exam_term()
+    exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
+    exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
     unread = _get_unread(session['user_id'])
     return render_template("student_timetable.html",
                            grouped=sorted_groups,
@@ -2308,6 +2342,8 @@ def student_timetable():
                            section=section,
                            full_name=full_name,
                            institute_name=institute_name,
+                           exam_term=exam_term,
+                           exam_semester=exam_semester,
                            unread_count=unread)
 
 # â”€â”€ MISC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

@@ -74,7 +74,12 @@ from system.logic import verify_login, is_super_admin, hash_password
 
 
 app = Flask(__name__, template_folder='template')
-app.secret_key = "cca_exam_management_secret_key_v2"
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "cca_exam_management_secret_key_v2")
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    MAX_CONTENT_LENGTH=16 * 1024 * 1024  # 16 MB max upload limit
+)
 
 # Automatically ensure database schema (tables & columns) exists
 try:

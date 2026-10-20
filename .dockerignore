@@ -10,3 +10,6 @@ venv
 .venv
 run.bat
 *.log
+*.sql
+firebase_credentials.json
+*.json.secret

@@ -343,8 +343,8 @@
                     <span class="meta-val">{{ (total_hours|float)|int if (total_hours|float) % 1 == 0 else (total_hours|float)|round(1) }} Hours</span>
                 </div>
                 <div class="print-meta-item">
-                    <span class="meta-title">Assigned Sessions</span>
-                    <span class="meta-val">{{ total }} Exam Session(s)</span>
+                    <span class="meta-title">Report Prepared By</span>
+                    <span class="meta-val">{{ prepared_by or 'Office of Academic Affairs' }}</span>
                 </div>
                 <div class="print-meta-item">
                     <span class="meta-title">Assignment Status</span>
@@ -421,7 +421,11 @@
                 <div class="print-signatures">
                     <div class="signature-box">
                         <div class="signature-line"></div>
-                        <div class="signature-title">Faculty Proctor Signature</div>
+                        <div class="signature-title">Prepared by: {{ prepared_by or 'Office of Academic Affairs' }}</div>
+                    </div>
+                    <div class="signature-box">
+                        <div class="signature-line"></div>
+                        <div class="signature-title">Faculty Proctor: {{ full_name }}</div>
                     </div>
                     <div class="signature-box">
                         <div class="signature-line"></div>

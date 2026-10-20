@@ -1596,21 +1596,44 @@ def export_schedule_pdf():
         grouped[dt.strftime("%A, %B %d, %Y")].append(exam)
     sorted_groups = sorted(grouped.items(),
                            key=lambda x: datetime.strptime(x[0], "%A, %B %d, %Y"))
-    pdf_bytes = _pdf(sorted_groups, conflict_ids)
+    term_tuple = get_exam_term()
+    exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
+    exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
+    prepared_by = session.get('full_name', 'Administrator')
+    pdf_bytes = _pdf(sorted_groups, conflict_ids, exam_term=exam_term, exam_semester=exam_semester, prepared_by=prepared_by)
     return send_file(io.BytesIO(pdf_bytes), mimetype='application/pdf',
                      as_attachment=True, download_name='exam_schedule.pdf')
 
 @app.route("/export/absence_report.pdf")
-@app.route("/export/assignment_report.pdf")
 def export_absence_pdf():
     guard = require_role('admin', 'secretary')
     if guard: return guard
     from system.exporter import export_proctor_report_pdf
-    absence = get_proctor_absence_report()
-    hours   = get_all_proctor_hours_summary()
-    pdf_bytes = export_proctor_report_pdf(hours, absence)
+    date_from = request.args.get('from', '')
+    date_to   = request.args.get('to', '')
+    absence   = get_proctor_absence_report(date_from or None, date_to or None)
+    hours     = get_all_proctor_hours_summary()
+    term_tuple = get_exam_term()
+    exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
+    exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
+    prepared_by = session.get('full_name', 'Administrator')
+    pdf_bytes = export_proctor_report_pdf(hours, absence, exam_term=exam_term, exam_semester=exam_semester, prepared_by=prepared_by, report_type='absence')
     return send_file(io.BytesIO(pdf_bytes), mimetype='application/pdf',
-                     as_attachment=True, download_name='proctor_report.pdf')
+                     as_attachment=True, download_name='proctor_absence_report.pdf')
+
+@app.route("/export/assignment_report.pdf")
+def export_assignment_pdf():
+    guard = require_role('admin', 'secretary')
+    if guard: return guard
+    from system.exporter import export_proctor_report_pdf
+    hours   = get_all_proctor_hours_summary()
+    term_tuple = get_exam_term()
+    exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
+    exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
+    prepared_by = session.get('full_name', 'Administrator')
+    pdf_bytes = export_proctor_report_pdf(hours, [], exam_term=exam_term, exam_semester=exam_semester, prepared_by=prepared_by, report_type='assignment')
+    return send_file(io.BytesIO(pdf_bytes), mimetype='application/pdf',
+                     as_attachment=True, download_name='proctor_assignment_report.pdf')
 
 @app.route("/export/collection_report.pdf")
 def export_collection_pdf():
@@ -1618,11 +1641,15 @@ def export_collection_pdf():
     if guard: return guard
     from system.exporter import export_collection_report_pdf
     data = get_exam_collection_status()
-    pdf_bytes = export_collection_report_pdf(data)
+    term_tuple = get_exam_term()
+    exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
+    exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
+    prepared_by = session.get('full_name', 'Administrator')
+    pdf_bytes = export_collection_report_pdf(data, exam_term=exam_term, exam_semester=exam_semester, prepared_by=prepared_by)
     return send_file(io.BytesIO(pdf_bytes), mimetype='application/pdf',
                      as_attachment=True, download_name='collection_report.pdf')
 
-# â”€â”€ REPORTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── REPORTS ─────────────────────────────────────────────────────────────────
 
 @app.route("/reports/clear_absence", methods=["POST"])
 def clear_absence_reports_route():
@@ -1642,11 +1669,25 @@ def reports_page():
     assignment = get_assignment_report()
     scheduling = get_scheduling_report()
     unread     = _get_unread(session['user_id'])
+
+    term_tuple = get_exam_term()
+    exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
+    exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
+    prepared_by = session.get('full_name', 'Administrator')
+    prepared_by_role = session.get('role', 'admin').capitalize()
+    from datetime import datetime
+    generated_at = datetime.now().strftime("%B %d, %Y %I:%M %p")
+
     return render_template("reports.html",
                            absence_report=absence,
                            assignment_report=assignment,
                            scheduling_report=scheduling,
                            date_from=date_from, date_to=date_to,
+                           exam_term=exam_term,
+                           exam_semester=exam_semester,
+                           prepared_by=prepared_by,
+                           prepared_by_role=prepared_by_role,
+                           generated_at=generated_at,
                            unread_count=unread)
 
 # ── EXAM ARCHIVES (HISTORICAL RECORDS) ──────────────────────────────────────
@@ -2347,6 +2388,7 @@ def proctor_dashboard():
     exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
     exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
     full_name = session.get('full_name', 'Faculty Proctor')
+    prepared_by = session.get('full_name', 'Faculty Proctor')
     return render_template("proctor_dashboard.html",
                            grouped=sorted_groups,
                            exams=exams,
@@ -2360,6 +2402,7 @@ def proctor_dashboard():
                            period_end=str(period_end) if period_end else '',
                            total_hours=total_hours,
                            unread_count=unread,
+                           prepared_by=prepared_by,
                            is_published=is_pub)
 
 @app.route("/proctor/schedule.pdf")
@@ -2383,7 +2426,8 @@ def export_proctor_schedule_pdf_route():
         exams=exams,
         exam_term=exam_term,
         exam_semester=exam_semester,
-        total_hours=total_hours
+        total_hours=total_hours,
+        prepared_by=session.get('full_name', 'Faculty Proctor')
     )
     
     import re

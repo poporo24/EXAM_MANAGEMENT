@@ -5,145 +5,302 @@ from reportlab.lib import colors
 import io
 from datetime import datetime, timedelta
 
-def export_schedule_pdf(grouped_schedule, conflict_ids=None):
-    """Returns bytes of a PDF with the full exam schedule.
-    grouped_schedule is a list of (date_str, [exam_dicts]) sorted by date.
-    Conflict rows are highlighted in red."""
+def _build_cca_report_header(elements, doc_title, exam_term='Midterm', exam_semester='1st Semester', prepared_by=None, is_landscape=False):
+    styles = getSampleStyleSheet()
+    univ_style = ParagraphStyle(
+        'UnivStyleR', parent=styles['Normal'],
+        fontName='Helvetica-Bold', fontSize=13, leading=16,
+        textColor=colors.HexColor('#27361b')
+    )
+    sub_univ_style = ParagraphStyle(
+        'SubUnivStyleR', parent=styles['Normal'],
+        fontName='Helvetica', fontSize=8, leading=10.5,
+        textColor=colors.HexColor('#475569')
+    )
+    doc_title_style = ParagraphStyle(
+        'DocTitleStyleR', parent=styles['Normal'],
+        fontName='Helvetica-Bold', fontSize=11, leading=14,
+        textColor=colors.HexColor('#3d5c2e'), alignment=1
+    )
+    doc_sub_style = ParagraphStyle(
+        'DocSubStyleR', parent=styles['Normal'],
+        fontName='Helvetica', fontSize=8, leading=11,
+        textColor=colors.HexColor('#475569'), alignment=1
+    )
+    meta_label = ParagraphStyle(
+        'MetaLabelR', parent=styles['Normal'],
+        fontName='Helvetica-Bold', fontSize=7.5, leading=9.5,
+        textColor=colors.HexColor('#334155')
+    )
+    meta_val = ParagraphStyle(
+        'MetaValR', parent=styles['Normal'],
+        fontName='Helvetica', fontSize=7.5, leading=9.5,
+        textColor=colors.HexColor('#0f172a')
+    )
+
+    elements.append(Paragraph("CITY COLLEGE OF ANGELES", univ_style))
+    elements.append(Paragraph("Arayat Blvd, Barangay Pampang, Angeles City, Pampanga, 2009 &bull; info@cca.edu.ph", sub_univ_style))
+    elements.append(Spacer(1, 6))
+
+    elements.append(Paragraph(doc_title.upper(), doc_title_style))
+    elements.append(Paragraph(f"{exam_term} Examination &bull; {exam_semester}, Academic Year 2025-2026", doc_sub_style))
+    elements.append(Spacer(1, 8))
+
+    # Metadata Box with Prepared By
+    prep_name = str(prepared_by or 'Office of Academic Affairs')
+    gen_time = datetime.now().strftime("%B %d, %Y %I:%M %p")
+    w1, w2 = (140, 645) if is_landscape else (110, 429)
+    meta_data = [
+        [
+            Paragraph("<b>Report Prepared By:</b>", meta_label),
+            Paragraph(f"<b>{prep_name}</b>", meta_val),
+            Paragraph("<b>Generated On:</b>", meta_label),
+            Paragraph(gen_time, meta_val)
+        ],
+        [
+            Paragraph("<b>Institution:</b>", meta_label),
+            Paragraph("City College of Angeles", meta_val),
+            Paragraph("<b>Document Type:</b>", meta_label),
+            Paragraph(doc_title, meta_val)
+        ]
+    ]
+    col_widths = [110, 280, 95, 300] if is_landscape else [90, 180, 85, 184]
+    meta_t = Table(meta_data, colWidths=col_widths)
+    meta_t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#cbd5e1')),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+    ]))
+    elements.append(meta_t)
+    elements.append(Spacer(1, 10))
+
+def _append_cca_signatures(elements, prepared_by=None, is_landscape=False):
+    styles = getSampleStyleSheet()
+    td_style = ParagraphStyle(
+        'SigTextR', parent=styles['Normal'],
+        fontName='Helvetica', fontSize=7.5, leading=10, alignment=1
+    )
+    elements.append(Spacer(1, 14))
+    prep_name = str(prepared_by or 'Office of Academic Affairs')
+    sig_data = [
+        [Paragraph("________________________________________", td_style), Paragraph("________________________________________", td_style)],
+        [Paragraph(f"<b>Prepared by: {prep_name}</b><br/><font color='#64748b' size=6.5>Examination In-Charge / Administrator</font>", td_style),
+         Paragraph("<b>Certified &amp; Approved by:</b><br/><font color='#64748b' size=6.5>College Dean / Academic Affairs Head</font>", td_style)]
+    ]
+    w = 392 if is_landscape else 269
+    sig_t = Table(sig_data, colWidths=[w, w])
+    sig_t.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+    ]))
+    elements.append(sig_t)
+
+def export_schedule_pdf(grouped_schedule, conflict_ids=None, exam_term='Midterm', exam_semester='1st Semester', prepared_by=None):
+    """Returns bytes of a PDF with the full exam schedule with official CCA header."""
     if conflict_ids is None: conflict_ids = []
     
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=28, leftMargin=28, topMargin=28, bottomMargin=28)
     elements = []
     styles = getSampleStyleSheet()
+
+    _build_cca_report_header(elements, "Official Examination Master Schedule", exam_term, exam_semester, prepared_by, is_landscape=True)
     
-    elements.append(Paragraph("Exam Schedule Report", styles['Title']))
-    elements.append(Spacer(1, 12))
-    
+    th_style = ParagraphStyle('THStyleS', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7.5, leading=9.5, textColor=colors.white, alignment=1)
+    td_style = ParagraphStyle('TDStyleS', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, leading=9.5, alignment=1)
+    td_left  = ParagraphStyle('TDLeftS', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, leading=9.5, alignment=0)
+    td_bold  = ParagraphStyle('TDBoldS', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7.5, leading=9.5, textColor=colors.HexColor('#2d4a22'), alignment=1)
+
     for date_str, exams in grouped_schedule:
-        elements.append(Paragraph(f"Date: {date_str}", styles['Heading2']))
+        elements.append(Paragraph(f"<b>Date: {date_str}</b>", ParagraphStyle('DateH', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#27361b'))))
+        elements.append(Spacer(1, 4))
         
-        data = [['Time', 'Subject', 'Section', 'Type', 'Room', 'Proctor']]
+        headers = [
+            Paragraph("<b>Time Window</b>", th_style),
+            Paragraph("<b>Subject / Course</b>", th_style),
+            Paragraph("<b>Section</b>", th_style),
+            Paragraph("<b>Type</b>", th_style),
+            Paragraph("<b>Room &amp; Venue</b>", th_style),
+            Paragraph("<b>Faculty Proctor</b>", th_style)
+        ]
+        table_data = [headers]
         
         for e in exams:
             dt = e.get('exam_date_time')
             dur = int(e.get('duration_minutes') or 60)
             if dt:
                 if isinstance(dt, str):
-                    try:
-                        dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
-                    except Exception:
-                        pass
+                    try: dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+                    except Exception: pass
                 if isinstance(dt, datetime):
                     end_dt = dt + timedelta(minutes=dur)
                     time_str = f"{dt.strftime('%I:%M %p')} - {end_dt.strftime('%I:%M %p')}"
                 else:
                     time_str = str(dt)
             else:
-                time_str = 'N/A'
-            data.append([
-                time_str,
-                e.get('subject_name', ''),
-                e.get('section', ''),
-                e.get('subject_type', ''),
-                e.get('room_name', ''),
-                e.get('instructor_name', '')
+                time_str = 'TBA'
+            
+            table_data.append([
+                Paragraph(time_str, td_bold),
+                Paragraph(f"<b>{e.get('subject_name', '')}</b>", td_left),
+                Paragraph(str(e.get('section', '—')), td_style),
+                Paragraph(str(e.get('subject_type', 'General')), td_style),
+                Paragraph(str(e.get('room_name') or 'TBA'), td_style),
+                Paragraph(str(e.get('instructor_name') or 'Unassigned'), td_left)
             ])
             
-        if len(data) > 1:
-            t = Table(data, repeatRows=1)
-            
+        if len(table_data) > 1:
+            t = Table(table_data, colWidths=[120, 220, 75, 75, 110, 185], repeatRows=1)
             tStyle = TableStyle([
-                ('BACKGROUND', (0,0), (-1,0), colors.grey),
-                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#3d5c2e')),
                 ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0,0), (-1,0), 12),
-                ('BOTTOMPADDING', (0,0), (-1,0), 12),
-                ('BACKGROUND', (0,1), (-1,-1), colors.beige),
-                ('GRID', (0,0), (-1,-1), 1, colors.black)
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('TOPPADDING', (0,0), (-1,-1), 3),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+                ('LEFTPADDING', (0,0), (-1,-1), 5),
+                ('RIGHTPADDING', (0,0), (-1,-1), 5),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
             ])
-            
-            for i, e in enumerate(exams):
+            for idx, e in enumerate(exams):
                 if e.get('exam_id') in conflict_ids or e.get('id') in conflict_ids:
-                    tStyle.add('BACKGROUND', (0, i+1), (-1, i+1), colors.lightpink)
-                    
+                    tStyle.add('BACKGROUND', (0, idx+1), (-1, idx+1), colors.HexColor('#fee2e2'))
+                elif (idx + 1) % 2 == 0:
+                    tStyle.add('BACKGROUND', (0, idx+1), (-1, idx+1), colors.HexColor('#f8fafc'))
             t.setStyle(tStyle)
             elements.append(t)
         else:
             elements.append(Paragraph("No exams scheduled for this date.", styles['Normal']))
-        elements.append(Spacer(1, 20))
-        
+        elements.append(Spacer(1, 10))
+
+    _append_cca_signatures(elements, prepared_by, is_landscape=True)
     doc.build(elements)
     return buffer.getvalue()
 
-def export_proctor_report_pdf(proctor_hours, absence_report):
-    """Returns bytes of a PDF proctor assignment + absence report."""
+def export_proctor_report_pdf(proctor_hours, absence_report, exam_term='Midterm', exam_semester='1st Semester', prepared_by=None, report_type='both'):
+    """Returns bytes of a PDF proctor assignment + absence report with official CCA header and prepared_by."""
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=28, leftMargin=28, topMargin=28, bottomMargin=28)
     elements = []
     styles = getSampleStyleSheet()
-    
-    elements.append(Paragraph("Proctor Report", styles['Title']))
-    elements.append(Spacer(1, 12))
-    
-    elements.append(Paragraph("Proctor Hours Summary", styles['Heading2']))
-    
-    data = [['Instructor Name', 'Total Exams', 'Total Hours']]
-    for p in proctor_hours:
-        tot = float(p.get('total_hours') or 0.0)
-        tot_str = str(int(tot)) if tot.is_integer() else f"{tot:.1f}"
-        data.append([p.get('name', ''), str(p.get('exam_count', 0)), tot_str])
-        
-    if len(data) > 1:
-        t = Table(data)
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.grey),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('GRID', (0,0), (-1,-1), 1, colors.black)
-        ]))
-        elements.append(t)
-    else:
-        elements.append(Paragraph("No proctor data available.", styles['Normal']))
-    elements.append(Spacer(1, 20))
-    
-    elements.append(Paragraph("Proctor Absences", styles['Heading2']))
-    if absence_report:
-        data2 = [['Date', 'Instructor', 'Exam', 'Reported By']]
-        for a in absence_report:
-            dt = a.get('reported_at')
-            dt_str = dt.strftime('%Y-%m-%d %H:%M') if dt else ''
-            data2.append([
-                dt_str,
-                a.get('instructor_name', ''),
-                a.get('subject_name', ''),
-                a.get('reported_by', '')
+
+    doc_title = "Official Proctor Absence Report" if report_type == 'absence' else ("Official Proctor Assignment Report" if report_type == 'assignment' else "Official Proctor Duty & Absence Report")
+    _build_cca_report_header(elements, doc_title, exam_term, exam_semester, prepared_by, is_landscape=False)
+
+    th_style = ParagraphStyle('THStylePR', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7.5, leading=9.5, textColor=colors.white, alignment=1)
+    td_style = ParagraphStyle('TDStylePR', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, leading=9.5, alignment=1)
+    td_left  = ParagraphStyle('TDLeftPR', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, leading=9.5, alignment=0)
+    td_bold  = ParagraphStyle('TDBoldPR', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7.5, leading=9.5, textColor=colors.HexColor('#2d4a22'), alignment=1)
+
+    if report_type in ['both', 'absence']:
+        elements.append(Paragraph("<b>Proctor Absence Records</b>", ParagraphStyle('AbsH', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#27361b'))))
+        elements.append(Spacer(1, 4))
+        if absence_report:
+            data2 = [[
+                Paragraph("<b>Date &amp; Time</b>", th_style),
+                Paragraph("<b>Instructor</b>", th_style),
+                Paragraph("<b>Subject / Section</b>", th_style),
+                Paragraph("<b>Reported Reason</b>", th_style)
+            ]]
+            for a in absence_report:
+                dt = a.get('reported_at')
+                dt_str = dt.strftime('%b %d, %Y %I:%M %p') if dt and hasattr(dt, 'strftime') else str(dt or '—')
+                data2.append([
+                    Paragraph(dt_str, td_bold),
+                    Paragraph(f"<b>{a.get('instructor_name', '')}</b>", td_left),
+                    Paragraph(f"{a.get('subject_name', '')} ({a.get('section', '')})", td_left),
+                    Paragraph(str(a.get('reason') or 'No reason specified'), td_left)
+                ])
+            t2 = Table(data2, colWidths=[110, 130, 140, 159], repeatRows=1)
+            t2_style = [
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#3d5c2e')),
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('TOPPADDING', (0,0), (-1,-1), 4),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+                ('LEFTPADDING', (0,0), (-1,-1), 5),
+                ('RIGHTPADDING', (0,0), (-1,-1), 5),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+            ]
+            for r in range(1, len(data2)):
+                if r % 2 == 0:
+                    t2_style.append(('BACKGROUND', (0, r), (-1, r), colors.HexColor('#f8fafc')))
+            t2.setStyle(TableStyle(t2_style))
+            elements.append(t2)
+        else:
+            elements.append(Paragraph("No proctor absences recorded for this period.", styles['Normal']))
+        elements.append(Spacer(1, 14))
+
+    if report_type in ['both', 'assignment']:
+        elements.append(Paragraph("<b>Faculty Proctor Assignment &amp; Load Summary</b>", ParagraphStyle('LoadH', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#27361b'))))
+        elements.append(Spacer(1, 4))
+        data = [[
+            Paragraph("<b>#</b>", th_style),
+            Paragraph("<b>Faculty Proctor Name</b>", th_style),
+            Paragraph("<b>Assigned Exams</b>", th_style),
+            Paragraph("<b>Total Duty Hours</b>", th_style)
+        ]]
+        for idx, p in enumerate(proctor_hours, 1):
+            tot = float(p.get('total_hours') or 0.0)
+            tot_str = f"{tot:.1f}".rstrip('0').rstrip('.') if tot % 1 != 0 else str(int(tot))
+            data.append([
+                Paragraph(str(idx), td_style),
+                Paragraph(f"<b>{p.get('name', '')}</b>", td_left),
+                Paragraph(f"{p.get('exam_count', 0)} Session(s)", td_style),
+                Paragraph(f"{tot_str} hrs", td_bold)
             ])
-        t2 = Table(data2)
-        t2.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.grey),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('GRID', (0,0), (-1,-1), 1, colors.black)
-        ]))
-        elements.append(t2)
-    else:
-        elements.append(Paragraph("No absences reported.", styles['Normal']))
-        
+            
+        if len(data) > 1:
+            t = Table(data, colWidths=[25, 274, 120, 120], repeatRows=1)
+            t_style = [
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#3d5c2e')),
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('TOPPADDING', (0,0), (-1,-1), 3),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+                ('LEFTPADDING', (0,0), (-1,-1), 5),
+                ('RIGHTPADDING', (0,0), (-1,-1), 5),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+            ]
+            for r in range(1, len(data)):
+                if r % 2 == 0:
+                    t_style.append(('BACKGROUND', (0, r), (-1, r), colors.HexColor('#f8fafc')))
+            t.setStyle(TableStyle(t_style))
+            elements.append(t)
+        else:
+            elements.append(Paragraph("No proctor assignment data available.", styles['Normal']))
+        elements.append(Spacer(1, 10))
+
+    _append_cca_signatures(elements, prepared_by, is_landscape=False)
     doc.build(elements)
     return buffer.getvalue()
 
-def export_collection_report_pdf(collection_data):
-    """Returns bytes of a PDF exam collection tracking report."""
+def export_collection_report_pdf(collection_data, exam_term='Midterm', exam_semester='1st Semester', prepared_by=None):
+    """Returns bytes of a PDF exam collection tracking report with official CCA header."""
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=28, leftMargin=28, topMargin=28, bottomMargin=28)
     elements = []
     styles = getSampleStyleSheet()
+
+    _build_cca_report_header(elements, "Exam Paper & Envelope Collection Tracking Report", exam_term, exam_semester, prepared_by, is_landscape=True)
     
-    elements.append(Paragraph("Exam Collection Tracking Report", styles['Title']))
-    elements.append(Spacer(1, 12))
-    
-    data = [['Exam Date & Time', 'Subject', 'Section', 'Collected At', 'Returned At']]
+    th_style = ParagraphStyle('THStyleC', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7.5, leading=9.5, textColor=colors.white, alignment=1)
+    td_style = ParagraphStyle('TDStyleC', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, leading=9.5, alignment=1)
+    td_left  = ParagraphStyle('TDLeftC', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, leading=9.5, alignment=0)
+    td_bold  = ParagraphStyle('TDBoldC', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7.5, leading=9.5, textColor=colors.HexColor('#2d4a22'), alignment=1)
+
+    headers = [
+        Paragraph("<b>Exam Date &amp; Time Window</b>", th_style),
+        Paragraph("<b>Subject / Course</b>", th_style),
+        Paragraph("<b>Section</b>", th_style),
+        Paragraph("<b>Claimed / Collected</b>", th_style),
+        Paragraph("<b>Returned / Received</b>", th_style)
+    ]
+    data = [headers]
     for c in collection_data:
         dt = c.get('exam_date_time')
         dur = int(c.get('duration_minutes') or 60)
@@ -151,38 +308,48 @@ def export_collection_report_pdf(collection_data):
         r_at = c.get('returned_at')
         if dt:
             if isinstance(dt, str):
-                try:
-                    dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
-                except Exception:
-                    pass
+                try: dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+                except Exception: pass
             if isinstance(dt, datetime):
                 end_dt = dt + timedelta(minutes=dur)
                 dt_str = f"{dt.strftime('%b %d, %Y')} ({dt.strftime('%I:%M %p')} - {end_dt.strftime('%I:%M %p')})"
             else:
                 dt_str = str(dt)
         else:
-            dt_str = 'N/A'
+            dt_str = 'TBA'
         
+        c_str = c_at.strftime('%b %d, %Y %I:%M %p') if c_at and hasattr(c_at, 'strftime') else (str(c_at) if c_at else 'Pending')
+        r_str = r_at.strftime('%b %d, %Y %I:%M %p') if r_at and hasattr(r_at, 'strftime') else (str(r_at) if r_at else 'Pending')
+
         data.append([
-            dt_str,
-            c.get('subject_name', ''),
-            c.get('section', ''),
-            c_at.strftime('%Y-%m-%d %H:%M') if c_at else 'Pending',
-            r_at.strftime('%Y-%m-%d %H:%M') if r_at else 'Pending'
+            Paragraph(dt_str, td_bold),
+            Paragraph(f"<b>{c.get('subject_name', '')}</b>", td_left),
+            Paragraph(str(c.get('section', '—')), td_style),
+            Paragraph(f"<font color='{'#15803d' if c_at else '#b45309'}'>{c_str}</font>", td_style),
+            Paragraph(f"<font color='{'#15803d' if r_at else '#64748b'}'>{r_str}</font>", td_style)
         ])
         
     if len(data) > 1:
-        t = Table(data, repeatRows=1)
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.grey),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        t = Table(data, colWidths=[200, 225, 80, 140, 140], repeatRows=1)
+        t_style = [
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#3d5c2e')),
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('GRID', (0,0), (-1,-1), 1, colors.black)
-        ]))
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('TOPPADDING', (0,0), (-1,-1), 4),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('LEFTPADDING', (0,0), (-1,-1), 5),
+            ('RIGHTPADDING', (0,0), (-1,-1), 5),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ]
+        for r in range(1, len(data)):
+            if r % 2 == 0:
+                t_style.append(('BACKGROUND', (0, r), (-1, r), colors.HexColor('#f8fafc')))
+        t.setStyle(TableStyle(t_style))
         elements.append(t)
     else:
-        elements.append(Paragraph("No exam collection data available.", styles['Normal']))
-        
+        elements.append(Paragraph("No exam collection tracking records found.", styles['Normal']))
+
+    _append_cca_signatures(elements, prepared_by, is_landscape=True)
     doc.build(elements)
     return buffer.getvalue()
 
@@ -332,7 +499,7 @@ def export_archive_pdf(archive):
 
 
 
-def export_proctor_duty_slip_pdf(proctor_name, exams, exam_term='Midterm', exam_semester='1st Semester', total_hours=0.0):
+def export_proctor_duty_slip_pdf(proctor_name, exams, exam_term='Midterm', exam_semester='1st Semester', total_hours=0.0, prepared_by=None):
     """Generates an official A4 portrait Faculty Proctoring Duty Schedule / Invigilation Slip PDF."""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(

@@ -3,6 +3,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 import io
+from datetime import datetime, timedelta
 
 def export_schedule_pdf(grouped_schedule, conflict_ids=None):
     """Returns bytes of a PDF with the full exam schedule.
@@ -25,7 +26,20 @@ def export_schedule_pdf(grouped_schedule, conflict_ids=None):
         
         for e in exams:
             dt = e.get('exam_date_time')
-            time_str = dt.strftime('%I:%M %p') if dt else 'N/A'
+            dur = int(e.get('duration_minutes') or 60)
+            if dt:
+                if isinstance(dt, str):
+                    try:
+                        dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+                    except Exception:
+                        pass
+                if isinstance(dt, datetime):
+                    end_dt = dt + timedelta(minutes=dur)
+                    time_str = f"{dt.strftime('%I:%M %p')} - {end_dt.strftime('%I:%M %p')}"
+                else:
+                    time_str = str(dt)
+            else:
+                time_str = 'N/A'
             data.append([
                 time_str,
                 e.get('subject_name', ''),
@@ -129,14 +143,28 @@ def export_collection_report_pdf(collection_data):
     elements.append(Paragraph("Exam Collection Tracking Report", styles['Title']))
     elements.append(Spacer(1, 12))
     
-    data = [['Exam Date', 'Subject', 'Section', 'Collected At', 'Returned At']]
+    data = [['Exam Date & Time', 'Subject', 'Section', 'Collected At', 'Returned At']]
     for c in collection_data:
         dt = c.get('exam_date_time')
+        dur = int(c.get('duration_minutes') or 60)
         c_at = c.get('collected_at')
         r_at = c.get('returned_at')
+        if dt:
+            if isinstance(dt, str):
+                try:
+                    dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    pass
+            if isinstance(dt, datetime):
+                end_dt = dt + timedelta(minutes=dur)
+                dt_str = f"{dt.strftime('%b %d, %Y')} ({dt.strftime('%I:%M %p')} - {end_dt.strftime('%I:%M %p')})"
+            else:
+                dt_str = str(dt)
+        else:
+            dt_str = 'N/A'
         
         data.append([
-            dt.strftime('%Y-%m-%d %H:%M') if dt else 'N/A',
+            dt_str,
             c.get('subject_name', ''),
             c.get('section', ''),
             c_at.strftime('%Y-%m-%d %H:%M') if c_at else 'Pending',

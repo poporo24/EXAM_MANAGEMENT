@@ -111,7 +111,7 @@
                 <tbody>
                     {% for t in times %}
                     <tr>
-                        <td class="time-cell">{{ t }}</td>
+                        <td class="time-cell">{{ time_labels.get(t, t) if time_labels else t }}</td>
                         {% for d in dates %}
                         <td>
                             {% set cell_exams = grid[t][d] %}
@@ -119,6 +119,9 @@
                                 {% for exam in cell_exams %}
                                 <div class="exam-card">
                                     <div class="subject">{{ exam.subject_name }}</div>
+                                    <div class="meta" style="font-weight:600; color:#3d5c2e;">
+                                        <span><i class="fa-regular fa-clock fa-xs mr-1"></i>{% if exam.time_end %}{{ exam.time }} &ndash; {{ exam.time_end }}{% else %}{{ exam.time }}{% endif %}</span>
+                                    </div>
                                     <div class="meta">
                                         <span><i class="fa-solid fa-door-open fa-xs mr-1"></i>{{ exam.room_name or 'TBA' }}</span>
                                     </div>

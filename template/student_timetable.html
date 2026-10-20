@@ -465,7 +465,7 @@
                     <div class="card-meta">
                         <div class="meta-row">
                             <i class="fa-regular fa-clock"></i>
-                            <span class="meta-label">{{ exam.time }}<span class="meta-sub">{{ exam.duration_minutes }} min</span></span>
+                            <span class="meta-label">{% if exam.time_end %}{{ exam.time }} &ndash; {{ exam.time_end }}{% else %}{{ exam.time }}{% endif %}<span class="meta-sub">({{ exam.duration_minutes }} min)</span></span>
                         </div>
                         <div class="meta-row">
                             <i class="fa-solid fa-location-dot"></i>

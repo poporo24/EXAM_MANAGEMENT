@@ -717,7 +717,7 @@
                     <tbody>
                         {% for t in times %}
                         <tr>
-                            <td class="time-cell">{{ t }}</td>
+                            <td class="time-cell">{{ time_labels.get(t, t) if time_labels else t }}</td>
                             {% for d in dates %}
                             <td>
                                 {% set cell_exams = timetable[t][d] %}
@@ -730,6 +730,10 @@
                                             <span class="float-right text-gray-400 hover:text-[#668054] ml-1" title="Click card to edit">
                                                 <i class="fa-solid fa-pen-to-square text-xs"></i>
                                             </span>
+                                        </div>
+
+                                        <div class="meta text-[#3d5c2e] font-semibold">
+                                            <span><i class="fa-regular fa-clock fa-xs mr-1 text-[#668054]"></i>{% if exam.time_end %}{{ exam.time }} &ndash; {{ exam.time_end }}{% else %}{{ exam.time }}{% endif %}</span>
                                         </div>
 
                                         <div class="meta">

@@ -1794,7 +1794,7 @@ def get_exam_collection_status(institute_id=None):
         cursor = db.cursor(dictionary=True)
         if institute_id:
             cursor.execute("""
-                SELECT e.id as exam_id, e.subject_name, e.section, e.exam_date_time,
+                SELECT e.id as exam_id, e.subject_name, e.section, e.exam_date_time, e.duration_minutes,
                        e.instructor_id, e.instructor_name, r.room_name,
                        e.institute_id,
                        c.collected_by_instructor_id, c.collected_at, c.returned_at, c.notes,
@@ -1808,7 +1808,7 @@ def get_exam_collection_status(institute_id=None):
             """, (institute_id,))
         else:
             cursor.execute("""
-                SELECT e.id as exam_id, e.subject_name, e.section, e.exam_date_time,
+                SELECT e.id as exam_id, e.subject_name, e.section, e.exam_date_time, e.duration_minutes,
                        e.instructor_id, e.instructor_name, r.room_name,
                        e.institute_id,
                        c.collected_by_instructor_id, c.collected_at, c.returned_at, c.notes,
@@ -1937,7 +1937,7 @@ def get_proctor_absence_report(date_from=None, date_to=None):
     try:
         cursor = db.cursor(dictionary=True)
         query = """
-            SELECT p.*, i.name as instructor_name, e.subject_name, e.section, e.exam_date_time, u.full_name as reported_by
+            SELECT p.*, i.name as instructor_name, e.subject_name, e.section, e.exam_date_time, e.duration_minutes, u.full_name as reported_by
             FROM proctor_absence p
             LEFT JOIN instructors i ON p.instructor_id = i.id
             LEFT JOIN exams e ON p.exam_id = e.id

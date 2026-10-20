@@ -155,7 +155,7 @@
                                         <div class="flex flex-col gap-2 mb-4">
                                             <div class="flex items-center gap-2 text-sm text-gray-700">
                                                 <i class="fa-regular fa-clock w-4 text-center text-[#829c74]"></i>
-                                                <span class="font-medium">{{ exam.time }} <span class="text-xs text-gray-400 ml-1">{{ exam.duration_minutes }} min</span></span>
+                                                <span class="font-medium">{% if exam.time_end %}{{ exam.time }} &ndash; {{ exam.time_end }}{% else %}{{ exam.time }}{% endif %} <span class="text-xs text-gray-400 ml-1">({{ exam.duration_minutes }} min)</span></span>
                                             </div>
                                             <div class="flex items-center gap-2 text-sm text-gray-700">
                                                 <i class="fa-solid fa-location-dot w-4 text-center text-[#829c74]"></i>

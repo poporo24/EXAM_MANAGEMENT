@@ -158,6 +158,44 @@ def clean_hours_filter(val):
     except (ValueError, TypeError):
         return val
 
+@app.template_filter('exam_time_range')
+def exam_time_range_filter(dt, duration=60):
+    if not dt:
+        return 'TBD'
+    if isinstance(dt, str):
+        try:
+            dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            try:
+                dt = datetime.strptime(dt, "%Y-%m-%dT%H:%M")
+            except Exception:
+                return dt
+    try:
+        dur = int(duration or 60)
+    except (ValueError, TypeError):
+        dur = 60
+    end_dt = dt + timedelta(minutes=dur)
+    return f"{dt.strftime('%I:%M %p')} - {end_dt.strftime('%I:%M %p')}"
+
+@app.template_filter('exam_datetime_range')
+def exam_datetime_range_filter(dt, duration=60):
+    if not dt:
+        return 'TBD'
+    if isinstance(dt, str):
+        try:
+            dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            try:
+                dt = datetime.strptime(dt, "%Y-%m-%dT%H:%M")
+            except Exception:
+                return dt
+    try:
+        dur = int(duration or 60)
+    except (ValueError, TypeError):
+        dur = 60
+    end_dt = dt + timedelta(minutes=dur)
+    return f"{dt.strftime('%b %d, %Y')} • {dt.strftime('%I:%M %p')} - {end_dt.strftime('%I:%M %p')}" 
+
 def require_role(*roles):
     redir = require_login()
     if redir:
@@ -783,11 +821,17 @@ def schedule_view():
             dt = exam['exam_date_time']
             if isinstance(dt, str):
                 dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
-            exam['_dt']       = dt
-            exam['_date_str'] = dt.strftime("%Y-%m-%d")          # for grouping
-            exam['_time_str'] = dt.strftime("%H:%M")             # row key
-            exam['_date_label'] = dt.strftime("%a %b %d")       # column header
-            exam['datetime']  = dt.strftime("%b %d, %Y %I:%M %p")
+            dur = int(exam.get('duration_minutes') or 60)
+            end_dt = dt + timedelta(minutes=dur)
+            exam['_dt']          = dt
+            exam['_end_dt']      = end_dt
+            exam['_date_str']    = dt.strftime("%Y-%m-%d")          # for grouping
+            exam['_time_str']    = dt.strftime("%H:%M")             # row key
+            exam['time']         = dt.strftime("%I:%M %p")
+            exam['time_end']     = end_dt.strftime("%I:%M %p")
+            exam['time_range']   = f"{exam['time']} - {exam['time_end']}"
+            exam['_date_label']  = dt.strftime("%a %b %d")       # column header
+            exam['datetime']     = dt.strftime("%b %d, %Y %I:%M %p")
             exam['datetime_raw'] = dt.strftime("%Y-%m-%dT%H:%M")
             scheduled_exams.append(exam)
         else:
@@ -873,12 +917,17 @@ def schedule_view():
     for e in scheduled_exams:
         date_labels[e['_date_str']] = e['_date_label']
 
+    time_labels = {}
+    for e in scheduled_exams:
+        time_labels[e['_time_str']] = e['time']
+
     institutes = get_all_institutes()
     unread     = _get_unread(session['user_id'])
     return render_template("schedule.html",
                            timetable=timetable,
                            dates=dates_set,
                            date_labels=date_labels,
+                           time_labels=time_labels,
                            times=times_set,
                            scheduled_exams=scheduled_exams,
                            unscheduled=unscheduled,
@@ -2277,7 +2326,11 @@ def proctor_dashboard():
             if not dt: continue
             if isinstance(dt, str):
                 dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+            dur = int(exam.get('duration_minutes') or 60)
+            end_dt = dt + timedelta(minutes=dur)
             exam['time'] = dt.strftime("%I:%M %p")
+            exam['time_end'] = end_dt.strftime("%I:%M %p")
+            exam['time_range'] = f"{exam['time']} - {exam['time_end']}"
             grouped[dt.strftime("%A, %B %d, %Y")].append(exam)
         sorted_groups = sorted(grouped.items(),
                                key=lambda x: datetime.strptime(x[0], "%A, %B %d, %Y"))
@@ -2397,6 +2450,20 @@ def secretary_dashboard():
         pending_absences = []
     else:
         exams       = get_exam_collection_status(institute_id=inst_id)
+        for ex in exams:
+            dt = ex.get('exam_date_time')
+            if dt:
+                if isinstance(dt, str):
+                    try:
+                        dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+                    except Exception:
+                        pass
+                dur = int(ex.get('duration_minutes') or 60)
+                if isinstance(dt, datetime):
+                    end_dt = dt + timedelta(minutes=dur)
+                    ex['time'] = dt.strftime("%I:%M %p")
+                    ex['time_end'] = end_dt.strftime("%I:%M %p")
+                    ex['time_range'] = f"{ex['time']} - {ex['time_end']}"
         stats       = get_collection_stats(institute_id=inst_id)
         from system.database import get_unresolved_absences
         pending_absences = get_unresolved_absences(institute_id=inst_id)
@@ -2653,7 +2720,12 @@ def admin_batch_print_sections():
             t_str = dt.strftime("%H:%M")
             exam['_date_label'] = dt.strftime("%a %b %d")
             exam['datetime_raw'] = dt.strftime("%Y-%m-%dT%H:%M")
-            exam['duration_minutes'] = exam.get('duration_minutes') or 60
+            dur = int(exam.get('duration_minutes') or 60)
+            end_dt = dt + timedelta(minutes=dur)
+            exam['duration_minutes'] = dur
+            exam['time'] = dt.strftime("%I:%M %p")
+            exam['time_end'] = end_dt.strftime("%I:%M %p")
+            exam['time_range'] = f"{exam['time']} - {exam['time_end']}"
             grid[t_str][d_str].append(exam)
             dates_set.add(d_str)
             times_set.add(t_str)
@@ -2664,16 +2736,20 @@ def admin_batch_print_sections():
     
 
     date_labels = {}
+    time_labels = {}
     for sec, exams in sections_dict.items():
         for e in exams:
             if '_date_label' in e:
                 dt = e['exam_date_time']
                 if isinstance(dt, str):
-                            dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+                    dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
                 date_labels[dt.strftime("%Y-%m-%d")] = e['_date_label']
+                if 'time' in e:
+                    time_labels[dt.strftime("%H:%M")] = e['time']
 
                 
     return render_template("batch_print.html",
+                           time_labels=time_labels,
                            section_grids=section_grids,
                            dates=dates_list,
                            times=times_list,

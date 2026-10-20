@@ -188,7 +188,7 @@
                                     {% for exam in upcoming_exams %}
                                     <tr class="hover:bg-gray-50 upcoming-exam-row">
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ exam.subject_name }} - {{ exam.section }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ exam.exam_date_time }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ exam.exam_date_time | exam_datetime_range(exam.duration_minutes) }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ exam.room_name }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                                             {% if exam.status == 'Scheduled' %}

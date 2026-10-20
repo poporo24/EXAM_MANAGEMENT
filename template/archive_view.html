@@ -64,6 +64,13 @@
                 </span>
             </div>
             <div class="flex items-center gap-2.5">
+                {% if session.get('role') in ['admin', 'super_admin'] %}
+                <form action="/admin/archives/{{ archive.id }}/sync_durations" method="POST" class="inline" onsubmit="return confirm('Recalculate and synchronize all exam durations in this archive snapshot with current system settings? (Major: {{ settings.major_duration_hrs|default(3.0) }} hrs, Minor: {{ settings.minor_duration_hrs|default(1.0) }} hrs)');">
+                    <button type="submit" class="text-xs font-semibold px-3 py-2 border border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg shadow-xs flex items-center gap-1.5 transition" title="Sync durations and recalculate end times with current settings">
+                        <i class="fa-solid fa-arrows-rotate text-emerald-600"></i> Sync Durations
+                    </button>
+                </form>
+                {% endif %}
                 <button onclick="window.print()" class="text-xs font-semibold px-3.5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center gap-1.5 transition">
                     <i class="fa-solid fa-print"></i> Print
                 </button>
@@ -85,6 +92,21 @@
         </div>
 
         <div class="p-8 max-w-7xl mx-auto space-y-6">
+
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="p-4 rounded-xl text-sm font-medium flex items-center justify-between shadow-xs border no-print {% if category == 'success' %}bg-emerald-50 text-emerald-800 border-emerald-200{% elif category == 'danger' or category == 'error' %}bg-rose-50 text-rose-800 border-rose-200{% else %}bg-amber-50 text-amber-800 border-amber-200{% endif %}">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fa-solid {% if category == 'success' %}fa-circle-check text-emerald-600{% elif category == 'danger' or category == 'error' %}fa-circle-exclamation text-rose-600{% else %}fa-triangle-exclamation text-amber-600{% endif %}"></i>
+                                <span>{{ message }}</span>
+                            </div>
+                            <button onclick="this.parentElement.remove()" class="opacity-60 hover:opacity-100"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
 
             <!-- Snapshot Info Card -->
             <div class="bg-white rounded-2xl p-6 border border-gray-200 shadow-xs no-print">
@@ -251,7 +273,13 @@
                                     <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold {% if ex.subject_type == 'Major' %}bg-emerald-50 text-emerald-800 border border-emerald-200{% else %}bg-amber-50 text-amber-800 border border-amber-200{% endif %}">
                                         {{ ex.subject_type or 'Major' }}
                                     </span>
-                                    <div class="text-[10px] text-gray-400 mt-0.5">{{ ex.duration_minutes }} min</div>
+                                    <div class="text-[10px] text-gray-500 font-medium mt-0.5">
+                                        {% if ex.duration_minutes and ex.duration_minutes >= 60 %}
+                                            {{ (ex.duration_minutes / 60)|int if (ex.duration_minutes % 60 == 0) else (ex.duration_minutes / 60)|round(1) }} hr{{ 's' if ex.duration_minutes != 60 else '' }} ({{ ex.duration_minutes }} min)
+                                        {% else %}
+                                            {{ ex.duration_minutes }} min
+                                        {% endif %}
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}

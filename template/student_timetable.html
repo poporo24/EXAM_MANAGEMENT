@@ -436,7 +436,7 @@
                         <td>
                             <span class="room-pill">{{ exam.room_name or 'TBA' }}</span>
                         </td>
-                        <td>{% if exam.duration_minutes == 60 %}1.0 hr{% elif exam.duration_minutes == 120 %}2.0 hrs{% elif exam.duration_minutes == 90 %}1.5 hrs{% else %}{{ exam.duration_minutes }} min{% endif %}</td>
+                        <td>{% if exam.duration_minutes and exam.duration_minutes >= 60 %}{{ (exam.duration_minutes / 60)|int if (exam.duration_minutes % 60 == 0) else (exam.duration_minutes / 60)|round(1) }} hr{{ 's' if exam.duration_minutes != 60 else '' }}{% else %}{{ exam.duration_minutes }} min{% endif %}</td>
                     </tr>
                     {% endfor %}
                 {% endfor %}

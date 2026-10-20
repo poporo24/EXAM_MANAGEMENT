@@ -125,7 +125,15 @@ def parse_exams_csv(file_content_bytes):
                 subject_type = row.get('subject_type', 'Major').strip()
                 if subject_type not in ('Major', 'Minor'):
                     subject_type = 'Major'
-                duration = int(row.get('duration_minutes', 60) or 60)
+                raw_dur = str(row.get('duration_minutes', '') or '').strip()
+                if raw_dur and raw_dur.isdigit():
+                    duration = int(raw_dur)
+                else:
+                    from system.database import get_system_settings
+                    _sys_set = get_system_settings() or {}
+                    _m_hrs = float(_sys_set.get('major_duration_hrs', 2.0) or 2.0)
+                    _min_hrs = float(_sys_set.get('minor_duration_hrs', 1.0) or 1.0)
+                    duration = int(round(_m_hrs * 60)) if subject_type == 'Major' else int(round(_min_hrs * 60))
                 rows.append({
                     'subject_name': row.get('subject_name', '').strip(),
                     'subject_code': subject_code,

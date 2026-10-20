@@ -890,7 +890,8 @@ def add_exam(name, section, subject_type, duration_minutes, institute_id=None, s
         cursor = db.cursor()
         duration_minutes = int(duration_minutes) if duration_minutes else 60
         section = section.strip().upper() if section else None
-        subject_type = subject_type if subject_type in ('Major', 'Minor') else 'Major'
+        st_norm = str(subject_type or '').strip().lower()
+        subject_type = 'Minor' if st_norm in ('minor', 'laboratory', 'lab') else 'Major'
         cursor.execute(
             """INSERT INTO exams (subject_name, section, subject_type, duration_minutes, status, institute_id, subject_id)
                VALUES (%s, %s, %s, %s, 'Pending', %s, %s)""",
@@ -3219,5 +3220,69 @@ def delete_exam_archive(archive_id):
     finally:
         db.close()
 
+def sync_archive_durations(archive_id=None):
+    """
+    Synchronizes duration_minutes and formatted_time_end of all exams in
+    exam_archives snapshot_data to match active system_settings (major_duration_hrs, minor_duration_hrs).
+    If archive_id is provided, only that archive is synced; otherwise all archives are synced.
+    """
+    import json
+    from datetime import datetime, timedelta
+    settings = get_system_settings() or {}
+    major_min = int(round(float(settings.get('major_duration_hrs', 2.0) or 2.0) * 60))
+    minor_min = int(round(float(settings.get('minor_duration_hrs', 1.0) or 1.0) * 60))
 
+    db = open_db()
+    if not db:
+        return False, "Database connection failed."
+    try:
+        cur = db.cursor(dictionary=True)
+        if archive_id:
+            cur.execute("SELECT id, snapshot_data FROM exam_archives WHERE id=%s", (archive_id,))
+        else:
+            cur.execute("SELECT id, snapshot_data FROM exam_archives")
+        rows = cur.fetchall()
+
+        update_cur = db.cursor()
+        updated_count = 0
+        for row in rows:
+            raw_snap = row.get('snapshot_data')
+            if not raw_snap:
+                continue
+            try:
+                data = json.loads(raw_snap)
+            except Exception:
+                continue
+            modified = False
+            for ex in data:
+                st = ex.get('subject_type') or 'Major'
+                new_dur = major_min if st == 'Major' else minor_min
+                if ex.get('duration_minutes') != new_dur:
+                    ex['duration_minutes'] = new_dur
+                    modified = True
+
+                # Recalculate formatted_time_end
+                dt_str = ex.get('exam_date_time')
+                if dt_str:
+                    try:
+                        dt = datetime.strptime(str(dt_str)[:19], "%Y-%m-%d %H:%M:%S")
+                        end_dt = dt + timedelta(minutes=new_dur)
+                        new_end_str = end_dt.strftime("%I:%M %p")
+                        if ex.get('formatted_time_end') != new_end_str:
+                            ex['formatted_time_end'] = new_end_str
+                            modified = True
+                    except Exception:
+                        pass
+            if modified:
+                update_cur.execute(
+                    "UPDATE exam_archives SET snapshot_data=%s WHERE id=%s",
+                    (json.dumps(data), row['id'])
+                )
+                updated_count += 1
+        db.commit()
+        return True, f"Successfully synced durations for {updated_count} archive(s)."
+    except Exception as e:
+        return False, str(e)
+    finally:
+        db.close()
 

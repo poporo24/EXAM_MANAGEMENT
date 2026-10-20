@@ -643,8 +643,8 @@
                                     <div>
                                         <label for="subject_type" class="block text-sm font-medium text-gray-700">Type</label>
                                         <select name="subject_type" id="subject_type" required onchange="updateDurationDefault()" class="mt-1 focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
-                                            <option value="Lecture">Lecture</option>
-                                            <option value="Laboratory">Laboratory</option>
+                                            <option value="Major">Lecture (Major)</option>
+                                            <option value="Minor">Laboratory (Minor)</option>
                                         </select>
                                     </div>
                                     <div>
@@ -987,7 +987,9 @@
 
         // ── Auto-fill duration based on subject type ─────────────────────────
         const durationDefaults = {
+            'Major': {{ settings.major_duration_hrs|default('2.0') }},
             'Lecture': {{ settings.major_duration_hrs|default('2.0') }},
+            'Minor': {{ settings.minor_duration_hrs|default('1.0') }},
             'Laboratory': {{ settings.minor_duration_hrs|default('1.0') }}
         };
         function updateDurationDefault() {

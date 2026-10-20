@@ -63,7 +63,7 @@ from system.database import (
     # reports
     get_scheduling_report, get_assignment_report, get_student_exam_load_report,
     # archives
-    create_exam_archive, get_exam_archives, get_exam_archive_by_id, delete_exam_archive,
+    create_exam_archive, get_exam_archives, get_exam_archive_by_id, delete_exam_archive, sync_archive_durations,
     # period
     open_db, ensure_database_schema,
 )
@@ -474,6 +474,38 @@ def dashboard():
                            pending_count=pending_count)
 
 # â”€â”€ ADD ROUTES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+@app.route("/add_exam", methods=["POST"])
+def add_exam_route():
+    guard = require_role('admin')
+    if guard: return guard
+    subject_id = request.form.get("subject_id")
+    section = request.form.get("section", "").strip().upper()
+    raw_type = request.form.get("subject_type", "Major").strip()
+    st_norm = raw_type.lower()
+    subject_type = 'Minor' if st_norm in ('minor', 'laboratory', 'lab') else 'Major'
+    
+    dur_hrs = request.form.get("duration_hours")
+    if dur_hrs:
+        try:
+            duration_minutes = int(round(float(dur_hrs) * 60))
+        except (ValueError, TypeError):
+            duration_minutes = 180 if subject_type == 'Major' else 60
+    else:
+        duration_minutes = 180 if subject_type == 'Major' else 60
+
+    institute_id = request.form.get("institute_id") or None
+    
+    subject_name = ""
+    if subject_id:
+        from system.database import get_subject_by_id
+        sub = get_subject_by_id(subject_id)
+        if sub:
+            subject_name = sub.get('name') or sub.get('code') or ''
+
+    add_exam(subject_name, section, subject_type, duration_minutes, institute_id, subject_id)
+    flash(f"Exam '{subject_name}' ({section}) added successfully.", "success")
+    return redirect(url_for('dashboard') + '#exams')
 
 @app.route("/add_room", methods=["POST"])
 def create_room():
@@ -1741,9 +1773,22 @@ def admin_archive_view(archive_id):
         flash("Archived record not found.", "danger")
         return redirect(url_for('admin_archives'))
     unread = _get_unread(session['user_id'])
+    settings = get_system_settings() or {}
     return render_template("archive_view.html",
                            archive=archive,
+                           settings=settings,
                            unread_count=unread)
+
+@app.route("/admin/archives/<int:archive_id>/sync_durations", methods=["POST"])
+def admin_archive_sync_durations(archive_id):
+    guard = require_role('admin')
+    if guard: return guard
+    ok, msg = sync_archive_durations(archive_id)
+    if ok:
+        flash("Archive durations and end times successfully synchronized with current settings.", "success")
+    else:
+        flash(f"Failed to sync archive durations: {msg}", "danger")
+    return redirect(url_for('admin_archive_view', archive_id=archive_id))
 
 @app.route("/admin/archives/<int:archive_id>/export_csv")
 def admin_archive_export_csv(archive_id):
@@ -1881,6 +1926,12 @@ def settings_save():
             print("Auto-update exams error:", e)
         finally:
             db.close()
+            
+    # Automatically synchronize all historical archives with the new duration settings
+    try:
+        sync_archive_durations()
+    except Exception as e:
+        print("Auto-sync archives error:", e)
 
     _configure_mail()
     flash("Settings saved successfully.", "success")

@@ -2790,41 +2790,69 @@ def change_my_password():
     if guard: return guard
     role = session.get('role')
     redirect_to = request.form.get("redirect_to", "")
-    # Determine safe redirect target based on role
     safe_redirects = {
         'proctor': 'proctor_dashboard',
         'student': 'student_timetable',
-        'admin': 'settings_page',
+        'admin': 'dashboard',
+        'super_admin': 'super_admin_page',
+        'secretary': 'secretary_dashboard',
     }
     fallback = safe_redirects.get(role, 'login')
-    redirect_target = redirect_to if redirect_to in safe_redirects.values() else fallback
 
+    def get_redirect():
+        ref = request.referrer
+        if ref and (request.host in ref):
+            return redirect(ref)
+        target = redirect_to if redirect_to in safe_redirects.values() else fallback
+        return redirect(url_for(target))
+
+    current_password = request.form.get("current_password", "").strip()
     new_password     = request.form.get("new_password", "").strip()
     confirm_password = request.form.get("confirm_password", "").strip()
-    if not new_password or len(new_password) < 6:
-        flash("Password must be at least 6 characters.", "danger")
-        return redirect(url_for(redirect_target))
+
+    if not current_password or not new_password or not confirm_password:
+        flash("All password fields are required.", "danger")
+        return get_redirect()
+    if len(new_password) < 6:
+        flash("New password must be at least 6 characters.", "danger")
+        return get_redirect()
     if new_password != confirm_password:
-        flash("Passwords do not match.", "danger")
-        return redirect(url_for(redirect_target))
+        flash("New passwords do not match.", "danger")
+        return get_redirect()
+    if new_password == current_password:
+        flash("New password cannot be the same as your current password.", "warning")
+        return get_redirect()
+
     db = open_db()
     if db:
         try:
             import bcrypt as _bcrypt
+            c_db = db.cursor(dictionary=True)
+            c_db.execute("SELECT id, password FROM users WHERE id = %s", (session['user_id'],))
+            user = c_db.fetchone()
+            if not user:
+                flash("User account not found.", "danger")
+                return get_redirect()
+
+            stored_pw = user.get('password') or ''
+            try:
+                current_ok = _bcrypt.checkpw(current_password.encode(), stored_pw.encode())
+            except (ValueError, TypeError):
+                current_ok = (current_password == stored_pw)
+
+            if not current_ok:
+                flash("Current password is incorrect.", "danger")
+                return get_redirect()
+
             hashed = _bcrypt.hashpw(new_password.encode(), _bcrypt.gensalt()).decode()
-            c = db.cursor()
-            c.execute("UPDATE users SET password = %s WHERE id = %s",
-                      (hashed, session['user_id']))
+            c_db.execute("UPDATE users SET password = %s WHERE id = %s", (hashed, session['user_id']))
             db.commit()
-            flash(" Password updated successfully.", "success")
+            flash("Password updated successfully.", "success")
         except Exception as e:
             flash(f"Error updating password: {e}", "danger")
         finally:
             db.close()
-    return redirect(url_for(redirect_target))
-
-# â”€â”€ STUDENT TIMETABLE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
+    return get_redirect()
 
 
 @app.route("/admin/batch_print_sections")

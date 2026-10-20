@@ -536,59 +536,7 @@
 </header>
 
 {% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
-<!-- Change Password Modal -->
-<div id="studentPwModal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.55); align-items:center; justify-content:center;">
-    <div style="background:#fff; border-radius:16px; width:100%; max-width:420px; margin:20px; box-shadow:0 20px 60px rgba(0,0,0,0.3); overflow:hidden;">
-        <div style="background:var(--green-dark); padding:16px 20px; display:flex; align-items:center; justify-content:space-between;">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <i class="fa-solid fa-key" style="color:#fff; font-size:16px;"></i>
-                <h3 style="color:#fff; font-size:16px; font-weight:700; margin:0;">Change My Password</h3>
-            </div>
-            <button type="button" onclick="closeStudentPwModal()" style="background:none; border:none; color:rgba(255,255,255,0.7); cursor:pointer; font-size:18px; padding:0 4px; line-height:1;">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-        </div>
-        <form action="/change_my_password" method="POST" style="padding:24px;" onsubmit="return validateStudentPw(this)">
-            <input type="hidden" name="redirect_to" value="student_timetable">
-            <p style="font-size:13px; color:var(--gray-500); margin-bottom:16px;">Choose a strong password for your account.</p>
-            <p id="student_pw_error" style="display:none; color:#dc2626; font-size:12px; margin-bottom:14px; background:#fef2f2; border:1px solid #fecaca; padding:8px 12px; border-radius:6px;">
-                <i class="fa-solid fa-circle-exclamation" style="margin-right:6px;"></i><span id="student_pw_error_text"></span>
-            </p>
-            <div style="margin-bottom:16px;">
-                <label style="display:block; font-size:13px; font-weight:600; color:var(--gray-700); margin-bottom:6px;">New Password</label>
-                <div style="position:relative; width:100%;">
-                    <input type="password" name="new_password" id="student_new_pw" required minlength="6"
-                           style="width:100%; padding:10px 40px 10px 12px; border:1px solid var(--gray-200); border-radius:8px; font-size:14px; outline:none; box-sizing:border-box;"
-                           placeholder="At least 6 characters">
-                    <button type="button" onclick="toggleStudentPassword('student_new_pw', 'icon_new_pw')"
-                            style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--gray-400); cursor:pointer; padding:6px; display:flex; align-items:center; justify-content:center;">
-                        <i id="icon_new_pw" class="fa-regular fa-eye"></i>
-                    </button>
-                </div>
-            </div>
-            <div style="margin-bottom:22px;">
-                <label style="display:block; font-size:13px; font-weight:600; color:var(--gray-700); margin-bottom:6px;">Confirm Password</label>
-                <div style="position:relative; width:100%;">
-                    <input type="password" name="confirm_password" id="student_confirm_pw" required minlength="6"
-                           style="width:100%; padding:10px 40px 10px 12px; border:1px solid var(--gray-200); border-radius:8px; font-size:14px; outline:none; box-sizing:border-box;"
-                           placeholder="Repeat new password">
-                    <button type="button" onclick="toggleStudentPassword('student_confirm_pw', 'icon_confirm_pw')"
-                            style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--gray-400); cursor:pointer; padding:6px; display:flex; align-items:center; justify-content:center;">
-                        <i id="icon_confirm_pw" class="fa-regular fa-eye"></i>
-                    </button>
-                </div>
-            </div>
-            <div style="display:flex; gap:10px; justify-content:flex-end;">
-                <button type="button" onclick="closeStudentPwModal()"
-                        style="padding:9px 18px; border:1px solid var(--gray-200); border-radius:8px; font-size:13px; font-weight:600; background:#fff; color:var(--gray-700); cursor:pointer;">Cancel</button>
-                <button type="submit"
-                        style="padding:9px 18px; border:none; border-radius:8px; font-size:13px; font-weight:600; background:var(--green-dark); color:#fff; cursor:pointer;">
-                    <i class="fa-solid fa-floppy-disk" style="margin-right:6px;"></i>Save Password
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
+{% include 'change_password_modal.html' %}
 
 <!-- Change Section Modal -->
 <div id="studentSectionModal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.55); align-items:center; justify-content:center;">

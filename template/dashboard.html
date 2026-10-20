@@ -49,6 +49,108 @@
             /* Make modals scrollable if they overflow */
             .fixed.inset-0 > div { padding: 1rem; overflow-y: auto; max-height: 100vh; }
         }
+    
+        /* Print Styles - Print ONLY the Table */
+        @media print {
+            @page {
+                size: auto;
+                margin: 10mm 12mm 10mm 12mm;
+            }
+
+            /* 1. Universal Screen UI suppression */
+            #sidebar, header, nav, aside, .no-print,
+            button, input, select, textarea,
+            .search-bar, [id*="Toolbar"], [id*="toolbar"],
+            [id*="ActionBar"], [id*="actionBar"], [id*="action-bar"],
+            [id*="Modal"], [id*="modal"],
+            .stats-container, .stats-card, .stats-grid,
+            .tab-buttons, .tab-nav,
+            .bg-green-50, .bg-amber-50, .alert, .pagination,
+            th:has(input[type="checkbox"]), td:has(input[type="checkbox"]),
+            th.col-checkbox, td.col-checkbox,
+            th.w-10, td.w-10,
+            th.print-hide, td.print-hide,
+            th[class*="sticky right-0"], td[class*="sticky right-0"] {
+                display: none !important;
+            }
+
+            /* 2. Reset page dimensions for clean document printing */
+            html, body {
+                background: #ffffff !important;
+                color: #000000 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                overflow: visible !important;
+                font-size: 9pt !important;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+            }
+            #main-content {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            .overflow-x-auto {
+                overflow: visible !important;
+                display: block !important;
+            }
+            .bg-white, .shadow-sm, .rounded-xl, .border {
+                box-shadow: none !important;
+                border: none !important;
+                border-radius: 0 !important;
+                background: transparent !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            /* 3. Reveal official print-only header */
+            .print-header-block {
+                display: block !important;
+                margin-bottom: 12px !important;
+                padding-bottom: 8px !important;
+                border-bottom: 2px solid #0f172a !important;
+            }
+
+            /* 4. Clean, high-contrast printable table formatting */
+            table {
+                display: table !important;
+                width: 100% !important;
+                border-collapse: collapse !important;
+                border: 1px solid #334155 !important;
+                margin: 0 !important;
+            }
+            thead {
+                display: table-header-group !important;
+            }
+            tbody {
+                display: table-row-group !important;
+            }
+            tr {
+                display: table-row !important;
+                page-break-inside: avoid !important;
+            }
+            th {
+                display: table-cell !important;
+                background-color: #f1f5f9 !important;
+                color: #0f172a !important;
+                border: 1px solid #64748b !important;
+                padding: 6px 8px !important;
+                font-size: 8.5pt !important;
+                font-weight: 700 !important;
+                text-align: left !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            td {
+                display: table-cell !important;
+                border: 1px solid #94a3b8 !important;
+                padding: 5px 8px !important;
+                font-size: 8pt !important;
+                color: #0f172a !important;
+                background: #ffffff !important;
+            }
+        }
     </style>
 
     <script>
@@ -166,7 +268,7 @@
             <!-- Tab Content: Dashboard -->
             <div id="dashboard-tab" class="tab-content block">
                 <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-200 flex flex-wrap gap-3 justify-between items-center bg-gray-50">
+                    <div class="no-print px-6 py-4 border-b border-gray-200 flex flex-wrap gap-3 justify-between items-center bg-gray-50">
                         <div class="flex items-center gap-4 flex-wrap">
                             <h2 class="font-semibold text-gray-800 text-lg">Upcoming Exams</h2>
                             <div class="relative">

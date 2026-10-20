@@ -2626,6 +2626,34 @@ def secretary_collect(exam_id):
     flash("Marked as collected.", "success")
     return redirect(url_for('secretary_dashboard'))
 
+@app.route("/secretary/batch_collect", methods=["POST"])
+def secretary_batch_collect():
+    guard = require_role('secretary', 'admin')
+    if guard: return guard
+    raw_exam_ids = request.form.getlist("exam_ids")
+    if not raw_exam_ids:
+        comma_ids = request.form.get("exam_ids", "")
+        if comma_ids:
+            raw_exam_ids = [x.strip() for x in comma_ids.split(",") if x.strip()]
+    
+    instructor_id = request.form.get("collected_by_instructor_id") or None
+    notes         = request.form.get("notes", "")
+
+    collected_count = 0
+    for eid_str in raw_exam_ids:
+        try:
+            eid = int(eid_str)
+            mark_exam_collected(eid, instructor_id, notes)
+            collected_count += 1
+        except (ValueError, TypeError):
+            continue
+
+    if collected_count > 0:
+        flash(f"Successfully marked {collected_count} exam envelope(s) as collected.", "success")
+    else:
+        flash("No valid exams were selected for collection.", "warning")
+    return redirect(url_for('secretary_dashboard'))
+
 @app.route("/secretary/return/<int:exam_id>", methods=["POST"])
 def secretary_return(exam_id):
     guard = require_role('secretary', 'admin')

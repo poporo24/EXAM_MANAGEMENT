@@ -374,10 +374,23 @@
                                         {% endif %}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button type="button" onclick="openEditSubjectModal('{{ sub.id }}', {{ sub.name | tojson }}, '{{ sub.code }}', '{{ sub.institute_id }}', '{{ sub.is_common }}')" class="text-blue-600 hover:text-blue-900 mr-3" title="Edit subject">
+                                        <button type="button" 
+                                                data-id="{{ sub.id }}"
+                                                data-name="{{ sub.name|escape }}"
+                                                data-code="{{ sub.code|escape }}"
+                                                data-institute="{{ sub.institute_id }}"
+                                                data-common="{{ sub.is_common }}"
+                                                onclick="openEditSubjectModal(this.dataset.id, this.dataset.name, this.dataset.code, this.dataset.institute, this.dataset.common)" 
+                                                class="text-blue-600 hover:text-blue-900 mr-3" 
+                                                title="Edit subject">
                                             <i class="fa-solid fa-edit"></i>
                                         </button>
-                                        <button type="button" onclick="confirmDeleteSubject('{{ sub.id }}', {{ sub.name | tojson }})" class="text-red-600 hover:text-red-900 cursor-pointer" title="Delete subject">
+                                        <button type="button" 
+                                                data-id="{{ sub.id }}"
+                                                data-name="{{ sub.name|escape }}"
+                                                onclick="confirmDeleteSubject(this.dataset.id, this.dataset.name)" 
+                                                class="text-red-600 hover:text-red-900 cursor-pointer" 
+                                                title="Delete subject">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                     </td>

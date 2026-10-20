@@ -65,7 +65,7 @@ from system.database import (
     # archives
     create_exam_archive, get_exam_archives, get_exam_archive_by_id, delete_exam_archive,
     # period
-    open_db,
+    open_db, ensure_database_schema,
 )
 from system.scheduler import run_scheduler
 from system.logic import verify_login, is_super_admin, hash_password
@@ -75,6 +75,12 @@ from system.logic import verify_login, is_super_admin, hash_password
 
 app = Flask(__name__, template_folder='template')
 app.secret_key = "cca_exam_management_secret_key_v2"
+
+# Automatically ensure database schema (tables & columns) exists
+try:
+    ensure_database_schema()
+except Exception as _schema_err:
+    print(f"Warning: automatic database schema check encountered an error: {_schema_err}")
 
 # â”€â”€ MAIL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 

@@ -36,6 +36,58 @@ def open_db():
             print(f"Local DB Error: {err}")
             return None
 
+def ensure_database_schema():
+    """
+    Ensures required tables and schema columns exist in the database.
+    Automatically runs on application startup to keep different environments
+    (like local laptops or remote servers) in sync without manual migration.
+    """
+    db = open_db()
+    if not db:
+        return False, "Database connection failed"
+    try:
+        cursor = db.cursor()
+
+        # 1. Create exam_archives table if missing
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS exam_archives (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                academic_year VARCHAR(50) NOT NULL,
+                exam_term VARCHAR(50) NOT NULL,
+                exam_semester VARCHAR(50) NOT NULL,
+                archive_title VARCHAR(150) NOT NULL,
+                total_exams INT DEFAULT 0,
+                total_proctors INT DEFAULT 0,
+                total_sections INT DEFAULT 0,
+                period_start DATE NULL,
+                period_end DATE NULL,
+                archived_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                archived_by INT NULL,
+                archived_by_name VARCHAR(100) NULL,
+                notes TEXT NULL,
+                snapshot_data LONGTEXT NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
+
+        # 2. Check and add missing columns to system_settings
+        cursor.execute("DESCRIBE system_settings")
+        cols = {row[0].lower() for row in cursor.fetchall()}
+
+        if 'max_daily_proctor_hrs' not in cols:
+            cursor.execute("ALTER TABLE system_settings ADD COLUMN max_daily_proctor_hrs FLOAT NOT NULL DEFAULT 4.0")
+        if 'schedule_published' not in cols:
+            cursor.execute("ALTER TABLE system_settings ADD COLUMN schedule_published TINYINT(1) NOT NULL DEFAULT 0")
+        if 'schedule_published_at' not in cols:
+            cursor.execute("ALTER TABLE system_settings ADD COLUMN schedule_published_at DATETIME NULL")
+
+        db.commit()
+        return True, "Database schema is up to date."
+    except Exception as e:
+        print(f"ensure_database_schema notice: {e}")
+        return False, str(e)
+    finally:
+        db.close()
+
 def get_system_settings():
     db = open_db()
     if not db:

@@ -2386,11 +2386,15 @@ def export_proctor_schedule_pdf_route():
         total_hours=total_hours
     )
     
-    response = make_response(pdf_bytes)
-    response.headers['Content-Type'] = 'application/pdf'
-    safe_name = session.get('full_name', 'proctor').replace(' ', '_').lower()
-    response.headers['Content-Disposition'] = f'inline; filename=proctor_schedule_{safe_name}.pdf'
-    return response
+    import re
+    safe_name = re.sub(r'[^a-zA-Z0-9]+', '_', session.get('full_name', 'proctor')).strip('_').lower()
+    filename = f"proctor_schedule_{safe_name}.pdf" if safe_name else "proctor_schedule.pdf"
+    return send_file(
+        io.BytesIO(pdf_bytes),
+        mimetype='application/pdf',
+        as_attachment=False,
+        download_name=filename
+    )
 
 
 
@@ -2905,11 +2909,15 @@ def export_student_schedule_pdf_route():
         exam_semester=exam_semester
     )
     
-    response = make_response(pdf_bytes)
-    response.headers['Content-Type'] = 'application/pdf'
-    safe_sec = section.replace(' ', '_').lower() if section else 'student'
-    response.headers['Content-Disposition'] = f'inline; filename=exam_permit_{safe_sec}.pdf'
-    return response
+    import re
+    safe_sec = re.sub(r'[^a-zA-Z0-9]+', '_', section).strip('_').lower() if section else 'student'
+    filename = f"exam_permit_{safe_sec}.pdf"
+    return send_file(
+        io.BytesIO(pdf_bytes),
+        mimetype='application/pdf',
+        as_attachment=False,
+        download_name=filename
+    )
 
 @app.route("/student/update_section", methods=["POST"])
 def student_update_section():

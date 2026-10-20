@@ -330,3 +330,474 @@ def export_archive_pdf(archive):
     doc.build(elements, onFirstPage=_draw_page_footer, onLaterPages=_draw_page_footer)
     return buffer.getvalue()
 
+
+
+def export_proctor_duty_slip_pdf(proctor_name, exams, exam_term='Midterm', exam_semester='1st Semester', total_hours=0.0):
+    """Generates an official A4 portrait Faculty Proctoring Duty Schedule / Invigilation Slip PDF."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=28,
+        rightMargin=28,
+        topMargin=28,
+        bottomMargin=28
+    )
+    styles = getSampleStyleSheet()
+    elements = []
+    
+    univ_style = ParagraphStyle(
+        'UnivStyleP',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=14,
+        leading=17,
+        textColor=colors.HexColor('#27361b')
+    )
+    sub_univ_style = ParagraphStyle(
+        'SubUnivStyleP',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor('#475569')
+    )
+    doc_title_style = ParagraphStyle(
+        'DocTitleStyleP',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=12,
+        leading=15,
+        textColor=colors.HexColor('#3d5c2e'),
+        alignment=1
+    )
+    doc_sub_style = ParagraphStyle(
+        'DocSubStyleP',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.HexColor('#475569'),
+        alignment=1
+    )
+    meta_label = ParagraphStyle(
+        'MetaLabelP',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor('#334155')
+    )
+    meta_val = ParagraphStyle(
+        'MetaValP',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor('#0f172a')
+    )
+    th_style = ParagraphStyle(
+        'THStyleP',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=7.5,
+        leading=9.5,
+        textColor=colors.white,
+        alignment=1
+    )
+    td_style = ParagraphStyle(
+        'TDStyleP',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=7.5,
+        leading=9.5,
+        alignment=1
+    )
+    td_left = ParagraphStyle(
+        'TDLeftP',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=7.5,
+        leading=9.5,
+        alignment=0
+    )
+    td_bold = ParagraphStyle(
+        'TDBoldP',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=7.5,
+        leading=9.5,
+        textColor=colors.HexColor('#2d4a22'),
+        alignment=1
+    )
+
+    # University Header
+    elements.append(Paragraph("CITY COLLEGE OF ANGELES", univ_style))
+    elements.append(Paragraph("Arayat Blvd, Barangay Pampang, Angeles City, Pampanga &bull; info@cca.edu.ph", sub_univ_style))
+    elements.append(Spacer(1, 8))
+    
+    elements.append(Paragraph("FACULTY PROCTORING DUTY SCHEDULE", doc_title_style))
+    elements.append(Paragraph(f"{exam_term} Examination &bull; {exam_semester}, Academic Year 2025-2026", doc_sub_style))
+    elements.append(Spacer(1, 10))
+
+    # Proctor Metadata Box
+    tot_hrs_str = f"{total_hours:.1f}".rstrip('0').rstrip('.') if isinstance(total_hours, float) else str(total_hours)
+    meta_data = [
+        [
+            Paragraph("<b>Faculty Proctor:</b>", meta_label),
+            Paragraph(str(proctor_name or 'N/A'), meta_val),
+            Paragraph("<b>Total Duty Hours:</b>", meta_label),
+            Paragraph(f"{tot_hrs_str} hrs", meta_val)
+        ],
+        [
+            Paragraph("<b>Institution:</b>", meta_label),
+            Paragraph("City College of Angeles", meta_val),
+            Paragraph("<b>Assigned Sessions:</b>", meta_label),
+            Paragraph(f"{len(exams)} Exam Session(s)", meta_val)
+        ]
+    ]
+    meta_t = Table(meta_data, colWidths=[90, 180, 100, 169])
+    meta_t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#cbd5e1')),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LEFTPADDING', (0,0), (-1,-1), 8),
+        ('RIGHTPADDING', (0,0), (-1,-1), 8),
+    ]))
+    elements.append(meta_t)
+    elements.append(Spacer(1, 12))
+
+    # Exam Table
+    headers = [
+        Paragraph("<b>#</b>", th_style),
+        Paragraph("<b>Subject / Course</b>", th_style),
+        Paragraph("<b>Section</b>", th_style),
+        Paragraph("<b>Exam Date</b>", th_style),
+        Paragraph("<b>Time Window</b>", th_style),
+        Paragraph("<b>Dur.</b>", th_style),
+        Paragraph("<b>Room / Venue</b>", th_style),
+    ]
+    table_data = [headers]
+
+    for idx, e in enumerate(exams, 1):
+        dt = e.get('exam_date_time')
+        dur = int(e.get('duration_minutes') or 60)
+        date_str = 'TBD'
+        time_str = 'TBD'
+        if dt:
+            if isinstance(dt, str):
+                try:
+                    dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    pass
+            if isinstance(dt, datetime):
+                end_dt = dt + timedelta(minutes=dur)
+                date_str = dt.strftime("%b %d, %Y")
+                time_str = f"{dt.strftime('%I:%M %p')} - {end_dt.strftime('%I:%M %p')}"
+            else:
+                date_str = str(dt)
+
+        subj = e.get('subject_name', '')
+        if e.get('subject_code'):
+            subj_cell = Paragraph(f"<b>{subj}</b><br/><font color='#64748b' size=6>{e.get('subject_code')}</font>", td_left)
+        else:
+            subj_cell = Paragraph(f"<b>{subj}</b>", td_left)
+
+        table_data.append([
+            Paragraph(str(idx), td_style),
+            subj_cell,
+            Paragraph(str(e.get('section', '')), td_style),
+            Paragraph(date_str, td_style),
+            Paragraph(time_str, td_bold),
+            Paragraph(f"{dur}m", td_style),
+            Paragraph(str(e.get('room_name') or 'TBA'), td_style)
+        ])
+
+    if len(table_data) > 1:
+        t = Table(table_data, colWidths=[20, 155, 60, 74, 125, 35, 70], repeatRows=1)
+        t_style = [
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#3d5c2e')),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('TOPPADDING', (0,0), (-1,-1), 4),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('LEFTPADDING', (0,0), (-1,-1), 3),
+            ('RIGHTPADDING', (0,0), (-1,-1), 3),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ]
+        for r in range(1, len(table_data)):
+            if r % 2 == 0:
+                t_style.append(('BACKGROUND', (0, r), (-1, r), colors.HexColor('#f8fafc')))
+        t.setStyle(TableStyle(t_style))
+        elements.append(t)
+    else:
+        elements.append(Paragraph("No proctoring assignments found for this period.", styles['Normal']))
+
+    elements.append(Spacer(1, 14))
+
+    # Instructions & Signatures
+    reminders_style = ParagraphStyle(
+        'RemindersP',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=7,
+        leading=9.5,
+        textColor=colors.HexColor('#475569')
+    )
+    elements.append(Paragraph("<b>PROCTOR GUIDELINES:</b><br/>"
+                              "1. Claim exam test papers from Department Secretary 15 minutes prior to start.<br/>"
+                              "2. Verify student permits and CCA ID cards before admitting examinees.<br/>"
+                              "3. Return all collected test papers and discrepancy forms directly after the session.", reminders_style))
+    elements.append(Spacer(1, 24))
+
+    sig_data = [
+        [Paragraph("________________________________________", td_style), Paragraph("________________________________________", td_style)],
+        [Paragraph("<b>Faculty Proctor Signature</b>", td_style), Paragraph("<b>Dean / Department Chair Signature</b>", td_style)]
+    ]
+    sig_t = Table(sig_data, colWidths=[269, 270])
+    sig_t.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+    ]))
+    elements.append(sig_t)
+
+    doc.build(elements)
+    return buffer.getvalue()
+
+
+def export_student_permit_pdf(student_name, section, exams, exam_term='Midterm', exam_semester='1st Semester'):
+    """Generates an official A4 portrait Student Examination Permit PDF."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=28,
+        rightMargin=28,
+        topMargin=28,
+        bottomMargin=28
+    )
+    styles = getSampleStyleSheet()
+    elements = []
+    
+    univ_style = ParagraphStyle(
+        'UnivStyleS',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=14,
+        leading=17,
+        textColor=colors.HexColor('#27361b')
+    )
+    sub_univ_style = ParagraphStyle(
+        'SubUnivStyleS',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor('#475569')
+    )
+    doc_title_style = ParagraphStyle(
+        'DocTitleStyleS',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=12,
+        leading=15,
+        textColor=colors.HexColor('#3d5c2e'),
+        alignment=1
+    )
+    doc_sub_style = ParagraphStyle(
+        'DocSubStyleS',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.HexColor('#475569'),
+        alignment=1
+    )
+    meta_label = ParagraphStyle(
+        'MetaLabelS',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor('#334155')
+    )
+    meta_val = ParagraphStyle(
+        'MetaValS',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor('#0f172a')
+    )
+    th_style = ParagraphStyle(
+        'THStyleS',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=7.5,
+        leading=9.5,
+        textColor=colors.white,
+        alignment=1
+    )
+    td_style = ParagraphStyle(
+        'TDStyleS',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=7.5,
+        leading=9.5,
+        alignment=1
+    )
+    td_left = ParagraphStyle(
+        'TDLeftS',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=7.5,
+        leading=9.5,
+        alignment=0
+    )
+    td_bold = ParagraphStyle(
+        'TDBoldS',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=7.5,
+        leading=9.5,
+        textColor=colors.HexColor('#2d4a22'),
+        alignment=1
+    )
+
+    # University Header
+    elements.append(Paragraph("CITY COLLEGE OF ANGELES", univ_style))
+    elements.append(Paragraph("Arayat Blvd, Barangay Pampang, Angeles City, Pampanga &bull; info@cca.edu.ph", sub_univ_style))
+    elements.append(Spacer(1, 8))
+    
+    elements.append(Paragraph("OFFICIAL STUDENT EXAMINATION PERMIT", doc_title_style))
+    elements.append(Paragraph(f"{exam_term} Examination &bull; {exam_semester}, Academic Year 2025-2026", doc_sub_style))
+    elements.append(Spacer(1, 10))
+
+    # Student Metadata Box
+    meta_data = [
+        [
+            Paragraph("<b>Student Name:</b>", meta_label),
+            Paragraph(str(student_name or 'N/A'), meta_val),
+            Paragraph("<b>Class Section:</b>", meta_label),
+            Paragraph(str(section or 'N/A'), meta_val)
+        ],
+        [
+            Paragraph("<b>Institution:</b>", meta_label),
+            Paragraph("City College of Angeles", meta_val),
+            Paragraph("<b>Permit Status:</b>", meta_label),
+            Paragraph("<font color='#15803d'><b>Officially Validated</b></font>", meta_val)
+        ]
+    ]
+    meta_t = Table(meta_data, colWidths=[90, 180, 90, 179])
+    meta_t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#cbd5e1')),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LEFTPADDING', (0,0), (-1,-1), 8),
+        ('RIGHTPADDING', (0,0), (-1,-1), 8),
+    ]))
+    elements.append(meta_t)
+    elements.append(Spacer(1, 12))
+
+    # Exam Table
+    headers = [
+        Paragraph("<b>Subject / Course</b>", th_style),
+        Paragraph("<b>Exam Date</b>", th_style),
+        Paragraph("<b>Start Time</b>", th_style),
+        Paragraph("<b>End Time</b>", th_style),
+        Paragraph("<b>Room</b>", th_style),
+        Paragraph("<b>Dur.</b>", th_style),
+    ]
+    table_data = [headers]
+
+    for e in exams:
+        dt = e.get('exam_date_time')
+        dur = int(e.get('duration_minutes') or 60)
+        date_str = 'TBD'
+        start_str = 'TBD'
+        end_str = 'TBD'
+        if dt:
+            if isinstance(dt, str):
+                try:
+                    dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    pass
+            if isinstance(dt, datetime):
+                end_dt = dt + timedelta(minutes=dur)
+                date_str = dt.strftime("%b %d, %Y")
+                start_str = dt.strftime("%I:%M %p")
+                end_str = end_dt.strftime("%I:%M %p")
+            else:
+                date_str = str(dt)
+
+        subj = e.get('subject_name', '')
+        if e.get('subject_code'):
+            subj_cell = Paragraph(f"<b>{subj}</b><br/><font color='#64748b' size=6>{e.get('subject_code')}</font>", td_left)
+        else:
+            subj_cell = Paragraph(f"<b>{subj}</b>", td_left)
+
+        table_data.append([
+            subj_cell,
+            Paragraph(date_str, td_style),
+            Paragraph(start_str, td_bold),
+            Paragraph(end_str, td_bold),
+            Paragraph(str(e.get('room_name') or 'TBA'), td_style),
+            Paragraph(f"{dur}m", td_style)
+        ])
+
+    if len(table_data) > 1:
+        t = Table(table_data, colWidths=[184, 85, 75, 75, 75, 45], repeatRows=1)
+        t_style = [
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#3d5c2e')),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('TOPPADDING', (0,0), (-1,-1), 4),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('LEFTPADDING', (0,0), (-1,-1), 4),
+            ('RIGHTPADDING', (0,0), (-1,-1), 4),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ]
+        for r in range(1, len(table_data)):
+            if r % 2 == 0:
+                t_style.append(('BACKGROUND', (0, r), (-1, r), colors.HexColor('#f8fafc')))
+        t.setStyle(TableStyle(t_style))
+        elements.append(t)
+    else:
+        elements.append(Paragraph("No scheduled exams found for this section.", styles['Normal']))
+
+    elements.append(Spacer(1, 14))
+
+    # Examinee instructions & Signatures
+    reminders_style = ParagraphStyle(
+        'RemindersS',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=7,
+        leading=9.5,
+        textColor=colors.HexColor('#475569')
+    )
+    elements.append(Paragraph("<b>EXAMINEE REMINDERS:</b><br/>"
+                              "1. Present this permit and your valid CCA Student ID to the room proctor upon entry.<br/>"
+                              "2. Arrive at designated examination rooms at least 15 minutes before the start time.<br/>"
+                              "3. Strictly uphold academic integrity. Any form of cheating results in immediate failure.", reminders_style))
+    elements.append(Spacer(1, 24))
+
+    sig_data = [
+        [Paragraph("________________________________________", td_style), Paragraph("________________________________________", td_style)],
+        [Paragraph("<b>Student Signature</b>", td_style), Paragraph("<b>College Registrar / Dean Signature</b>", td_style)]
+    ]
+    sig_t = Table(sig_data, colWidths=[269, 270])
+    sig_t.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+    ]))
+    elements.append(sig_t)
+
+    doc.build(elements)
+    return buffer.getvalue()

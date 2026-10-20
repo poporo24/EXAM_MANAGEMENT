@@ -2343,9 +2343,17 @@ def proctor_dashboard():
             period_dates.append(str(cur))
             cur += timedelta(days=1)
     unread = _get_unread(session['user_id'])
+    term_tuple = get_exam_term()
+    exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
+    exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
+    full_name = session.get('full_name', 'Faculty Proctor')
     return render_template("proctor_dashboard.html",
                            grouped=sorted_groups,
+                           exams=exams,
                            total=len(exams),
+                           full_name=full_name,
+                           exam_term=exam_term,
+                           exam_semester=exam_semester,
                            saved_dates=saved_dates,
                            period_dates=period_dates,
                            period_start=str(period_start) if period_start else '',
@@ -2353,6 +2361,36 @@ def proctor_dashboard():
                            total_hours=total_hours,
                            unread_count=unread,
                            is_published=is_pub)
+
+@app.route("/proctor/schedule.pdf")
+def export_proctor_schedule_pdf_route():
+    guard = require_role('proctor')
+    if guard: return guard
+    instructor_id = session.get('instructor_id')
+    if not instructor_id:
+        flash("Instructor profile not linked to account.", "danger")
+        return redirect(url_for('proctor_dashboard'))
+    
+    exams = get_proctor_exams(instructor_id)
+    term_tuple = get_exam_term()
+    exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
+    exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
+    total_hours = get_proctor_total_hours(instructor_id)
+    
+    from system.exporter import export_proctor_duty_slip_pdf
+    pdf_bytes = export_proctor_duty_slip_pdf(
+        proctor_name=session.get('full_name', 'Faculty Proctor'),
+        exams=exams,
+        exam_term=exam_term,
+        exam_semester=exam_semester,
+        total_hours=total_hours
+    )
+    
+    response = make_response(pdf_bytes)
+    response.headers['Content-Type'] = 'application/pdf'
+    safe_name = session.get('full_name', 'proctor').replace(' ', '_').lower()
+    response.headers['Content-Disposition'] = f'inline; filename=proctor_schedule_{safe_name}.pdf'
+    return response
 
 
 
@@ -2845,6 +2883,33 @@ def student_timetable():
                            unread_count=unread,
                            is_published=is_pub,
                            available_sections=available_sections)
+
+@app.route("/student/schedule.pdf")
+def export_student_schedule_pdf_route():
+    guard = require_role('student')
+    if guard: return guard
+    section      = session.get('section', '')
+    institute_id = session.get('institute_id')
+    full_name    = session.get('full_name', 'Student')
+    exams = get_public_timetable(section=section, institute_id=institute_id)
+    term_tuple = get_exam_term()
+    exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
+    exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
+    
+    from system.exporter import export_student_permit_pdf
+    pdf_bytes = export_student_permit_pdf(
+        student_name=full_name,
+        section=section,
+        exams=exams,
+        exam_term=exam_term,
+        exam_semester=exam_semester
+    )
+    
+    response = make_response(pdf_bytes)
+    response.headers['Content-Type'] = 'application/pdf'
+    safe_sec = section.replace(' ', '_').lower() if section else 'student'
+    response.headers['Content-Disposition'] = f'inline; filename=exam_permit_{safe_sec}.pdf'
+    return response
 
 @app.route("/student/update_section", methods=["POST"])
 def student_update_section():

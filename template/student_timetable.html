@@ -108,7 +108,7 @@
                 font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
                 color: #1e293b !important;
             }
-            .hero, .controls-bar, .ctrl-btn-logout, .info-strip, .main-content, .page-footer, #studentPwModal, #studentSectionModal {
+            .hero, .controls-bar, .ctrl-btn-logout, .info-strip, .main-content, .page-footer, #studentPwModal, #studentSectionModal, #change-password-modal, .no-print {
                 display: none !important;
             }
             .print-container {
@@ -122,6 +122,7 @@
         @media screen {
             .print-container { display: none !important; }
         }
+        .hidden { display: none !important; }
 
         /* Official Print Permit Layout */
         .print-header {
@@ -776,49 +777,25 @@
     }
 
     function openStudentPwModal() {
-        const m = document.getElementById('studentPwModal');
-        m.style.display = 'flex';
+        if (typeof openChangePasswordModal === 'function') {
+            openChangePasswordModal();
+        } else {
+            const m = document.getElementById('change-password-modal');
+            if (m) {
+                m.classList.remove('hidden');
+                m.style.display = 'flex';
+            }
+        }
     }
     function closeStudentPwModal() {
-        const m = document.getElementById('studentPwModal');
-        m.style.display = 'none';
-        m.querySelector('form').reset();
-        const errBox = document.getElementById('student_pw_error');
-        if (errBox) errBox.style.display = 'none';
-    }
-    function validateStudentPw(form) {
-        const pw = form.querySelector('[name=new_password]').value;
-        const cf = form.querySelector('[name=confirm_password]').value;
-        const errBox = document.getElementById('student_pw_error');
-        const errText = document.getElementById('student_pw_error_text');
-        if (pw !== cf) {
-            if (errBox && errText) {
-                errText.textContent = 'Passwords do not match.';
-                errBox.style.display = 'block';
-            }
-            return false;
-        }
-        if (pw.length < 6) {
-            if (errBox && errText) {
-                errText.textContent = 'Password must be at least 6 characters.';
-                errBox.style.display = 'block';
-            }
-            return false;
-        }
-        if (errBox) errBox.style.display = 'none';
-        return true;
-    }
-    function toggleStudentPassword(inputId, iconId) {
-        const input = document.getElementById(inputId);
-        const icon = document.getElementById(iconId);
-        if (input.type === 'password') {
-            input.type = 'text';
-            icon.classList.remove('fa-eye');
-            icon.classList.add('fa-eye-slash');
+        if (typeof closeChangePasswordModal === 'function') {
+            closeChangePasswordModal();
         } else {
-            input.type = 'password';
-            icon.classList.remove('fa-eye-slash');
-            icon.classList.add('fa-eye');
+            const m = document.getElementById('change-password-modal');
+            if (m) {
+                m.classList.add('hidden');
+                m.style.display = 'none';
+            }
         }
     }
 
@@ -839,7 +816,7 @@
     }
 
     // Close password modal on backdrop click
-    const pwModal = document.getElementById('studentPwModal');
+    const pwModal = document.getElementById('change-password-modal') || document.getElementById('studentPwModal');
     if (pwModal) {
         pwModal.addEventListener('click', function(e) {
             if (e.target === this) closeStudentPwModal();

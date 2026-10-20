@@ -8,10 +8,26 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        (function() {
+            try {
+                if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                    document.documentElement.classList.add('sidebar-collapsed');
+                }
+            } catch (e) {}
+        })();
+    </script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .sidebar-transition { transition: width 0.3s ease; }
         .content-transition { transition: margin-left 0.3s ease; }
+        html, body { overflow-x: hidden; }
+        #main-content { min-width: 0; max-width: 100%; }
+        html.sidebar-collapsed #sidebar { width: 4rem !important; }
+        html.sidebar-collapsed #main-content { margin-left: 4rem !important; }
+        html.sidebar-collapsed .nav-text { display: none !important; }
+        html.sidebar-collapsed .sidebar-header-container { justify-content: center !important; }
+        html.sidebar-collapsed .sidebar-header-container > div:first-child { display: none !important; }
     </style>
 
     <style>
@@ -51,7 +67,7 @@
     {% include 'admin_sidebar.html' %}
 
     <!-- Main Content -->
-    <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
+    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen">
         <!-- Top header -->
         <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
             <h1 class="text-xl font-semibold text-gray-800">Admin Dashboard</h1>
@@ -145,12 +161,20 @@
             <!-- Tab Content: Dashboard -->
             <div id="dashboard-tab" class="tab-content block">
                 <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                        <h2 class="font-semibold text-gray-800 text-lg">Upcoming Exams</h2>
-                        <a href="/schedule" class="text-sm text-[#668054] font-medium hover:underline">View Full Schedule →</a>
+                    <div class="px-6 py-4 border-b border-gray-200 flex flex-wrap gap-3 justify-between items-center bg-gray-50">
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <h2 class="font-semibold text-gray-800 text-lg">Upcoming Exams</h2>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fa-solid fa-search text-gray-400 text-sm"></i>
+                                </div>
+                                <input type="text" id="searchUpcomingExams" oninput="filterUpcomingExams()" onkeyup="filterUpcomingExams()" class="block w-64 pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#668054] focus:border-[#668054]" placeholder="Search upcoming exams...">
+                            </div>
+                        </div>
+                        <a href="/schedule" class="text-sm text-[#668054] font-medium hover:underline inline-flex items-center">View Full Schedule &rarr;</a>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
+                        <table id="upcomingExamsTable" class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
@@ -162,7 +186,7 @@
                             <tbody class="bg-white divide-y divide-gray-200">
                                 {% if upcoming_exams %}
                                     {% for exam in upcoming_exams %}
-                                    <tr class="hover:bg-gray-50">
+                                    <tr class="hover:bg-gray-50 upcoming-exam-row">
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ exam.subject_name }} - {{ exam.section }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ exam.exam_date_time }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ exam.room_name }}</td>
@@ -177,6 +201,11 @@
                                         </td>
                                     </tr>
                                     {% endfor %}
+                                    <tr id="noUpcomingMatchesRow" style="display: none;">
+                                        <td colspan="4" class="px-6 py-8 text-center text-gray-400 text-sm">
+                                            <i class="fa-solid fa-magnifying-glass mr-2"></i>No matching upcoming exams found.
+                                        </td>
+                                    </tr>
                                 {% else %}
                                     <tr>
                                         <td colspan="4" class="px-6 py-10 text-center text-gray-500">No upcoming exams found.</td>
@@ -714,59 +743,8 @@
 
     <!-- Javascript -->
     <script>
-        // Sidebar Toggle
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const mainContent = document.getElementById('main-content');
-            sidebar.classList.toggle('w-64');
-            sidebar.classList.toggle('w-16');
-            mainContent.classList.toggle('ml-64');
-            mainContent.classList.toggle('ml-16');
-            
-            const headers = document.querySelectorAll('.sidebar-header-container');
-            headers.forEach(h => {
-                if (sidebar.classList.contains('w-16')) {
-                    h.classList.remove('justify-between');
-                    h.classList.add('justify-center');
-                } else {
-                    h.classList.add('justify-between');
-                    h.classList.remove('justify-center');
-                }
-            });
-            
-            const isCollapsed = sidebar.classList.contains('w-16');
-            localStorage.setItem('sidebarCollapsed', isCollapsed);
-            
-            const texts = sidebar.querySelectorAll('.nav-text');
-            texts.forEach(el => {
-                if (isCollapsed) {
-                    el.classList.add('hidden');
-                } else {
-                    el.classList.remove('hidden');
-                }
-            });
-        }
-
-        // Initialize sidebar from localStorage
+        // Handle URL hash for tabs on DOMContentLoaded
         document.addEventListener('DOMContentLoaded', () => {
-            const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-            if (isCollapsed) {
-                const sidebar = document.getElementById('sidebar');
-                const mainContent = document.getElementById('main-content');
-                sidebar.classList.remove('w-64');
-                sidebar.classList.add('w-16');
-                mainContent.classList.remove('ml-64');
-                mainContent.classList.add('ml-16');
-                
-                const texts = sidebar.querySelectorAll('.nav-text');
-                texts.forEach(el => el.classList.add('hidden'));
-                document.querySelectorAll('.sidebar-header-container').forEach(h => {
-                    h.classList.remove('justify-between');
-                    h.classList.add('justify-center');
-                });
-            }
-
-            // Handle URL hash for tabs
             if (window.location.hash) {
                 const tabId = window.location.hash.substring(1) + '-tab';
                 if (document.getElementById(tabId)) {
@@ -1183,6 +1161,23 @@ function filterTable(inputId, rowSelector) {
     document.querySelectorAll(rowSelector).forEach(r => {
         r.style.display = r.innerText.toLowerCase().includes(q) ? "" : "none";
     });
+}
+
+function filterUpcomingExams() {
+    const input = document.getElementById('searchUpcomingExams');
+    if (!input) return;
+    const q = input.value.toLowerCase().trim();
+    const rows = document.querySelectorAll('#upcomingExamsTable tbody tr.upcoming-exam-row');
+    const noMatch = document.getElementById('noUpcomingMatchesRow');
+    let visible = 0;
+    rows.forEach(r => {
+        const match = r.innerText.toLowerCase().includes(q);
+        r.style.display = match ? '' : 'none';
+        if (match) visible++;
+    });
+    if (noMatch) {
+        noMatch.style.display = (visible === 0 && rows.length > 0) ? '' : 'none';
+    }
 }
 </script>
 </body>

@@ -213,7 +213,13 @@
                 {% endfor %}
             {% else %}
                 <tr>
-                    <td colspan="6" style="padding: 20px;">No exams scheduled.</td>
+                    <td colspan="6" style="padding: 20px;">
+                        {% if not is_published %}
+                            Exam timetable is currently under administrative review and not yet officially published.
+                        {% else %}
+                            No exams scheduled.
+                        {% endif %}
+                    </td>
                 </tr>
             {% endif %}
         </tbody>
@@ -221,6 +227,19 @@
 </div>
 
 <header class="hero">
+    {% if full_name == "Irregular Student Viewer" %}
+    <div style="position: absolute; top: 18px; left: 20px; z-index: 10;">
+        <a href="/login" class="ctrl-btn ctrl-btn-outline" style="font-size: 12px; padding: 6px 14px; border-radius: 20px; background: rgba(0,0,0,0.25);">
+            <i class="fa-solid fa-arrow-left"></i> Back to Login
+        </a>
+    </div>
+    {% elif full_name == "Admin Generated" %}
+    <div style="position: absolute; top: 18px; left: 20px; z-index: 10;">
+        <a href="/schedule" class="ctrl-btn ctrl-btn-outline" style="font-size: 12px; padding: 6px 14px; border-radius: 20px; background: rgba(0,0,0,0.25);">
+            <i class="fa-solid fa-arrow-left"></i> Back to Schedule
+        </a>
+    </div>
+    {% endif %}
 
     <p class="hero-eyebrow">City College of Angeles</p>
     <h1>Exam Timetable</h1>
@@ -235,11 +254,25 @@
             <i class="fa-solid fa-print"></i> Print
         </button>
         {% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
+        <button class="ctrl-btn ctrl-btn-outline" onclick="openStudentSectionModal()">
+            <i class="fa-solid fa-users-rectangle"></i> Change Section
+        </button>
         <button class="ctrl-btn ctrl-btn-outline" onclick="openStudentPwModal()">
             <i class="fa-solid fa-key"></i> Change Password
         </button>
         <a href="/logout" class="ctrl-btn ctrl-btn-logout">
             <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </a>
+        {% elif full_name == "Irregular Student Viewer" %}
+        <a href="/public/timetable" class="ctrl-btn ctrl-btn-outline" title="Select another section">
+            <i class="fa-solid fa-layer-group"></i> Change Section
+        </a>
+        <a href="/login" class="ctrl-btn ctrl-btn-outline" style="background: rgba(255,255,255,0.22); font-weight: 700;">
+            <i class="fa-solid fa-arrow-left"></i> Back to Login
+        </a>
+        {% elif full_name == "Admin Generated" %}
+        <a href="/schedule" class="ctrl-btn ctrl-btn-outline">
+            <i class="fa-solid fa-arrow-left"></i> Back to Schedule
         </a>
         {% endif %}
 
@@ -262,6 +295,9 @@
         <form action="/change_my_password" method="POST" style="padding:24px;" onsubmit="return validateStudentPw(this)">
             <input type="hidden" name="redirect_to" value="student_timetable">
             <p style="font-size:13px; color:var(--gray-500); margin-bottom:16px;">Choose a strong password for your account.</p>
+            <p id="student_pw_error" style="display:none; color:#dc2626; font-size:12px; margin-bottom:14px; background:#fef2f2; border:1px solid #fecaca; padding:8px 12px; border-radius:6px;">
+                <i class="fa-solid fa-circle-exclamation" style="margin-right:6px;"></i><span id="student_pw_error_text"></span>
+            </p>
             <div style="margin-bottom:16px;">
                 <label style="display:block; font-size:13px; font-weight:600; color:var(--gray-700); margin-bottom:6px;">New Password</label>
                 <div style="position:relative; width:100%;">
@@ -297,18 +333,93 @@
         </form>
     </div>
 </div>
+
+<!-- Change Section Modal -->
+<div id="studentSectionModal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.55); align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:16px; width:100%; max-width:440px; margin:20px; box-shadow:0 20px 60px rgba(0,0,0,0.3); overflow:hidden;">
+        <div style="background:var(--green-dark); padding:16px 20px; display:flex; align-items:center; justify-content:space-between;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <i class="fa-solid fa-users-rectangle" style="color:#fff; font-size:18px;"></i>
+                <h3 style="color:#fff; font-size:16px; font-weight:700; margin:0;">Change My Section</h3>
+            </div>
+            <button onclick="closeStudentSectionModal()" style="background:none; border:none; color:rgba(255,255,255,0.7); font-size:18px; cursor:pointer;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <form action="/student/update_section" method="POST" style="padding:22px;">
+            <div style="margin-bottom:14px;">
+                <label style="display:block; font-size:12px; font-weight:700; text-transform:uppercase; color:#374151; margin-bottom:6px;">
+                    Current Section
+                </label>
+                <div style="background:#f3f4f6; padding:8px 12px; border-radius:8px; font-size:13px; font-weight:600; color:#4b5563;">
+                    {{ section or 'No section currently assigned' }}
+                </div>
+            </div>
+
+            <div style="margin-bottom:16px;">
+                <label style="display:block; font-size:12px; font-weight:700; text-transform:uppercase; color:#374151; margin-bottom:6px;">
+                    Select Correct Section <span style="color:#dc2626;">*</span>
+                </label>
+                <select name="section" id="studentSectionSelect" required
+                        style="width:100%; border:1px solid #d1d5db; border-radius:8px; padding:10px 12px; font-size:14px; background:#fff; outline:none; font-family:'Inter', sans-serif;">
+                    <option value="">-- Choose Your Section --</option>
+                    {% for sec in available_sections %}
+                    <option value="{{ sec }}" {% if sec == section %}selected{% endif %}>{{ sec }}</option>
+                    {% endfor %}
+                </select>
+                <p style="font-size:11px; color:#6b7280; margin-top:5px;">
+                    Select the section you are currently officially enrolled in.
+                </p>
+            </div>
+
+            <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:10px 12px; margin-bottom:18px; font-size:12px; color:#92400e; display:flex; gap:8px;">
+                <i class="fa-solid fa-triangle-exclamation" style="margin-top:2px; flex-shrink:0;"></i>
+                <span>Updating your section will immediately reload your exam schedule and show examinations assigned to the selected section.</span>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" onclick="closeStudentSectionModal()"
+                        style="padding:8px 16px; border:1px solid var(--gray-200); border-radius:8px; background:#fff; font-size:13px; font-weight:600; color:var(--gray-700); cursor:pointer;">
+                    Cancel
+                </button>
+                <button type="submit"
+                        style="padding:8px 18px; border:none; border-radius:8px; background:var(--green-dark); font-size:13px; font-weight:700; color:#fff; cursor:pointer;">
+                    <i class="fa-solid fa-check" style="margin-right:6px;"></i>Update Section
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endif %}
 
 <div class="info-strip">
+    {% if not is_published %}
+    <span class="count" style="color: #b45309; display: flex; align-items: center; gap: 8px;">
+        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b;"></span>
+        <strong>Draft Mode</strong> &mdash; Examination schedule under administrative review
+    </span>
+    {% else %}
     <span class="count">
         <i class="fa-solid fa-calendar-check"></i>
         <span id="visibleCount">{{ total }}</span> scheduled exam{{ 's' if total != 1 else '' }}
     </span>
+    {% endif %}
     <span class="readonly">View-only &mdash; contact admin for changes</span>
     {% if section %}
     <span class="student-info">
         <i class="fa-solid fa-user-graduate"></i>
-        {{ full_name }} &nbsp;&middot;&nbsp; {{ section }}
+        {{ full_name }} &nbsp;&middot;&nbsp; 
+        {% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
+        <span onclick="openStudentSectionModal()" style="cursor:pointer; background:#e0ecd7; color:#2e4520; padding:2px 8px; border-radius:6px; font-weight:700; transition:background .15s;" title="Click to update section">
+            {{ section }} <i class="fa-solid fa-pen-to-square" style="font-size:10px; opacity:0.75; margin-left:3px;"></i>
+        </span>
+        {% elif full_name == "Irregular Student Viewer" %}
+        <a href="/public/timetable" style="text-decoration:none; background:#e0ecd7; color:#2e4520; padding:2px 8px; border-radius:6px; font-weight:700; transition:background .15s; display:inline-flex; align-items:center; gap:4px;" title="Click to change section">
+            {{ section }} <i class="fa-solid fa-arrow-right-arrow-left" style="font-size:10px; opacity:0.75;"></i>
+        </a>
+        {% else %}
+        {{ section }}
+        {% endif %}
     </span>
     {% endif %}
 </div>
@@ -372,17 +483,50 @@
         </div>
         {% endfor %}
     {% else %}
-        {% if not section %}
+        {% if not is_published %}
+        <div class="empty-state" style="border: 2px dashed #f59e0b; background: #fffbeb; padding: 60px 24px;">
+            <div class="empty-icon" style="background: #fef3c7; color: #d97706; width: 80px; height: 80px; font-size: 32px;"><i class="fa-solid fa-hourglass-half"></i></div>
+            <h3 style="color: #92400e; font-size: 20px;">Exam Timetable Under Administrative Review</h3>
+            <p style="color: #78350f; max-width: 460px; margin-top: 8px; line-height: 1.6;">
+                The examination schedule is currently being audited and finalized by college administrators.
+                Your official section timetable will be published here once finalized. Please check back soon.
+            </p>
+        </div>
+        {% elif not section %}
         <div class="empty-state">
             <div class="empty-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
             <h3>No Section Assigned</h3>
-            <p>Your account does not have a section configured. Please contact your administrator or institute to have your section updated in the system.</p>
+            <p>Your account does not have a section configured. Click below to select your current section and load your official exam timetable.</p>
+            {% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
+            <button onclick="openStudentSectionModal()" style="margin-top:16px; padding:9px 20px; background:#3d5c2e; color:#fff; border:none; border-radius:8px; font-weight:700; font-size:13px; cursor:pointer;">
+                <i class="fa-solid fa-users-rectangle mr-1"></i> Choose My Section
+            </button>
+            {% elif full_name == "Irregular Student Viewer" %}
+            <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
+                <a href="/public/timetable" style="padding:9px 18px; background:#3d5c2e; color:#fff; text-decoration:none; border-radius:8px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; gap:6px;">
+                    <i class="fa-solid fa-layer-group"></i> Select Section
+                </a>
+                <a href="/login" style="padding:9px 18px; background:#e5e7eb; color:#374151; text-decoration:none; border-radius:8px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; gap:6px;">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Login
+                </a>
+            </div>
+            {% endif %}
         </div>
         {% else %}
         <div class="empty-state">
             <div class="empty-icon"><i class="fa-solid fa-calendar-xmark"></i></div>
             <h3>No Exams Scheduled Yet</h3>
             <p>There are currently no examinations scheduled for section <strong>{{ section }}</strong>. Check back later or contact your institute.</p>
+            {% if full_name == "Irregular Student Viewer" %}
+            <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
+                <a href="/public/timetable" style="padding:9px 18px; background:#3d5c2e; color:#fff; text-decoration:none; border-radius:8px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; gap:6px;">
+                    <i class="fa-solid fa-layer-group"></i> Choose Different Section
+                </a>
+                <a href="/login" style="padding:9px 18px; background:#e5e7eb; color:#374151; text-decoration:none; border-radius:8px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; gap:6px;">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Login
+                </a>
+            </div>
+            {% endif %}
         </div>
         {% endif %}
     {% endif %}
@@ -435,12 +579,29 @@
         const m = document.getElementById('studentPwModal');
         m.style.display = 'none';
         m.querySelector('form').reset();
+        const errBox = document.getElementById('student_pw_error');
+        if (errBox) errBox.style.display = 'none';
     }
     function validateStudentPw(form) {
         const pw = form.querySelector('[name=new_password]').value;
         const cf = form.querySelector('[name=confirm_password]').value;
-        if (pw !== cf) { alert('Passwords do not match.'); return false; }
-        if (pw.length < 6) { alert('Password must be at least 6 characters.'); return false; }
+        const errBox = document.getElementById('student_pw_error');
+        const errText = document.getElementById('student_pw_error_text');
+        if (pw !== cf) {
+            if (errBox && errText) {
+                errText.textContent = 'Passwords do not match.';
+                errBox.style.display = 'block';
+            }
+            return false;
+        }
+        if (pw.length < 6) {
+            if (errBox && errText) {
+                errText.textContent = 'Password must be at least 6 characters.';
+                errBox.style.display = 'block';
+            }
+            return false;
+        }
+        if (errBox) errBox.style.display = 'none';
         return true;
     }
     function toggleStudentPassword(inputId, iconId) {
@@ -457,10 +618,29 @@
         }
     }
 
-    // Close modal on backdrop click
-    document.getElementById('studentPwModal').addEventListener('click', function(e) {
-        if (e.target === this) closeStudentPwModal();
-    });
+    // Section Modal handlers
+    function openStudentSectionModal() {
+        const modal = document.getElementById('studentSectionModal');
+        if (modal) modal.style.display = 'flex';
+    }
+    function closeStudentSectionModal() {
+        const modal = document.getElementById('studentSectionModal');
+        if (modal) modal.style.display = 'none';
+    }
+    const secModal = document.getElementById('studentSectionModal');
+    if (secModal) {
+        secModal.addEventListener('click', function(e) {
+            if (e.target === this) closeStudentSectionModal();
+        });
+    }
+
+    // Close password modal on backdrop click
+    const pwModal = document.getElementById('studentPwModal');
+    if (pwModal) {
+        pwModal.addEventListener('click', function(e) {
+            if (e.target === this) closeStudentPwModal();
+        });
+    }
 </script>
 
 

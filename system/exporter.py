@@ -1,6 +1,6 @@
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 import io
 
@@ -76,7 +76,9 @@ def export_proctor_report_pdf(proctor_hours, absence_report):
     
     data = [['Instructor Name', 'Total Exams', 'Total Hours']]
     for p in proctor_hours:
-        data.append([p.get('name', ''), str(p.get('exam_count', 0)), f"{p.get('total_hours', 0.0):.2f}"])
+        tot = float(p.get('total_hours') or 0.0)
+        tot_str = str(int(tot)) if tot.is_integer() else f"{tot:.1f}"
+        data.append([p.get('name', ''), str(p.get('exam_count', 0)), tot_str])
         
     if len(data) > 1:
         t = Table(data)
@@ -155,3 +157,148 @@ def export_collection_report_pdf(collection_data):
         
     doc.build(elements)
     return buffer.getvalue()
+
+def export_archive_pdf(archive):
+    """Returns bytes of a PDF for an archived exam schedule."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        leftMargin=24,
+        rightMargin=24,
+        topMargin=24,
+        bottomMargin=28
+    )
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'ArchiveTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=15,
+        leading=18,
+        textColor=colors.HexColor('#27361b')
+    )
+    subtitle_style = ParagraphStyle(
+        'ArchiveSubtitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=10,
+        leading=13,
+        textColor=colors.HexColor('#668054')
+    )
+    meta_style = ParagraphStyle(
+        'ArchiveMeta',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8.5,
+        leading=12,
+        textColor=colors.HexColor('#374151')
+    )
+    cell_style = ParagraphStyle(
+        'CellText',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor('#1f2937')
+    )
+    cell_bold = ParagraphStyle(
+        'CellBold',
+        parent=cell_style,
+        fontName='Helvetica-Bold'
+    )
+    cell_th = ParagraphStyle(
+        'CellTH',
+        parent=cell_style,
+        fontName='Helvetica-Bold',
+        textColor=colors.whitesmoke
+    )
+
+    elements = []
+
+    # Header
+    elements.append(Paragraph("CITY COLLEGE OF ANGELES", subtitle_style))
+    elements.append(Paragraph(f"Exam Archive: {archive.get('archive_title', 'Archived Schedule')}", title_style))
+    elements.append(Spacer(1, 6))
+
+    ay = archive.get('academic_year') or 'N/A'
+    sem = archive.get('exam_semester') or 'N/A'
+    term = archive.get('exam_term') or 'N/A'
+    total_exams = archive.get('total_exams', len(archive.get('exams', [])))
+    total_proctors = archive.get('total_proctors', 0)
+    total_sections = archive.get('total_sections', 0)
+    arch_at = str(archive.get('archived_at', ''))[:19]
+    arch_by = archive.get('archived_by_name') or 'System'
+
+    meta_line1 = f"<b>Academic Year:</b> {ay} &nbsp;&nbsp;|&nbsp;&nbsp; <b>Semester:</b> {sem} &nbsp;&nbsp;|&nbsp;&nbsp; <b>Term:</b> {term} &nbsp;&nbsp;|&nbsp;&nbsp; <b>Total Exams:</b> {total_exams} &nbsp;&nbsp;|&nbsp;&nbsp; <b>Proctors:</b> {total_proctors} &nbsp;&nbsp;|&nbsp;&nbsp; <b>Sections:</b> {total_sections}"
+    meta_line2 = f"<b>Archived On:</b> {arch_at} &nbsp;&nbsp;|&nbsp;&nbsp; <b>Archived By:</b> {arch_by}"
+    elements.append(Paragraph(meta_line1, meta_style))
+    elements.append(Paragraph(meta_line2, meta_style))
+    if archive.get('notes'):
+        elements.append(Paragraph(f"<b>Notes:</b> {archive.get('notes')}", meta_style))
+    elements.append(Spacer(1, 10))
+
+    headers = ['Date', 'Time', 'Code', 'Subject Name', 'Section', 'Room', 'Proctor', 'Institute']
+    data = [[Paragraph(f"<b>{h}</b>", cell_th) for h in headers]]
+
+    exams = archive.get('exams', [])
+    if exams:
+        for ex in exams:
+            d_str = ex.get('formatted_date') or (ex.get('exam_date_time', '')[:10] if ex.get('exam_date_time') else 'N/A')
+            t_start = ex.get('formatted_time', '')
+            t_end = ex.get('formatted_time_end', '')
+            t_str = f"{t_start} - {t_end}" if (t_start and t_end) else (t_start or t_end or 'TBA')
+            code = ex.get('subject_code') or '-'
+            subj = ex.get('subject_name') or '-'
+            sec = ex.get('section') or '-'
+            r_name = ex.get('room_name') or 'TBA'
+            bldg = f" ({ex.get('building')})" if ex.get('building') else ''
+            room_str = f"{r_name}{bldg}"
+            proc = ex.get('instructor_name') or 'Unassigned'
+            inst = ex.get('institute_code') or ex.get('institute_name') or '-'
+
+            data.append([
+                Paragraph(d_str, cell_style),
+                Paragraph(t_str, cell_style),
+                Paragraph(code, cell_bold),
+                Paragraph(subj, cell_style),
+                Paragraph(sec, cell_style),
+                Paragraph(room_str, cell_style),
+                Paragraph(proc, cell_style),
+                Paragraph(inst, cell_style)
+            ])
+
+        col_widths = [80, 85, 55, 175, 65, 100, 140, 70]
+        t = Table(data, colWidths=col_widths, repeatRows=1)
+
+        t_style = [
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#668054')),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+        ]
+        for i in range(1, len(data)):
+            if i % 2 == 0:
+                t_style.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor('#f9fafb')))
+        t.setStyle(TableStyle(t_style))
+        elements.append(t)
+    else:
+        elements.append(Paragraph("No scheduled exam records found in this archive snapshot.", styles['Normal']))
+
+    def _draw_page_footer(canvas, d):
+        canvas.saveState()
+        canvas.setFont('Helvetica', 8)
+        canvas.setFillColor(colors.HexColor('#6b7280'))
+        canvas.drawString(24, 14, "City College of Angeles • Examination Management System")
+        footer_text = f"Page {d.page}"
+        canvas.drawRightString(841.89 - 24, 14, footer_text)
+        canvas.restoreState()
+
+    doc.build(elements, onFirstPage=_draw_page_footer, onLaterPages=_draw_page_footer)
+    return buffer.getvalue()
+

@@ -8,10 +8,26 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        (function() {
+            try {
+                if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                    document.documentElement.classList.add('sidebar-collapsed');
+                }
+            } catch (e) {}
+        })();
+    </script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .sidebar-transition { transition: width 0.3s ease; }
         .content-transition { transition: margin-left 0.3s ease; }
+        html, body { overflow-x: hidden; }
+        #main-content { min-width: 0; max-width: 100%; }
+        html.sidebar-collapsed #sidebar { width: 4rem !important; }
+        html.sidebar-collapsed #main-content { margin-left: 4rem !important; }
+        html.sidebar-collapsed .nav-text { display: none !important; }
+        html.sidebar-collapsed .sidebar-header-container { justify-content: center !important; }
+        html.sidebar-collapsed .sidebar-header-container > div:first-child { display: none !important; }
     </style>
 
     <style>
@@ -46,68 +62,66 @@
 </head>
 <body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
 
-    <!-- Sidebar (Dynamic based on Role) -->
-    <aside id="sidebar" class="bg-white border-r border-gray-200 fixed h-full w-64 sidebar-transition z-20 flex flex-col">
-        <div class="h-16 flex items-center justify-between px-4 border-b border-gray-200">
-            <div class="flex items-center gap-3 overflow-hidden whitespace-nowrap">
-                <i class="fa-solid fa-graduation-cap text-2xl text-[#668054]"></i>
-                <span class="font-bold text-lg nav-text">CCA Exams</span>
-            </div>
-            <button onclick="toggleSidebar()" class="text-gray-500 hover:text-[#668054] focus:outline-none">
-                <i class="fa-solid fa-bars text-xl"></i>
-            </button>
-        </div>
-
-        <nav class="flex-1 overflow-y-auto py-4 space-y-1">
-            {% set role = session.get('role') %}
-            
-            {% if role == 'admin' or role == 'super_admin' %}
-                <a href="/dashboard" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
-                    <i class="fa-solid fa-chart-line w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Dashboard</span>
-                </a>
-                <a href="/schedule" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
-                    <i class="fa-solid fa-calendar-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Schedule</span>
-                </a>
-            {% elif role == 'proctor' %}
-                <a href="/proctor" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
-                    <i class="fa-solid fa-clipboard-list w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">My Exams</span>
-                </a>
-            {% elif role == 'student' %}
-                <a href="/timetable" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
-                    <i class="fa-solid fa-calendar-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">My Schedule</span>
-                </a>
-            {% elif role == 'secretary' %}
-                <a href="/secretary" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group">
-                    <i class="fa-solid fa-inbox w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Exam Collection</span>
-                </a>
-            {% endif %}
-
-            <a href="/notifications" class="flex items-center px-4 py-3 bg-green-50 text-[#668054] border-r-4 border-[#668054] group" title="Notifications">
-                <i class="fa-solid fa-bell w-6 text-center text-lg relative">
-                    {% if unread_count and unread_count > 0 %}
-                    <span class="absolute top-0 right-0 -mt-1 -mr-1 flex h-2 w-2" id="sidebar-bell-badge">
-                        <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                    </span>
-                    {% endif %}
-                </i>
-                <span class="ml-3 nav-text font-medium">Notifications</span>
-            </a>
-        </nav>
-
-        <div class="border-t border-gray-200 p-4">
-            <div class="flex items-center mb-4 overflow-hidden whitespace-nowrap">
-                <div class="w-8 h-8 rounded-full bg-[#829c74] text-white flex items-center justify-center font-bold">U</div>
-                <div class="ml-3 nav-text">
-                    <p class="text-sm font-medium text-gray-900">{{ role|title }}</p>
+    <!-- Sidebar -->
+    {% set active_page = 'notifications' %}
+    {% if session.get('role') == 'secretary' %}
+        {% include 'secretary_sidebar.html' %}
+    {% elif session.get('role') == 'admin' or session.get('is_super_admin') %}
+        {% include 'admin_sidebar.html' %}
+    {% elif session.get('role') == 'proctor' %}
+        {% include 'proctor_sidebar.html' %}
+    {% elif session.get('role') == 'student' %}
+        <aside id="sidebar" class="bg-white border-r border-gray-200 fixed h-full w-64 sidebar-transition z-20 flex flex-col">
+            <div class="h-16 flex items-center justify-between px-4 border-b border-gray-200 sidebar-header-container">
+                <div class="flex items-center gap-3 overflow-hidden whitespace-nowrap">
+                    <i class="fa-solid fa-graduation-cap text-2xl text-[#668054]"></i>
+                    <span class="font-bold text-lg nav-text">CCA Exams</span>
                 </div>
+                <button onclick="toggleSidebar()" class="text-gray-500 hover:text-[#668054] focus:outline-none">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
             </div>
-            <a href="/logout" class="flex items-center text-gray-600 hover:text-red-600 group w-full">
-                <i class="fa-solid fa-sign-out-alt w-6 text-center text-lg"></i><span class="ml-3 nav-text font-medium">Logout</span>
-            </a>
-        </div>
-    </aside>
+            <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+                <a href="/timetable" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-[#668054] group" title="My Schedule">
+                    <i class="fa-solid fa-calendar-alt w-6 text-center text-lg"></i>
+                    <span class="ml-3 nav-text font-medium">My Schedule</span>
+                </a>
+                <a href="/notifications" class="flex items-center px-4 py-3 bg-green-50 text-[#668054] border-r-4 border-[#668054] group" title="Notifications">
+                    <i class="fa-solid fa-bell w-6 text-center text-lg relative">
+                        {% if unread_count and unread_count > 0 %}
+                        <span class="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                        </span>
+                        {% endif %}
+                    </i>
+                    <span class="ml-3 nav-text font-medium flex-1">Notifications</span>
+                    {% if unread_count and unread_count > 0 %}
+                    <span class="nav-text ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ unread_count }}</span>
+                    {% endif %}
+                </a>
+            </nav>
+            <div class="border-t border-gray-200 p-4 sidebar-footer">
+                <div class="flex items-center mb-3 overflow-hidden whitespace-nowrap user-profile-row">
+                    <div class="w-8 h-8 rounded-full bg-[#829c74] text-white flex items-center justify-center font-bold uppercase flex-shrink-0">
+                        {{ session.get('full_name', 'S')[:1] }}
+                    </div>
+                    <div class="ml-3 nav-text">
+                        <p class="text-sm font-medium text-gray-900 truncate w-40" title="{{ session.get('full_name', 'Student User') }}">{{ session.get('full_name', 'Student User') }}</p>
+                        <p class="text-xs text-gray-500">Student</p>
+                    </div>
+                </div>
+                <a href="/logout" class="flex items-center text-gray-600 hover:text-red-600 group w-full" title="Logout">
+                    <i class="fa-solid fa-sign-out-alt w-6 text-center text-lg"></i>
+                    <span class="ml-3 nav-text font-medium">Logout</span>
+                </a>
+            </div>
+        </aside>
+    {% else %}
+        {% include 'admin_sidebar.html' %}
+    {% endif %}
 
-    <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
+    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen">
         <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
             <h1 class="text-xl font-semibold text-gray-800">Your Notifications</h1>
             {% if unread_count and unread_count > 0 %}
@@ -137,8 +151,8 @@
                             <i class="fa-solid fa-check-double mr-1"></i> Mark All as Read
                         </button>
                     </form>
-                    <form action="/notifications/clear_all" method="POST">
-                        <button type="submit" class="text-sm font-medium text-red-600 hover:text-red-800" onclick="return confirm('Are you sure you want to clear all notifications?');">
+                    <form id="clearNotifsForm" action="/notifications/clear_all" method="POST">
+                        <button type="button" class="text-sm font-medium text-red-600 hover:text-red-800 cursor-pointer" onclick="confirmClearAllNotifs()">
                             <i class="fa-solid fa-trash mr-1"></i> Clear All
                         </button>
                     </form>
@@ -189,50 +203,183 @@
         </div>
     </main>
 
+    {% if session.get('role') == 'secretary' %}
+    <!-- Secretary Change Password Modal -->
+    <div id="change-password-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="closeModal('change-password-modal')"></div>
+            <div class="relative bg-white rounded-xl shadow-xl w-full max-w-md z-10">
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900"><i class="fa-solid fa-key text-[#668054] mr-2"></i>Change Password</h3>
+                    <button onclick="closeModal('change-password-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                <form action="/secretary/change_password" method="POST" id="changePwForm" class="px-6 py-5 space-y-4" onsubmit="return validateChangePw()">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+                        <div class="relative w-full">
+                            <input type="password" name="current_password" id="cp_current" required
+                                class="block w-full border border-gray-300 rounded-lg py-2 pl-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#668054] focus:border-[#668054]"
+                                placeholder="Enter current password">
+                            <button type="button" onclick="togglePassword(this)" 
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
+                                title="Toggle password visibility">
+                                <i class="fa-regular fa-eye text-base"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">New Password <span class="text-gray-400 font-normal">(min. 6 characters)</span></label>
+                        <div class="relative w-full">
+                            <input type="password" name="new_password" id="cp_new" required minlength="6"
+                                class="block w-full border border-gray-300 rounded-lg py-2 pl-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#668054] focus:border-[#668054]"
+                                placeholder="Enter new password">
+                            <button type="button" onclick="togglePassword(this)" 
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
+                                title="Toggle password visibility">
+                                <i class="fa-regular fa-eye text-base"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+                        <div class="relative w-full">
+                            <input type="password" name="confirm_password" id="cp_confirm" required minlength="6"
+                                class="block w-full border border-gray-300 rounded-lg py-2 pl-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#668054] focus:border-[#668054]"
+                                placeholder="Re-enter new password">
+                            <button type="button" onclick="togglePassword(this)" 
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
+                                title="Toggle password visibility">
+                                <i class="fa-regular fa-eye text-base"></i>
+                            </button>
+                        </div>
+                        <p id="cp_match_err" class="hidden mt-1 text-xs text-red-600"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Passwords do not match.</p>
+                    </div>
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button type="button" onclick="closeModal('change-password-modal')"
+                                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                            Cancel
+                        </button>
+                        <button type="submit"
+                                class="px-4 py-2 text-sm font-medium text-white bg-[#668054] rounded-md hover:bg-[#829c74]">
+                            Update Password
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% elif session.get('role') == 'proctor' %}
+    <!-- Proctor Change Password Modal -->
+    <div id="change-password-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="closeModal('change-password-modal')"></div>
+            <div class="relative bg-white rounded-xl shadow-xl w-full max-w-md z-10">
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900"><i class="fa-solid fa-key text-[#668054] mr-2"></i>Change Password</h3>
+                    <button onclick="closeModal('change-password-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                <form action="/change_my_password" method="POST" id="changePwForm" class="px-6 py-5 space-y-4" onsubmit="return validatePwForm(this)">
+                    <input type="hidden" name="redirect_to" value="proctor_dashboard">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">New Password <span class="text-gray-400 font-normal">(min. 6 characters)</span></label>
+                        <div class="relative w-full">
+                            <input type="password" name="new_password" required minlength="6" 
+                                class="block w-full border border-gray-300 rounded-lg py-2 pl-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#668054] focus:border-[#668054]" 
+                                placeholder="Enter new password">
+                            <button type="button" onclick="togglePassword(this)" 
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
+                                title="Toggle password visibility">
+                                <i class="fa-regular fa-eye text-base"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+                        <div class="relative w-full">
+                            <input type="password" name="confirm_password" required minlength="6" 
+                                class="block w-full border border-gray-300 rounded-lg py-2 pl-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#668054] focus:border-[#668054]" 
+                                placeholder="Confirm new password">
+                            <button type="button" onclick="togglePassword(this)" 
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
+                                title="Toggle password visibility">
+                                <i class="fa-regular fa-eye text-base"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="pt-4 flex justify-end space-x-3">
+                        <button type="button" onclick="closeModal('change-password-modal')" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
+                        <button type="submit" class="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-[#668054] hover:bg-[#829c74]">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <script>
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const mainContent = document.getElementById('main-content');
-            sidebar.classList.toggle('w-64');
-            sidebar.classList.toggle('w-16');
-            mainContent.classList.toggle('ml-64');
-            mainContent.classList.toggle('ml-16');
-            
-            const headers = document.querySelectorAll('.sidebar-header-container');
-            headers.forEach(h => {
-                if (sidebar.classList.contains('w-16')) {
-                    h.classList.remove('justify-between');
-                    h.classList.add('justify-center');
-                } else {
-                    h.classList.add('justify-between');
-                    h.classList.remove('justify-center');
-                }
-            });
-            
-            const isCollapsed = sidebar.classList.contains('w-16');
-            localStorage.setItem('sidebarCollapsed', isCollapsed);
-            
-            sidebar.querySelectorAll('.nav-text').forEach(el => {
-                if (isCollapsed) el.classList.add('hidden');
-                else el.classList.remove('hidden');
-            });
+        function openModal(id) {
+            const m = document.getElementById(id);
+            if (m) m.classList.remove('hidden');
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            if (localStorage.getItem('sidebarCollapsed') === 'true') {
-                const sidebar = document.getElementById('sidebar');
-                const mainContent = document.getElementById('main-content');
-                sidebar.classList.remove('w-64');
-                sidebar.classList.add('w-16');
-                mainContent.classList.remove('ml-64');
-                mainContent.classList.add('ml-16');
-                sidebar.querySelectorAll('.nav-text').forEach(el => el.classList.add('hidden'));
-                document.querySelectorAll('.sidebar-header-container').forEach(h => {
-                    h.classList.remove('justify-between');
-                    h.classList.add('justify-center');
-                });
+        function closeModal(id) {
+            const m = document.getElementById(id);
+            if (m) m.classList.add('hidden');
+        }
+
+        function togglePassword(btn) {
+            const input = btn.parentElement.querySelector('input');
+            if (!input) return;
+            const icon = btn.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                if (icon) {
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
+                }
+            } else {
+                input.type = 'password';
+                if (icon) {
+                    icon.classList.remove('fa-eye-slash');
+                    icon.classList.add('fa-eye');
+                }
             }
-        });
+        }
+
+        function validateChangePw() {
+            const p1 = document.getElementById('cp_new').value;
+            const p2 = document.getElementById('cp_confirm').value;
+            const err = document.getElementById('cp_match_err');
+            if (p1 !== p2) {
+                if (err) err.classList.remove('hidden');
+                return false;
+            }
+            if (err) err.classList.add('hidden');
+            return true;
+        }
+
+        function validatePwForm(form) {
+            const p1 = form.querySelector('input[name="new_password"]').value;
+            const p2 = form.querySelector('input[name="confirm_password"]').value;
+            if (p1 !== p2) {
+                showAlertModal("Passwords do not match. Please verify both password entries.", "Password Mismatch", "warning");
+                return false;
+            }
+            return true;
+        }
+
+        function confirmClearAllNotifs() {
+            showConfirmModal({
+                title: 'Clear All Notifications',
+                message: 'Are you sure you want to clear <strong>all notifications</strong> from your inbox?',
+                sub: 'This action will permanently delete all your notifications and cannot be undone.',
+                type: 'danger',
+                confirmText: '<i class="fa-solid fa-trash mr-1"></i> Clear All',
+                onConfirm: function() {
+                    document.getElementById('clearNotifsForm').submit();
+                }
+            });
+        }
 
         function markRead(id) {
             const dot = document.getElementById('dot-' + id);
@@ -257,5 +404,6 @@
             }
         }
     </script>
+    {% include 'confirm_modal.html' %}
 </body>
 </html>

@@ -30,7 +30,8 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
     day_start = _to_time(settings.get('day_start'), dt_time(7, 0))
     day_end = _to_time(settings.get('day_end'), dt_time(20, 0))
     slot_interval = int(settings.get('slot_interval_min', 60))
-    max_consec_hrs = float(settings.get('max_proctor_hrs', 8.0))
+    max_consec_hrs = float(settings.get('max_consecutive_proctor_hrs') or settings.get('max_proctor_hrs') or 3.0)
+    max_daily_hrs = float(settings.get('max_daily_proctor_hrs') or 4.0)
     travel_buffer = int(settings.get('travel_buffer_min', 15))
 
     room_cal = defaultdict(list)
@@ -42,6 +43,10 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
     subject_locked_slot = {}
     inst_last_building = defaultdict(dict)
     inst_consecutive_hours = defaultdict(lambda: defaultdict(list))
+    inst_daily_hours = defaultdict(lambda: defaultdict(float))  # inst_id -> date -> total hours
+    inst_total_hours = defaultdict(float)                       # inst_id -> cumulative hours across exam period
+    inst_last_assigned = defaultdict(lambda: -1)                # inst_id -> assignment order for fair rotation
+    assign_counter = [0]
     
     inst_map = {i['id']: i for i in instructors}
     room_map = {r['id']: r for r in rooms}
@@ -62,6 +67,11 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
             inst_cal[i_id].append((dt, end))
             # Track consec hours roughly for existing
             inst_consecutive_hours[i_id][dt.date()].append((dt, end))
+            dur_hrs = dur / 60.0
+            inst_daily_hours[i_id][dt.date()] += dur_hrs
+            inst_total_hours[i_id] += dur_hrs
+            inst_last_assigned[i_id] = assign_counter[0]
+            assign_counter[0] += 1
             # Last building
             if r_id in room_map:
                 inst_last_building[i_id][dt.date()] = (end, room_map[r_id].get('building'))
@@ -210,7 +220,16 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
             
             candidate_datetimes.sort(key=sort_key_for_date)
 
-        for major_limit in [2, 3]:
+        dur_hrs = dur / 60.0
+        # Multi-tier relaxation: Try strict major limit and daily hour limit first.
+        # If no slot is found satisfying the tight constraints, relax slightly so no exam is left unscheduled.
+        limit_tiers = [
+            (2, max_daily_hrs),
+            (3, max_daily_hrs),
+            (3, max_daily_hrs + 2.0),
+            (3, max(max_daily_hrs + 4.0, 8.0))
+        ]
+        for major_limit, allowed_daily_hrs in limit_tiers:
             if placed_group: break
 
             for start_dt in candidate_datetimes:
@@ -256,10 +275,6 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                 for e in group_exams:
                     req_cap = 0
                     if e.get('institute_id'):
-                        # Get institute cap default? No access to db here, rely on e or rooms
-                        # Actually rule: "if exam has institute_id, room cap >= institute capacity_default"
-                        # But we only have rooms[] which has institute_id. Wait, we don't have institute capacities.
-                        # We can assume room cap is already set. Let's just find free rooms.
                         pass
                     free_rms = [r for r in rooms if room_free(r['id'], start_dt, end_dt)]
                     valid_rooms_per_exam.append(free_rms)
@@ -279,10 +294,23 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                 
                     # Rule 1: Max consec
                     if get_consecutive_hours(i['id'], ex_date, start_dt, end_dt) > max_consec_hrs: continue
+
+                    # Rule 3: Max daily proctor hours (strictly enforced per tier)
+                    if inst_daily_hours[i['id']][ex_date] + dur_hrs > allowed_daily_hrs + 1e-5: continue
                 
                     candidate_insts.append(i)
             
                 if len(candidate_insts) < n_needed: continue
+
+                # Fair workload balancing:
+                # 1. Fewest daily hours already scheduled today
+                # 2. Fewest cumulative hours across the entire examination period
+                # 3. Least recently assigned (or never assigned: -1)
+                candidate_insts.sort(key=lambda inst: (
+                    inst_daily_hours[inst['id']][ex_date],
+                    inst_total_hours[inst['id']],
+                    inst_last_assigned[inst['id']]
+                ))
 
                 # Assignment
                 assigned_this_slot = True
@@ -295,24 +323,22 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                     exam_room = None
                     exam_inst = None
                 
-                    # We should match PWD inst with PWD room
-                    for r in available_rooms:
-                        # Find suitable inst
-                        for i in available_insts:
+                    # Match suitable inst with suitable room
+                    # available_insts is already sorted by fairness (least loaded first)
+                    for i in available_insts:
+                        last_b = inst_last_building[i['id']].get(ex_date)
+                        for r in available_rooms:
                             if i.get('is_pwd') and not r.get('is_pwd_accessible'): continue
-                        
-                            # Travel buffer
-                            last_b = inst_last_building[i['id']].get(ex_date)
                             if last_b:
                                 last_end, b_name = last_b
                                 if b_name != r.get('building'):
                                     if (start_dt - last_end).total_seconds() < travel_buffer * 60:
                                         continue
-                        
                             exam_room = r
                             exam_inst = i
                             break
-                        if exam_room: break
+                        if exam_room and exam_inst:
+                            break
                 
                     if exam_room and exam_inst:
                         available_rooms.remove(exam_room)
@@ -346,6 +372,10 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                         room_cal[r['id']].append((start_dt, end_dt))
                         inst_cal[i['id']].append((start_dt, end_dt))
                         inst_consecutive_hours[i['id']][ex_date].append((start_dt, end_dt))
+                        inst_daily_hours[i['id']][ex_date] += dur_hrs
+                        inst_total_hours[i['id']] += dur_hrs
+                        inst_last_assigned[i['id']] = assign_counter[0]
+                        assign_counter[0] += 1
                         inst_last_building[i['id']][ex_date] = (end_dt, r.get('building'))
                         if section:
                             sec_key = section.strip()

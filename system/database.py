@@ -48,19 +48,66 @@ def get_system_settings():
     finally:
         db.close()
 
-def save_system_settings(day_start, day_end, slot_interval_min, max_proctor_hrs, travel_buffer_min, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from, smtp_use_tls, major_duration_hrs=2.0, minor_duration_hrs=1.0):
+def save_system_settings(day_start, day_end, slot_interval_min, max_proctor_hrs, travel_buffer_min, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from, smtp_use_tls, major_duration_hrs=2.0, minor_duration_hrs=1.0, max_daily_proctor_hrs=4.0):
     db = open_db()
     if not db:
         return
     try:
         cursor = db.cursor()
         cursor.execute("""
-            INSERT INTO system_settings (id, day_start, day_end, slot_interval_min, max_consecutive_proctor_hrs, travel_buffer_min, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from, smtp_use_tls, major_duration_hrs, minor_duration_hrs)
-            VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO system_settings (id, day_start, day_end, slot_interval_min, max_consecutive_proctor_hrs, travel_buffer_min, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from, smtp_use_tls, major_duration_hrs, minor_duration_hrs, max_daily_proctor_hrs)
+            VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE
-            day_start=VALUES(day_start), day_end=VALUES(day_end), slot_interval_min=VALUES(slot_interval_min), max_consecutive_proctor_hrs=VALUES(max_consecutive_proctor_hrs), travel_buffer_min=VALUES(travel_buffer_min), smtp_host=VALUES(smtp_host), smtp_port=VALUES(smtp_port), smtp_user=VALUES(smtp_user), smtp_password=VALUES(smtp_password), smtp_from=VALUES(smtp_from), smtp_use_tls=VALUES(smtp_use_tls), major_duration_hrs=VALUES(major_duration_hrs), minor_duration_hrs=VALUES(minor_duration_hrs)
-        """, (day_start, day_end, slot_interval_min, max_proctor_hrs, travel_buffer_min, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from, smtp_use_tls, major_duration_hrs, minor_duration_hrs))
+            day_start=VALUES(day_start), day_end=VALUES(day_end), slot_interval_min=VALUES(slot_interval_min), max_consecutive_proctor_hrs=VALUES(max_consecutive_proctor_hrs), travel_buffer_min=VALUES(travel_buffer_min), smtp_host=VALUES(smtp_host), smtp_port=VALUES(smtp_port), smtp_user=VALUES(smtp_user), smtp_password=VALUES(smtp_password), smtp_from=VALUES(smtp_from), smtp_use_tls=VALUES(smtp_use_tls), major_duration_hrs=VALUES(major_duration_hrs), minor_duration_hrs=VALUES(minor_duration_hrs), max_daily_proctor_hrs=VALUES(max_daily_proctor_hrs)
+        """, (day_start, day_end, slot_interval_min, max_proctor_hrs, travel_buffer_min, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from, smtp_use_tls, major_duration_hrs, minor_duration_hrs, max_daily_proctor_hrs))
         db.commit()
+    finally:
+        db.close()
+
+def is_schedule_published():
+    s = get_system_settings()
+    return bool(s.get('schedule_published', 0))
+
+def publish_schedule(user_id=None):
+    """
+    Publishes the current timetable, making it visible to students, proctors, and secretaries,
+    and dispatches broadcast notifications.
+    """
+    db = open_db()
+    if not db: return False, "Database connection failed"
+    try:
+        cursor = db.cursor()
+        cursor.execute("UPDATE system_settings SET schedule_published = 1, schedule_published_at = NOW() WHERE id = 1")
+        
+        # Notify all active students and proctors
+        cursor.execute("""
+            INSERT INTO notifications (user_id, title, message, created_at, is_read)
+            SELECT u.id, 'Exam Timetable Published',
+                   'The official exam timetable has been approved and published. Check your schedule now in your portal.',
+                   NOW(), 0
+            FROM users u
+            WHERE u.role IN ('student', 'proctor') AND u.is_active = 1
+        """)
+        db.commit()
+        return True, "Timetable has been officially published and distributed."
+    except Exception as e:
+        return False, str(e)
+    finally:
+        db.close()
+
+def unpublish_schedule(user_id=None):
+    """
+    Reverts the timetable back to Draft mode, hiding it from non-admin portals.
+    """
+    db = open_db()
+    if not db: return False, "Database connection failed"
+    try:
+        cursor = db.cursor()
+        cursor.execute("UPDATE system_settings SET schedule_published = 0 WHERE id = 1")
+        db.commit()
+        return True, "Timetable has been reverted to Draft mode."
+    except Exception as e:
+        return False, str(e)
     finally:
         db.close()
 
@@ -299,7 +346,13 @@ def get_all_users():
     if not db: return []
     try:
         cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT id, full_name, email, role, section, institute_id, is_super_admin FROM users ORDER BY full_name")
+        cursor.execute("""
+            SELECT u.id, u.full_name, u.full_name as name, u.email, u.role, u.section, u.institute_id, u.is_super_admin,
+                   inst.name as institute_name
+            FROM users u
+            LEFT JOIN institutes inst ON u.institute_id = inst.id
+            ORDER BY u.full_name
+        """)
         return cursor.fetchall()
     finally:
         db.close()
@@ -309,7 +362,13 @@ def get_user_by_id(id):
     if not db: return {}
     try:
         cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT id, full_name, email, role, section, institute_id, is_super_admin FROM users WHERE id=%s", (id,))
+        cursor.execute("""
+            SELECT u.id, u.full_name, u.full_name as name, u.email, u.role, u.section, u.institute_id, u.is_super_admin,
+                   inst.name as institute_name
+            FROM users u
+            LEFT JOIN institutes inst ON u.institute_id = inst.id
+            WHERE u.id = %s
+        """, (id,))
         return cursor.fetchone() or {}
     finally:
         db.close()
@@ -372,10 +431,14 @@ def get_pending_users():
     if not db: return []
     try:
         cursor = db.cursor(dictionary=True)
-        cursor.execute(
-            "SELECT id, full_name, email, section, institute_id, created_at "
-            "FROM users WHERE role IN ('student', 'proctor') AND is_active=0 ORDER BY created_at DESC"
-        )
+        cursor.execute("""
+            SELECT u.id, u.full_name, u.full_name as name, u.email, u.section, u.institute_id, u.created_at,
+                   inst.name as institute_name
+            FROM users u
+            LEFT JOIN institutes inst ON u.institute_id = inst.id
+            WHERE u.role IN ('student', 'proctor') AND u.is_active=0
+            ORDER BY u.created_at DESC
+        """)
         return cursor.fetchall()
     finally:
         db.close()
@@ -565,7 +628,12 @@ def get_all_instructors():
             LEFT JOIN institutes inst ON i.institute_id = inst.id
             ORDER BY i.name ASC
         """)
-        return cursor.fetchall()
+        rows = cursor.fetchall()
+        for r in rows:
+            if 'total_hours' in r and r['total_hours'] is not None:
+                tot = float(r['total_hours'])
+                r['total_hours'] = int(tot) if tot.is_integer() else round(tot, 1)
+        return rows
     finally:
         db.close()
 
@@ -727,7 +795,7 @@ def bulk_import_instructors(rows):
 
 def get_proctor_total_hours(instructor_id, date_from=None, date_to=None):
     db = open_db()
-    if not db: return 0.0
+    if not db: return 0
     try:
         cursor = db.cursor(dictionary=True)
         query = "SELECT SUM(duration_minutes) as tot FROM exams WHERE instructor_id=%s AND status='Scheduled'"
@@ -737,7 +805,8 @@ def get_proctor_total_hours(instructor_id, date_from=None, date_to=None):
             params.extend([date_from, date_to])
         cursor.execute(query, tuple(params))
         res = cursor.fetchone()
-        return float(res['tot'] or 0) / 60.0
+        tot = float(res['tot'] or 0) / 60.0
+        return int(tot) if tot.is_integer() else round(tot, 1)
     finally:
         db.close()
 
@@ -752,7 +821,11 @@ def get_all_proctor_hours_summary():
             LEFT JOIN exams e ON e.instructor_id = i.id AND e.status='Scheduled'
             GROUP BY i.id, i.name
         """)
-        return cursor.fetchall()
+        rows = cursor.fetchall()
+        for r in rows:
+            tot = float(r.get('total_hours') or 0.0)
+            r['total_hours'] = int(tot) if tot.is_integer() else round(tot, 1)
+        return rows
     finally:
         db.close()
 
@@ -1107,7 +1180,11 @@ def reset_schedule():
                         )
                         notified_students.add(student['id'])
 
-        # ── Clear the schedule ────────────────────────────────────────────
+        # ── Clear the schedule & associated schedule records ──────────────
+        cursor.execute("DELETE FROM exam_collection")
+        cursor.execute("DELETE FROM relievers")
+        cursor.execute("DELETE FROM proctor_absence")
+        cursor.execute("UPDATE system_settings SET schedule_published = 0 WHERE id = 1")
         cursor.execute(
             "UPDATE exams SET room_id=NULL, instructor_id=NULL, instructor_name=NULL, "
             "exam_date_time=NULL, status='Pending'"
@@ -1123,6 +1200,9 @@ def unschedule_exams(exam_ids):
     try:
         cursor = db.cursor()
         format_strings = ','.join(['%s'] * len(exam_ids))
+        cursor.execute(f"DELETE FROM exam_collection WHERE exam_id IN ({format_strings})", tuple(exam_ids))
+        cursor.execute(f"DELETE FROM relievers WHERE exam_id IN ({format_strings})", tuple(exam_ids))
+        cursor.execute(f"DELETE FROM proctor_absence WHERE exam_id IN ({format_strings})", tuple(exam_ids))
         cursor.execute(
             f"UPDATE exams SET room_id=NULL, instructor_id=NULL, instructor_name=NULL, "
             f"exam_date_time=NULL, status='Pending' WHERE id IN ({format_strings})",
@@ -1748,28 +1828,41 @@ def get_collection_stats(institute_id=None):
     try:
         cursor = db.cursor(dictionary=True)
         if institute_id:
-            cursor.execute("SELECT COUNT(*) as c FROM exams WHERE status='Scheduled' AND institute_id=%s", (institute_id,))
-            total = cursor.fetchone()['c']
+            cursor.execute("SELECT COUNT(*) as c FROM exams WHERE status='Scheduled' AND exam_date_time IS NOT NULL AND institute_id=%s", (institute_id,))
+            total = cursor.fetchone()['c'] or 0
+            if total == 0:
+                return {'total': 0, 'collected': 0, 'returned': 0, 'pending_collection': 0}
             cursor.execute("""
                 SELECT COUNT(*) as c FROM exam_collection ec
                 JOIN exams e ON ec.exam_id = e.id
-                WHERE ec.collected_at IS NOT NULL AND e.institute_id=%s
+                WHERE ec.collected_at IS NOT NULL AND e.status='Scheduled' AND e.exam_date_time IS NOT NULL AND e.institute_id=%s
             """, (institute_id,))
-            collected = cursor.fetchone()['c']
+            collected = cursor.fetchone()['c'] or 0
             cursor.execute("""
                 SELECT COUNT(*) as c FROM exam_collection ec
                 JOIN exams e ON ec.exam_id = e.id
-                WHERE ec.returned_at IS NOT NULL AND e.institute_id=%s
+                WHERE ec.returned_at IS NOT NULL AND e.status='Scheduled' AND e.exam_date_time IS NOT NULL AND e.institute_id=%s
             """, (institute_id,))
-            returned = cursor.fetchone()['c']
+            returned = cursor.fetchone()['c'] or 0
         else:
-            cursor.execute("SELECT COUNT(*) as c FROM exams WHERE status='Scheduled'")
-            total = cursor.fetchone()['c']
-            cursor.execute("SELECT COUNT(*) as c FROM exam_collection WHERE collected_at IS NOT NULL")
-            collected = cursor.fetchone()['c']
-            cursor.execute("SELECT COUNT(*) as c FROM exam_collection WHERE returned_at IS NOT NULL")
-            returned = cursor.fetchone()['c']
-        return {'total': total, 'collected': collected, 'returned': returned, 'pending_collection': total - collected}
+            cursor.execute("SELECT COUNT(*) as c FROM exams WHERE status='Scheduled' AND exam_date_time IS NOT NULL")
+            total = cursor.fetchone()['c'] or 0
+            if total == 0:
+                return {'total': 0, 'collected': 0, 'returned': 0, 'pending_collection': 0}
+            cursor.execute("""
+                SELECT COUNT(*) as c FROM exam_collection ec
+                JOIN exams e ON ec.exam_id = e.id
+                WHERE ec.collected_at IS NOT NULL AND e.status='Scheduled' AND e.exam_date_time IS NOT NULL
+            """)
+            collected = cursor.fetchone()['c'] or 0
+            cursor.execute("""
+                SELECT COUNT(*) as c FROM exam_collection ec
+                JOIN exams e ON ec.exam_id = e.id
+                WHERE ec.returned_at IS NOT NULL AND e.status='Scheduled' AND e.exam_date_time IS NOT NULL
+            """)
+            returned = cursor.fetchone()['c'] or 0
+        pending = max(0, total - collected)
+        return {'total': total, 'collected': collected, 'returned': returned, 'pending_collection': pending}
     finally:
         db.close()
 
@@ -2379,3 +2472,665 @@ def get_full_auto_schedule(exam_id, duration_minutes, sync_all=False):
         return None
     finally:
         db_conn.close()
+
+def get_resource_schedule_details(resource_type, resource_id):
+    """
+    Returns complete availability & scheduled slots for an instructor or room.
+    resource_type: 'instructor' or 'room'
+    resource_id: int
+    """
+    from datetime import datetime as _dt, date as _date, time as _time, timedelta as _td
+    from collections import defaultdict
+    db = open_db()
+    if not db: return None
+
+    try:
+        cursor = db.cursor(dictionary=True)
+
+        # 1. Fetch resource metadata
+        if resource_type == 'instructor':
+            cursor.execute("""
+                SELECT i.*, inst.name as institute_name
+                FROM instructors i
+                LEFT JOIN institutes inst ON i.institute_id = inst.id
+                WHERE i.id = %s
+            """, (resource_id,))
+            resource = cursor.fetchone()
+            if not resource: return None
+            resource_name = resource['name']
+        elif resource_type == 'room':
+            cursor.execute("""
+                SELECT r.*, inst.name as institute_name
+                FROM rooms r
+                LEFT JOIN institutes inst ON r.institute_id = inst.id
+                WHERE r.id = %s
+            """, (resource_id,))
+            resource = cursor.fetchone()
+            if not resource: return None
+            resource_name = resource['room_name']
+        else:
+            return None
+
+        # 2. System settings & exam period
+        settings = get_system_settings() or {}
+        period_start, period_end = get_exam_period()
+
+        def _parse_time(val, default):
+            if isinstance(val, _td):
+                return (_dt.min + val).time()
+            if isinstance(val, _time):
+                return val
+            if isinstance(val, str):
+                parts = val.split(':')
+                if len(parts) >= 2:
+                    return _time(int(parts[0]), int(parts[1]))
+            return default
+
+        day_start = _parse_time(settings.get('day_start'), _time(7, 0))
+        day_end   = _parse_time(settings.get('day_end'), _time(20, 0))
+        max_daily_hrs = float(settings.get('max_daily_proctor_hrs') or 4.0)
+
+        # 3. Scheduled exams for this resource
+        if resource_type == 'instructor':
+            cursor.execute("""
+                SELECT e.id, e.subject_name, e.section, e.exam_date_time, e.duration_minutes, e.subject_type,
+                       r.room_name as other_name, r.building as other_building
+                FROM exams e
+                LEFT JOIN rooms r ON e.room_id = r.id
+                WHERE e.instructor_id = %s AND e.status = 'Scheduled' AND e.exam_date_time IS NOT NULL
+                ORDER BY e.exam_date_time
+            """, (resource_id,))
+        else:
+            cursor.execute("""
+                SELECT e.id, e.subject_name, e.section, e.exam_date_time, e.duration_minutes, e.subject_type,
+                       i.name as other_name, i.building as other_building
+                FROM exams e
+                LEFT JOIN instructors i ON e.instructor_id = i.id
+                WHERE e.room_id = %s AND e.status = 'Scheduled' AND e.exam_date_time IS NOT NULL
+                ORDER BY e.exam_date_time
+            """, (resource_id,))
+
+        raw_exams = cursor.fetchall()
+
+        # Proctor working availability (if instructor)
+        avail_by_date = {}
+        if resource_type == 'instructor':
+            cursor.execute("""
+                SELECT available_date, start_time, end_time
+                FROM proctor_availability
+                WHERE instructor_id = %s
+            """, (resource_id,))
+            for r in cursor.fetchall():
+                d = r['available_date']
+                if not isinstance(d, _date):
+                    d = _date.fromisoformat(str(d))
+                st = _parse_time(r['start_time'], day_start)
+                et = _parse_time(r['end_time'], day_end)
+                avail_by_date[d] = {'start': st, 'end': et}
+
+        # Determine target dates
+        target_dates = []
+        if period_start and period_end:
+            cur_d = period_start
+            while cur_d <= period_end:
+                if cur_d.weekday() != 6:  # Skip Sunday
+                    target_dates.append(cur_d)
+                cur_d += _td(days=1)
+        
+        # If no period, or exams fall outside, include exam dates
+        exam_dates_set = set()
+        for e in raw_exams:
+            edt = e['exam_date_time']
+            if isinstance(edt, str):
+                try: edt = _dt.strptime(edt, '%Y-%m-%d %H:%M:%S')
+                except ValueError: edt = _dt.strptime(edt, '%Y-%m-%dT%H:%M')
+            exam_dates_set.add(edt.date())
+
+        for ed in sorted(exam_dates_set):
+            if ed not in target_dates:
+                target_dates.append(ed)
+        target_dates.sort()
+
+        if not target_dates:
+            today = _date.today()
+            target_dates = [today + _td(days=i) for i in range(5) if (today + _td(days=i)).weekday() != 6]
+
+        # Group exams by date
+        exams_by_date = defaultdict(list)
+        for e in raw_exams:
+            edt = e['exam_date_time']
+            if isinstance(edt, str):
+                try: edt = _dt.strptime(edt, '%Y-%m-%d %H:%M:%S')
+                except ValueError: edt = _dt.strptime(edt, '%Y-%m-%dT%H:%M')
+            dur = e['duration_minutes'] or 60
+            end_dt = edt + _td(minutes=dur)
+            exams_by_date[edt.date()].append({
+                'id': e['id'],
+                'subject_name': e['subject_name'] or 'Unknown Subject',
+                'section': e['section'] or '',
+                'subject_type': e.get('subject_type', 'Major'),
+                'other_name': e.get('other_name') or 'Not Assigned',
+                'start_dt': edt,
+                'end_dt': end_dt,
+                'start_time': edt.strftime('%I:%M %p'),
+                'end_time': end_dt.strftime('%I:%M %p'),
+                'duration_minutes': dur,
+                'duration_hours': round(dur / 60.0, 1)
+            })
+
+        # Calculate free and busy slots per day
+        days_result = []
+        total_busy_hours = 0.0
+
+        for d in target_dates:
+            day_exams = sorted(exams_by_date[d], key=lambda x: x['start_dt'])
+            
+            # Determine daily work window
+            if resource_type == 'instructor' and d in avail_by_date:
+                w_start = avail_by_date[d]['start']
+                w_end   = avail_by_date[d]['end']
+                custom_avail = True
+            else:
+                w_start = day_start
+                w_end   = day_end
+                custom_avail = False
+
+            w_start_dt = _dt.combine(d, w_start)
+            w_end_dt   = _dt.combine(d, w_end)
+
+            busy_slots = []
+            day_busy_mins = 0
+
+            for ex in day_exams:
+                day_busy_mins += ex['duration_minutes']
+                busy_slots.append({
+                    'exam_id': ex['id'],
+                    'subject_name': ex['subject_name'],
+                    'section': ex['section'],
+                    'subject_type': ex['subject_type'],
+                    'other_name': ex['other_name'],
+                    'start_time': ex['start_time'],
+                    'end_time': ex['end_time'],
+                    'duration_hours': ex['duration_hours']
+                })
+
+            # Calculate free intervals within work window
+            free_slots = []
+            curr_ptr = w_start_dt
+
+            for ex in day_exams:
+                if curr_ptr < ex['start_dt']:
+                    free_mins = int((ex['start_dt'] - curr_ptr).total_seconds() / 60)
+                    if free_mins >= 15:
+                        free_slots.append({
+                            'start_time': curr_ptr.strftime('%I:%M %p'),
+                            'end_time': ex['start_dt'].strftime('%I:%M %p'),
+                            'duration_hours': round(free_mins / 60.0, 1),
+                            'duration_minutes': free_mins
+                        })
+                if ex['end_dt'] > curr_ptr:
+                    curr_ptr = ex['end_dt']
+
+            if curr_ptr < w_end_dt:
+                free_mins = int((w_end_dt - curr_ptr).total_seconds() / 60)
+                if free_mins >= 15:
+                    free_slots.append({
+                        'start_time': curr_ptr.strftime('%I:%M %p'),
+                        'end_time': w_end_dt.strftime('%I:%M %p'),
+                        'duration_hours': round(free_mins / 60.0, 1),
+                        'duration_minutes': free_mins
+                    })
+
+            day_busy_hours = round(day_busy_mins / 60.0, 1)
+            total_busy_hours += day_busy_hours
+
+            days_result.append({
+                'date': d.strftime('%Y-%m-%d'),
+                'date_label': d.strftime('%a, %b %d, %Y'),
+                'day_name': d.strftime('%A'),
+                'is_completely_free': len(busy_slots) == 0,
+                'custom_avail': custom_avail,
+                'work_window': f"{w_start.strftime('%I:%M %p')} - {w_end.strftime('%I:%M %p')}",
+                'busy_hours': day_busy_hours,
+                'max_daily_hours': max_daily_hrs if resource_type == 'instructor' else None,
+                'busy_slots': busy_slots,
+                'free_slots': free_slots
+            })
+
+        return {
+            'success': True,
+            'resource_type': resource_type,
+            'resource_id': resource_id,
+            'resource_name': resource_name,
+            'info': resource,
+            'total_exams': len(raw_exams),
+            'total_busy_hours': round(total_busy_hours, 1),
+            'days': days_result
+        }
+    finally:
+        db.close()
+
+def get_unresolved_absences(institute_id=None):
+    """
+    Returns pending/unresolved proctor absences for a given institute (or all if None).
+    """
+    db = open_db()
+    if not db: return []
+    try:
+        cursor = db.cursor(dictionary=True)
+        if institute_id:
+            cursor.execute("""
+                SELECT p.*, i.name as instructor_name, e.subject_name, e.section, e.exam_date_time, e.institute_id,
+                       e.duration_minutes, e.room_id, r.room_name, u.full_name as reported_by_name,
+                       (SELECT COUNT(*) FROM relievers rel WHERE rel.exam_id = p.exam_id) as reliever_count
+                FROM proctor_absence p
+                LEFT JOIN instructors i ON p.instructor_id = i.id
+                LEFT JOIN exams e ON p.exam_id = e.id
+                LEFT JOIN rooms r ON e.room_id = r.id
+                LEFT JOIN users u ON p.reported_by = u.id
+                WHERE e.institute_id = %s
+                HAVING reliever_count = 0
+                ORDER BY p.reported_at DESC
+            """, (institute_id,))
+        else:
+            cursor.execute("""
+                SELECT p.*, i.name as instructor_name, e.subject_name, e.section, e.exam_date_time, e.institute_id,
+                       e.duration_minutes, e.room_id, r.room_name, u.full_name as reported_by_name,
+                       (SELECT COUNT(*) FROM relievers rel WHERE rel.exam_id = p.exam_id) as reliever_count
+                FROM proctor_absence p
+                LEFT JOIN instructors i ON p.instructor_id = i.id
+                LEFT JOIN exams e ON p.exam_id = e.id
+                LEFT JOIN rooms r ON e.room_id = r.id
+                LEFT JOIN users u ON p.reported_by = u.id
+                HAVING reliever_count = 0
+                ORDER BY p.reported_at DESC
+            """)
+        return cursor.fetchall()
+    finally:
+        db.close()
+
+def get_substitute_candidates(exam_id, institute_id=None):
+    """
+    Returns available proctors (strictly filtered to institute if provided) and available rooms
+    for an exam's specific time slot.
+    """
+    from datetime import datetime as _dt, timedelta as _td
+    db = open_db()
+    if not db: return None
+
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT e.*, r.room_name, r.building as room_building, i.name as current_instructor_name,
+                   inst.name as institute_name
+            FROM exams e
+            LEFT JOIN rooms r ON e.room_id = r.id
+            LEFT JOIN instructors i ON e.instructor_id = i.id
+            LEFT JOIN institutes inst ON e.institute_id = inst.id
+            WHERE e.id = %s
+        """, (exam_id,))
+        exam = cursor.fetchone()
+        if not exam: return None
+
+        exam_dt = exam.get('exam_date_time')
+        dur = exam.get('duration_minutes') or 60
+        if isinstance(exam_dt, str):
+            try: exam_dt = _dt.strptime(exam_dt, '%Y-%m-%d %H:%M:%S')
+            except ValueError: exam_dt = _dt.strptime(exam_dt, '%Y-%m-%dT%H:%M')
+        
+        exam_end = exam_dt + _td(minutes=dur) if exam_dt else None
+
+        filter_inst = institute_id or exam.get('institute_id')
+        
+        if filter_inst:
+            cursor.execute("""
+                SELECT i.*, inst.name as institute_name
+                FROM instructors i
+                LEFT JOIN institutes inst ON i.institute_id = inst.id
+                WHERE i.status = 'Active' AND (i.institute_id = %s OR i.institute_id IS NULL)
+                ORDER BY i.name
+            """, (filter_inst,))
+        else:
+            cursor.execute("""
+                SELECT i.*, inst.name as institute_name
+                FROM instructors i
+                LEFT JOIN institutes inst ON i.institute_id = inst.id
+                WHERE i.status = 'Active'
+                ORDER BY i.name
+            """)
+        instructors = cursor.fetchall()
+
+        busy_instructor_ids = {}
+        busy_room_ids = {}
+        if exam_dt and exam_end:
+            cursor.execute("""
+                SELECT id, instructor_id, room_id, exam_date_time, duration_minutes, subject_name, section
+                FROM exams
+                WHERE status = 'Scheduled' AND exam_date_time IS NOT NULL AND id != %s
+            """, (exam_id,))
+            for other in cursor.fetchall():
+                o_start = other['exam_date_time']
+                if isinstance(o_start, str):
+                    try: o_start = _dt.strptime(o_start, '%Y-%m-%d %H:%M:%S')
+                    except ValueError: o_start = _dt.strptime(o_start, '%Y-%m-%dT%H:%M')
+                o_end = o_start + _td(minutes=other['duration_minutes'] or 60)
+                if exam_dt < o_end and o_start < exam_end:
+                    if other['instructor_id']:
+                        busy_instructor_ids[other['instructor_id']] = f"Busy with {other['subject_name']} ({other['section']})"
+                    if other['room_id']:
+                        busy_room_ids[other['room_id']] = f"Occupied by {other['subject_name']} ({other['section']})"
+
+        proctor_avail = get_proctor_availability()
+
+        candidate_instructors = []
+        for i in instructors:
+            if i['id'] == exam.get('instructor_id'):
+                continue
+            
+            is_free = True
+            conflict_reason = None
+
+            if i['id'] in busy_instructor_ids:
+                is_free = False
+                conflict_reason = busy_instructor_ids[i['id']]
+
+            if is_free and exam.get('subject_name'):
+                subs = [s.strip().lower() for s in (i.get('subjects_taught') or '').split(',') if s.strip()]
+                if exam['subject_name'].strip().lower() in subs:
+                    is_free = False
+                    conflict_reason = "Teaches this course (Integrity Rule)"
+
+            if is_free and exam_dt and proctor_avail.get(i['id']):
+                avail_entries = proctor_avail[i['id']]
+                has_entry = False
+                time_match = False
+                for ent in avail_entries:
+                    if ent['date'] == exam_dt.date():
+                        has_entry = True
+                        if exam_dt.time() >= ent['start_time'] and exam_end.time() <= ent['end_time']:
+                            time_match = True
+                            break
+                if has_entry and not time_match:
+                    is_free = False
+                    conflict_reason = "Outside declared available shift"
+
+            candidate_instructors.append({
+                'id': i['id'],
+                'name': i['name'],
+                'institute_name': i.get('institute_name') or 'General',
+                'is_free': is_free,
+                'conflict_reason': conflict_reason
+            })
+
+        candidate_instructors.sort(key=lambda x: (0 if x['is_free'] else 1, x['name']))
+
+        cursor.execute("""
+            SELECT r.*, inst.name as institute_name
+            FROM rooms r
+            LEFT JOIN institutes inst ON r.institute_id = inst.id
+            ORDER BY r.room_name
+        """)
+        rooms = cursor.fetchall()
+        candidate_rooms = []
+        for r in rooms:
+            is_free = True
+            conflict_reason = None
+            if r['id'] in busy_room_ids:
+                is_free = False
+                conflict_reason = busy_room_ids[r['id']]
+            candidate_rooms.append({
+                'id': r['id'],
+                'room_name': r['room_name'],
+                'capacity': r['capacity'],
+                'building': r.get('building') or 'Main Campus',
+                'is_current': (r['id'] == exam.get('room_id')),
+                'is_free': is_free,
+                'conflict_reason': conflict_reason
+            })
+        candidate_rooms.sort(key=lambda x: (0 if x['is_current'] else (1 if x['is_free'] else 2), x['room_name']))
+
+        # Format exam datetime for display
+        dt_display = exam_dt.strftime('%b %d, %Y %I:%M %p') if exam_dt else 'Not scheduled'
+
+        return {
+            'success': True,
+            'exam': {
+                'id': exam['id'],
+                'subject_name': exam['subject_name'],
+                'section': exam['section'],
+                'datetime_str': dt_display,
+                'duration_minutes': dur,
+                'duration_hours': round(dur / 60.0, 1),
+                'room_id': exam.get('room_id'),
+                'room_name': exam.get('room_name') or '—',
+                'instructor_id': exam.get('instructor_id'),
+                'instructor_name': exam.get('current_instructor_name') or '—',
+                'institute_name': exam.get('institute_name') or 'General Department'
+            },
+            'instructors': candidate_instructors,
+            'rooms': candidate_rooms,
+            'institute_name': exam.get('institute_name') or 'Department'
+        }
+    finally:
+        db.close()
+
+def reassign_exam_proctor_room(exam_id, new_instructor_id, new_room_id=None, reason="", reassigned_by=None):
+    """
+    Substitutes an exam proctor (and optionally room), inserts into relievers audit table,
+    and dispatches notifications.
+    """
+    db = open_db()
+    if not db: return False, "Database connection failed"
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM exams WHERE id = %s", (exam_id,))
+        exam = cursor.fetchone()
+        if not exam: return False, "Exam not found"
+
+        old_instructor_id = exam.get('instructor_id')
+        old_room_id = exam.get('room_id')
+
+        cursor.execute("SELECT name FROM instructors WHERE id = %s", (new_instructor_id,))
+        inst = cursor.fetchone()
+        if not inst: return False, "Selected substitute instructor not found"
+        new_inst_name = inst['name']
+
+        # 1. Insert into relievers audit table
+        cursor.execute("""
+            INSERT INTO relievers (exam_id, instructor_id, reason)
+            VALUES (%s, %s, %s)
+        """, (exam_id, new_instructor_id, reason))
+
+        # 2. Update exams table
+        if new_room_id and str(new_room_id) != str(old_room_id or ''):
+            cursor.execute("""
+                UPDATE exams
+                SET instructor_id = %s, instructor_name = %s, room_id = %s
+                WHERE id = %s
+            """, (new_instructor_id, new_inst_name, new_room_id, exam_id))
+        else:
+            cursor.execute("""
+                UPDATE exams
+                SET instructor_id = %s, instructor_name = %s
+                WHERE id = %s
+            """, (new_instructor_id, new_inst_name, exam_id))
+
+        # 3. Notification for new substitute proctor
+        cursor.execute("SELECT id FROM users WHERE instructor_id = %s", (new_instructor_id,))
+        reliever_user = cursor.fetchone()
+        if reliever_user:
+            notif_title = "Assigned as Proctor Reliever"
+            notif_msg = f"You have been assigned as a substitute proctor for {exam.get('subject_name')} ({exam.get('section')}) on {exam.get('exam_date_time')}. Reason: {reason or 'Emergency reliever dispatch'}."
+            cursor.execute("INSERT INTO notifications (user_id, title, message, created_at, is_read) VALUES (%s, %s, %s, NOW(), 0)",
+                           (reliever_user['id'], notif_title, notif_msg))
+
+        # 4. Notification for Admins
+        cursor.execute("SELECT id FROM users WHERE role = 'admin'")
+        for adm in cursor.fetchall():
+            cursor.execute("INSERT INTO notifications (user_id, title, message, created_at, is_read) VALUES (%s, %s, %s, NOW(), 0)",
+                           (adm['id'], "Proctor Substitution Dispatched",
+                            f"Substitute proctor {new_inst_name} was dispatched for {exam.get('subject_name')} ({exam.get('section')})."))
+
+        db.commit()
+        return True, f"Successfully assigned {new_inst_name} as substitute proctor."
+    except Exception as e:
+        return False, str(e)
+    finally:
+        db.close()
+
+
+# ── EXAM ARCHIVES (HISTORICAL RECORDS) ──────────────────────────────────────
+
+def create_exam_archive(academic_year, exam_term, exam_semester, archive_title=None, notes=None, user_id=None, user_name=None):
+    """
+    Captures an immutable snapshot of the current scheduled examinations along with
+    proctors, rooms, sections, and dates, and stores it in exam_archives.
+    """
+    import json
+    db = open_db()
+    if not db:
+        return False, "Database connection failed."
+    try:
+        cursor = db.cursor(dictionary=True)
+        # Fetch all currently scheduled exams with full relational details
+        cursor.execute("""
+            SELECT e.id, e.subject_name, e.section, e.subject_type, e.duration_minutes,
+                   e.exam_date_time, e.room_id, r.room_name, r.building, r.floor, r.capacity,
+                   e.instructor_id, COALESCE(i.name, e.instructor_name) AS instructor_name,
+                   e.institute_id, inst.name AS institute_name, inst.code AS institute_code,
+                   s.code AS subject_code
+            FROM exams e
+            LEFT JOIN rooms r ON e.room_id = r.id
+            LEFT JOIN instructors i ON e.instructor_id = i.id
+            LEFT JOIN institutes inst ON e.institute_id = inst.id
+            LEFT JOIN subjects s ON e.subject_id = s.id
+            WHERE e.status = 'Scheduled' AND e.exam_date_time IS NOT NULL
+            ORDER BY e.exam_date_time, e.section, e.subject_name
+        """)
+        exams = cursor.fetchall()
+        if not exams:
+            return False, "No scheduled exams found to archive."
+
+        proctors = set()
+        sections = set()
+        dates = []
+        serializable_exams = []
+
+        for ex in exams:
+            dt = ex.get('exam_date_time')
+            dt_str = dt.strftime("%Y-%m-%d %H:%M:%S") if isinstance(dt, datetime) else str(dt or '')
+            d_only = dt.strftime("%Y-%m-%d") if isinstance(dt, datetime) else dt_str[:10]
+            if d_only:
+                dates.append(d_only)
+
+            if ex.get('instructor_name'):
+                proctors.add(ex['instructor_name'])
+            if ex.get('section'):
+                sections.add(ex['section'].strip())
+
+            item = dict(ex)
+            item['exam_date_time'] = dt_str
+            if isinstance(dt, datetime):
+                item['formatted_date'] = dt.strftime("%A, %B %d, %Y")
+                item['formatted_time'] = dt.strftime("%I:%M %p")
+                end_dt = dt + timedelta(minutes=int(ex.get('duration_minutes') or 60))
+                item['formatted_time_end'] = end_dt.strftime("%I:%M %p")
+            else:
+                item['formatted_date'] = ''
+                item['formatted_time'] = ''
+                item['formatted_time_end'] = ''
+            serializable_exams.append(item)
+
+        total_exams = len(serializable_exams)
+        total_proctors = len(proctors)
+        total_sections = len(sections)
+        period_start = min(dates) if dates else None
+        period_end = max(dates) if dates else None
+
+        if not archive_title or not archive_title.strip():
+            archive_title = f"A.Y. {academic_year} {exam_semester} {exam_term}"
+
+        snapshot_json = json.dumps(serializable_exams)
+
+        cursor.execute("""
+            INSERT INTO exam_archives
+            (academic_year, exam_term, exam_semester, archive_title, total_exams, total_proctors,
+             total_sections, period_start, period_end, archived_at, archived_by, archived_by_name, notes, snapshot_data)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s, %s, %s, %s)
+        """, (academic_year, exam_term, exam_semester, archive_title, total_exams, total_proctors,
+              total_sections, period_start, period_end, user_id, user_name, notes, snapshot_json))
+        db.commit()
+        archive_id = cursor.lastrowid
+        return True, archive_id
+    except Exception as e:
+        return False, str(e)
+    finally:
+        db.close()
+
+def get_exam_archives():
+    """
+    Returns high-level metadata for all stored exam archives.
+    """
+    db = open_db()
+    if not db:
+        return []
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, academic_year, exam_term, exam_semester, archive_title,
+                   total_exams, total_proctors, total_sections, period_start, period_end,
+                   archived_at, archived_by, archived_by_name, notes
+            FROM exam_archives
+            ORDER BY archived_at DESC, id DESC
+        """)
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Error fetching exam archives: {e}")
+        return []
+    finally:
+        db.close()
+
+def get_exam_archive_by_id(archive_id):
+    """
+    Returns a specific exam archive with its full parsed snapshot data.
+    """
+    import json
+    db = open_db()
+    if not db:
+        return None
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM exam_archives WHERE id = %s", (archive_id,))
+        row = cursor.fetchone()
+        if not row:
+            return None
+        try:
+            row['exams'] = json.loads(row.get('snapshot_data') or '[]')
+        except Exception:
+            row['exams'] = []
+        return row
+    except Exception as e:
+        print(f"Error fetching archive {archive_id}: {e}")
+        return None
+    finally:
+        db.close()
+
+def delete_exam_archive(archive_id):
+    """
+    Permanently removes a historical archive record.
+    """
+    db = open_db()
+    if not db:
+        return False, "Database connection failed."
+    try:
+        cursor = db.cursor()
+        cursor.execute("DELETE FROM exam_archives WHERE id = %s", (archive_id,))
+        db.commit()
+        return True, "Archive deleted successfully."
+    except Exception as e:
+        return False, str(e)
+    finally:
+        db.close()
+
+
+

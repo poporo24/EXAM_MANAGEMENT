@@ -39,6 +39,25 @@
         .group-count-badge:hover { background: #bfdbfe; }
     </style>
 
+    <script>
+        (function() {
+            try {
+                if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                    document.documentElement.classList.add('sidebar-collapsed');
+                }
+            } catch (e) {}
+        })();
+    </script>
+    <style>
+        html, body { overflow-x: hidden; }
+        #main-content { min-width: 0; max-width: 100%; }
+        html.sidebar-collapsed #sidebar { width: 4rem !important; }
+        html.sidebar-collapsed #main-content { margin-left: 4rem !important; }
+        html.sidebar-collapsed .nav-text { display: none !important; }
+        html.sidebar-collapsed .sidebar-header-container { justify-content: center !important; }
+        html.sidebar-collapsed .sidebar-header-container > div:first-child { display: none !important; }
+    </style>
+
     <style>
         /* Mobile Responsive Overrides */
         @media (max-width: 768px) {
@@ -75,7 +94,7 @@
     {% set active_page = 'subjects' %}
     {% include 'admin_sidebar.html' %}
 
-    <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
+    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen">
         <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
             <h1 class="text-xl font-semibold text-gray-800">Subject Management</h1>
         </header>
@@ -297,9 +316,9 @@
                         <button type="button" onclick="clearBulkSelection()" class="text-sm text-gray-600 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-100">
                             Clear
                         </button>
-                        <button type="submit"
-                            onclick="return confirm('Delete the selected subjects? This cannot be undone and may affect associated exams.')"
-                            class="inline-flex items-center gap-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md px-4 py-1.5 transition-colors">
+                        <button type="button"
+                            onclick="confirmBulkDeleteSubjects()"
+                            class="inline-flex items-center gap-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md px-4 py-1.5 transition-colors cursor-pointer">
                             <i class="fa-solid fa-trash"></i> Delete Selected
                         </button>
                     </div>
@@ -358,9 +377,9 @@
                                         <button type="button" onclick="openEditSubjectModal('{{ sub.id }}', {{ sub.name | tojson }}, '{{ sub.code }}', '{{ sub.institute_id }}', '{{ sub.is_common }}')" class="text-blue-600 hover:text-blue-900 mr-3" title="Edit subject">
                                             <i class="fa-solid fa-edit"></i>
                                         </button>
-                                        <a href="/subjects/{{ sub.id }}/delete" onclick="return confirm('Delete this subject? Associated exams will also be affected.')" class="text-red-600 hover:text-red-900" title="Delete subject">
+                                        <button type="button" onclick="confirmDeleteSubject('{{ sub.id }}', {{ sub.name | tojson }})" class="text-red-600 hover:text-red-900 cursor-pointer" title="Delete subject">
                                             <i class="fa-solid fa-trash"></i>
-                                        </a>
+                                        </button>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -456,46 +475,7 @@
     </div>
 
     <script>
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const mainContent = document.getElementById('main-content');
-            sidebar.classList.toggle('w-64');
-            sidebar.classList.toggle('w-16');
-            mainContent.classList.toggle('ml-64');
-            mainContent.classList.toggle('ml-16');
-            
-            const headers = document.querySelectorAll('.sidebar-header-container');
-            headers.forEach(h => {
-                if (sidebar.classList.contains('w-16')) {
-                    h.classList.remove('justify-between');
-                    h.classList.add('justify-center');
-                } else {
-                    h.classList.add('justify-between');
-                    h.classList.remove('justify-center');
-                }
-            });
-            const isCollapsed = sidebar.classList.contains('w-16');
-            localStorage.setItem('sidebarCollapsed', isCollapsed);
-            sidebar.querySelectorAll('.nav-text').forEach(el => {
-                if (isCollapsed) el.classList.add('hidden');
-                else el.classList.remove('hidden');
-            });
-        }
-
         document.addEventListener('DOMContentLoaded', () => {
-            if (localStorage.getItem('sidebarCollapsed') === 'true') {
-                const sidebar = document.getElementById('sidebar');
-                const mainContent = document.getElementById('main-content');
-                sidebar.classList.remove('w-64');
-                sidebar.classList.add('w-16');
-                mainContent.classList.remove('ml-64');
-                mainContent.classList.add('ml-16');
-                sidebar.querySelectorAll('.nav-text').forEach(el => el.classList.add('hidden'));
-                document.querySelectorAll('.sidebar-header-container').forEach(h => {
-                    h.classList.remove('justify-between');
-                    h.classList.add('justify-center');
-                });
-            }
             updateLinkButton();
         });
 
@@ -663,10 +643,37 @@
             document.getElementById('unlinkConfirmBtn').href = url;
             document.getElementById('unlinkConfirmModal').classList.remove('hidden');
         }
-        function closeUnlinkConfirmModal() {
-            document.getElementById('unlinkConfirmModal').classList.add('hidden');
+        function confirmDeleteSubject(id, name) {
+            showConfirmModal({
+                title: 'Delete Subject',
+                message: 'Are you sure you want to delete subject <strong>' + name + '</strong>?',
+                sub: '<strong>Warning:</strong> Deleting this subject may affect existing scheduled exams and timetables associated with it.',
+                type: 'danger',
+                confirmText: '<i class="fa-solid fa-trash mr-1"></i> Delete Subject',
+                onConfirm: function() {
+                    window.location.href = '/subjects/' + id + '/delete';
+                }
+            });
+        }
+
+        function confirmBulkDeleteSubjects() {
+            const checked = document.querySelectorAll('.row-checkbox:checked');
+            if (!checked.length) {
+                showAlertModal('Please select at least one subject to delete.', 'No Selection', 'warning');
+                return;
+            }
+            showConfirmModal({
+                title: 'Delete Selected Subjects',
+                message: 'You are about to permanently delete <strong>' + checked.length + ' selected subject(s)</strong>.',
+                sub: '<strong>Warning:</strong> This cannot be undone and may affect associated scheduled exams.',
+                type: 'danger',
+                confirmText: '<i class="fa-solid fa-trash mr-1"></i> Delete ' + checked.length + ' Subjects',
+                onConfirm: function() {
+                    document.getElementById('bulkDeleteForm').submit();
+                }
+            });
         }
     </script>
-
+    {% include 'confirm_modal.html' %}
 </body>
 </html>

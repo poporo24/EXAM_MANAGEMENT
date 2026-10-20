@@ -8,10 +8,26 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        (function() {
+            try {
+                if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                    document.documentElement.classList.add('sidebar-collapsed');
+                }
+            } catch (e) {}
+        })();
+    </script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .sidebar-transition { transition: width 0.3s ease; }
         .content-transition { transition: margin-left 0.3s ease; }
+        html, body { overflow-x: hidden; }
+        #main-content { min-width: 0; max-width: 100%; }
+        html.sidebar-collapsed #sidebar { width: 4rem !important; }
+        html.sidebar-collapsed #main-content { margin-left: 4rem !important; }
+        html.sidebar-collapsed .nav-text { display: none !important; }
+        html.sidebar-collapsed .sidebar-header-container { justify-content: center !important; }
+        html.sidebar-collapsed .sidebar-header-container > div:first-child { display: none !important; }
     </style>
 
     <style>
@@ -54,7 +70,7 @@
         {% include 'admin_sidebar.html' %}
     {% endif %}
 
-    <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
+    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen">
         <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
             <h1 class="text-xl font-semibold text-gray-800">Reports Center</h1>
             <div class="flex items-center gap-3">
@@ -103,8 +119,8 @@
                         
                         <div class="flex gap-2">
                             {% if session.role in ['admin', 'secretary'] %}
-                            <form action="/reports/clear_absence" method="POST" onsubmit="return confirm('Are you sure you want to delete all absence reports? This cannot be undone.');">
-                                <button type="submit" class="inline-flex items-center px-4 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50">
+                            <form id="clearAbsenceForm" action="/reports/clear_absence" method="POST">
+                                <button type="button" onclick="confirmClearAbsenceReports()" class="inline-flex items-center px-4 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 cursor-pointer">
                                     <i class="fa-solid fa-trash mr-2"></i> Delete All
                                 </button>
                             </form>
@@ -166,7 +182,7 @@
                     </div>
                     <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                         <p class="text-sm text-gray-500">Average Hours / Proctor</p>
-                        <p class="text-2xl font-bold">{% if total_proctors > 0 %}{{ (total_h / total_proctors)|round(1) }}{% else %}0{% endif %} hrs</p>
+                        <p class="text-2xl font-bold">{% if total_proctors > 0 %}{% set avg_h = (total_h / total_proctors)|round(1) %}{{ avg_h|int if avg_h % 1 == 0 else avg_h }}{% else %}0{% endif %} hrs</p>
                     </div>
                 </div>
 
@@ -188,7 +204,7 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ row.name }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ row.institute }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ row.exam_count }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-700">{{ row.total_hours }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-700">{{ (row.total_hours|float)|int if (row.total_hours|float) % 1 == 0 else (row.total_hours|float)|round(1) }}</td>
                                     </tr>
                                     {% endfor %}
                                 {% else %}
@@ -278,50 +294,6 @@
     </main>
 
     <script>
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const mainContent = document.getElementById('main-content');
-            sidebar.classList.toggle('w-64');
-            sidebar.classList.toggle('w-16');
-            mainContent.classList.toggle('ml-64');
-            mainContent.classList.toggle('ml-16');
-            
-            const headers = document.querySelectorAll('.sidebar-header-container');
-            headers.forEach(h => {
-                if (sidebar.classList.contains('w-16')) {
-                    h.classList.remove('justify-between');
-                    h.classList.add('justify-center');
-                } else {
-                    h.classList.add('justify-between');
-                    h.classList.remove('justify-center');
-                }
-            });
-            
-            const isCollapsed = sidebar.classList.contains('w-16');
-            localStorage.setItem('sidebarCollapsed', isCollapsed);
-            
-            sidebar.querySelectorAll('.nav-text').forEach(el => {
-                if (isCollapsed) el.classList.add('hidden');
-                else el.classList.remove('hidden');
-            });
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            if (localStorage.getItem('sidebarCollapsed') === 'true') {
-                const sidebar = document.getElementById('sidebar');
-                const mainContent = document.getElementById('main-content');
-                sidebar.classList.remove('w-64');
-                sidebar.classList.add('w-16');
-                mainContent.classList.remove('ml-64');
-                mainContent.classList.add('ml-16');
-                sidebar.querySelectorAll('.nav-text').forEach(el => el.classList.add('hidden'));
-                document.querySelectorAll('.sidebar-header-container').forEach(h => {
-                    h.classList.remove('justify-between');
-                    h.classList.add('justify-center');
-                });
-            }
-        });
-
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.add('hidden');
@@ -339,6 +311,20 @@
             activeBtn.classList.remove('border-transparent', 'text-gray-500');
             activeBtn.classList.add('border-[#668054]', 'text-[#668054]');
         }
+
+        function confirmClearAbsenceReports() {
+            showConfirmModal({
+                title: 'Delete Absence Reports',
+                message: 'Are you sure you want to delete <strong>all absence reports</strong>?',
+                sub: 'This action will clear all reported proctor absences and cannot be undone.',
+                type: 'danger',
+                confirmText: '<i class="fa-solid fa-trash mr-1"></i> Delete All',
+                onConfirm: function() {
+                    document.getElementById('clearAbsenceForm').submit();
+                }
+            });
+        }
     </script>
+    {% include 'confirm_modal.html' %}
 </body>
 </html>

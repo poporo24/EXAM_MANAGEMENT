@@ -7,7 +7,27 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>body { font-family: "Inter", sans-serif; } .sidebar-transition { transition: width 0.3s ease; } .content-transition { transition: margin-left 0.3s ease; }</style>
+    <script>
+        (function() {
+            try {
+                if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                    document.documentElement.classList.add('sidebar-collapsed');
+                }
+            } catch (e) {}
+        })();
+    </script>
+    <style>
+        body { font-family: "Inter", sans-serif; }
+        .sidebar-transition { transition: width 0.3s ease; }
+        .content-transition { transition: margin-left 0.3s ease; }
+        html, body { overflow-x: hidden; }
+        #main-content { min-width: 0; max-width: 100%; }
+        html.sidebar-collapsed #sidebar { width: 4rem !important; }
+        html.sidebar-collapsed #main-content { margin-left: 4rem !important; }
+        html.sidebar-collapsed .nav-text { display: none !important; }
+        html.sidebar-collapsed .sidebar-header-container { justify-content: center !important; }
+        html.sidebar-collapsed .sidebar-header-container > div:first-child { display: none !important; }
+    </style>
 
     <style>
         /* Mobile Responsive Overrides */
@@ -45,7 +65,7 @@
     {% set active_page = 'students' %}
     {% include 'admin_sidebar.html' %}
 
-    <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
+    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen">
         <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
             <h1 class="text-xl font-semibold text-gray-800">Student Management</h1>
             <a href="/notifications" class="relative text-gray-500 hover:text-[#668054]">
@@ -96,9 +116,7 @@
                                     <form action="/students/approve/{{ s.id }}" method="POST">
                                         <button class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700"><i class="fa-solid fa-check mr-1"></i>Approve</button>
                                     </form>
-                                    <form action="/students/reject/{{ s.id }}" method="POST" onsubmit="return confirm('Permanently reject this registration?')">
-                                        <button class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-times mr-1"></i>Reject</button>
-                                    </form>
+                                    <button type="button" onclick="confirmRejectRegistration({{ s.id }}, '{{ s.full_name|e }}')" class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-times mr-1"></i>Reject</button>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -116,7 +134,7 @@
                     <form action="/students/bulk_action" method="POST" id="pendingDeleteForm">
                         <input type="hidden" name="bulk_action" value="delete">
                         <div id="pendingDeleteIds"></div>
-                        <button type="button" onclick="submitBulk('pendingDeleteForm','pending-cb','delete')" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700" onclick="return confirm('Delete selected?')"><i class="fa-solid fa-trash mr-1"></i>Delete Selected</button>
+                        <button type="button" onclick="confirmBulkPendingDelete()" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-trash mr-1"></i>Delete Selected</button>
                     </form>
                 </div>
             </div>
@@ -168,12 +186,13 @@
                                     <td class="px-6 py-4 whitespace-nowrap">{% if s.section %}<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{{ s.section }}</span>{% else %}<span class="text-gray-400">—</span>{% endif %}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ s.created_at.strftime("%b %d, %Y") if s.created_at else "—" }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap flex gap-2">
-                                        <button onclick="openChangePwModal({{ s.id }}, '{{ s.full_name|e }}')" class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"><i class="fa-solid fa-key mr-1"></i>Password</button>
-                                        <form action="/students/deactivate/{{ s.id }}" method="POST" onsubmit="return confirm('Deactivate this student account?')">
-                                            <button class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-amber-500 hover:bg-amber-600"><i class="fa-solid fa-ban mr-1"></i>Deactivate</button>
+                                        <button onclick="openEditStudentModal({{ s.id }}, '{{ s.full_name|e }}', '{{ s.email|e }}', '{{ (s.section or '')|e }}')" class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-[#668054] hover:bg-[#526843] shadow-xs" title="Edit Student & Section"><i class="fa-solid fa-pen-to-square mr-1"></i>Edit</button>
+                                        <button onclick="openResetPwModal({{ s.id }}, '{{ s.full_name|e }}')" class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 shadow-xs" title="Reset Password"><i class="fa-solid fa-rotate-left mr-1"></i>Reset Password</button>
+                                        <form action="/students/deactivate/{{ s.id }}" method="POST" id="deactForm_{{ s.id }}" class="inline">
+                                            <button type="button" onclick="confirmDeactivateStudent({{ s.id }}, '{{ s.full_name|e }}')" class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-amber-500 hover:bg-amber-600"><i class="fa-solid fa-ban mr-1"></i>Deactivate</button>
                                         </form>
-                                        <form action="/students/reject/{{ s.id }}" method="POST" onsubmit="return confirm('Permanently delete this account?')">
-                                            <button class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-trash mr-1"></i>Delete</button>
+                                        <form action="/students/reject/{{ s.id }}" method="POST" id="delForm_{{ s.id }}" class="inline">
+                                            <button type="button" onclick="confirmDeleteStudent({{ s.id }}, '{{ s.full_name|e }}')" class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-trash mr-1"></i>Delete</button>
                                         </form>
                                     </td>
                                 </tr>
@@ -188,8 +207,10 @@
                 {% if active_students %}
                 <div class="px-6 py-3 bg-gray-50 border-t border-gray-200 flex items-center gap-3 flex-wrap">
                     <span class="text-xs text-gray-500 font-medium">Bulk action on selected:</span>
-                    <button type="button" onclick="submitBulk('activeBulkDeact','active-cb','deactivate')" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-amber-500 hover:bg-amber-600"><i class="fa-solid fa-ban mr-1"></i>Deactivate</button>
+                    <button type="button" onclick="confirmBulkResetPassword()" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"><i class="fa-solid fa-rotate-left mr-1"></i>Reset Password</button>
+                    <button type="button" onclick="confirmBulkDeactivate()" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-amber-500 hover:bg-amber-600"><i class="fa-solid fa-ban mr-1"></i>Deactivate</button>
                     <button type="button" onclick="confirmBulkDelete()" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-trash mr-1"></i>Delete</button>
+                    <form action="/students/bulk_action" method="POST" id="activeBulkResetPw"><input type="hidden" name="bulk_action" value="reset_password"><div id="activeBulkResetPwIds"></div></form>
                     <form action="/students/bulk_action" method="POST" id="activeBulkDeact"><input type="hidden" name="bulk_action" value="deactivate"><div id="activeBulkDeactIds"></div></form>
                     <form action="/students/bulk_action" method="POST" id="activeBulkDel"><input type="hidden" name="bulk_action" value="delete"><div id="activeBulkDelIds"></div></form>
                 </div>
@@ -226,8 +247,8 @@
                                     <form action="/students/reactivate/{{ s.id }}" method="POST">
                                         <button class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700"><i class="fa-solid fa-rotate-left mr-1"></i>Reactivate</button>
                                     </form>
-                                    <form action="/students/reject/{{ s.id }}" method="POST" onsubmit="return confirm('Permanently delete this account?')">
-                                        <button class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-trash mr-1"></i>Delete</button>
+                                    <form action="/students/reject/{{ s.id }}" method="POST" id="delForm_{{ s.id }}" class="inline">
+                                        <button type="button" onclick="confirmDeleteStudent({{ s.id }}, '{{ s.full_name|e }}')" class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-trash mr-1"></i>Delete</button>
                                     </form>
                                 </td>
                             </tr>
@@ -240,39 +261,103 @@
         </div>
     </main>
 
-    <!-- ── Change Password Modal ──────────────────────────────── -->
-    <div id="changePwModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <!-- ── Reset Password Modal ──────────────────────────────── -->
+    <div id="resetPwModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
         <div class="flex items-center justify-center min-h-screen px-4">
-            <div class="fixed inset-0 bg-gray-900 bg-opacity-60" onclick="closeChangePwModal()"></div>
-            <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md z-10 overflow-hidden">
-                <div class="bg-blue-600 px-6 py-4 flex items-center gap-3">
-                    <i class="fa-solid fa-key text-2xl text-white"></i>
-                    <h3 class="text-lg font-bold text-white">Change Password</h3>
+            <div class="fixed inset-0 bg-gray-900 bg-opacity-60 transition-opacity" onclick="closeResetPwModal()"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden border border-gray-100">
+                <div class="bg-blue-600 px-6 py-4 flex items-center justify-between text-white">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center text-white">
+                            <i class="fa-solid fa-rotate-left text-base"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold leading-tight">Reset Password</h3>
+                            <p class="text-xs text-white/80">Reset student account credentials</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closeResetPwModal()" class="text-white/80 hover:text-white transition-colors">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
                 </div>
-                <form id="changePwForm" method="POST" action="" class="p-6 space-y-4">
+                <form id="resetPwForm" method="POST" action="" class="p-6 space-y-4">
                     <input type="hidden" name="redirect_to" value="students_page">
-                    <p class="text-sm text-gray-600">Setting new password for: <strong id="changePwName" class="text-gray-900"></strong></p>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-                        <div class="relative w-full"><input type="password" name="new_password" required minlength="6"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
-                               placeholder="At least 6 characters"><div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" onclick="togglePassword(this)">
-    <i class="fa-regular fa-eye text-gray-400 hover:text-gray-600"></i>
-</div></div>
+                    <input type="hidden" name="new_password" id="resetPwInputNewPw" value="">
+                    <input type="hidden" name="confirm_password" id="resetPwInputConfirmPw" value="">
+
+                    <div class="text-center py-2">
+                        <div class="w-12 h-12 rounded-full bg-blue-50 text-blue-600 mx-auto flex items-center justify-center mb-3">
+                            <i class="fa-solid fa-key text-xl"></i>
+                        </div>
+                        <p class="text-sm text-gray-600">
+                            Are you sure you want to reset the password for:
+                        </p>
+                        <h4 id="resetPwName" class="font-bold text-gray-900 text-base mt-1">—</h4>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-                        <div class="relative w-full"><input type="password" name="confirm_password" required minlength="6"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
-                               placeholder="Repeat the new password"><div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" onclick="togglePassword(this)">
-    <i class="fa-regular fa-eye text-gray-400 hover:text-gray-600"></i>
-</div></div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-center">
+                        <span class="text-xs text-blue-700 font-medium block mb-1">New Default Password:</span>
+                        <code id="resetPwCode" class="text-base font-mono font-bold text-blue-900 bg-white px-3 py-1 rounded-md border border-blue-200 inline-block tracking-wider">lastname123</code>
+                        <p class="text-[11px] text-blue-600/80 mt-1.5">
+                            Formed automatically from their <strong>lastname + 123</strong>.
+                        </p>
                     </div>
-                    <div class="flex justify-end gap-3 pt-2">
-                        <button type="button" onclick="closeChangePwModal()"
-                                class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100">Cancel</button>
+
+                    <div class="flex justify-end gap-2.5 pt-2 border-t border-gray-100">
+                        <button type="button" onclick="closeResetPwModal()"
+                                class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+                            Cancel
+                        </button>
                         <button type="submit"
-                                class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors">Save Password</button>
+                                class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors flex items-center gap-1.5">
+                            <i class="fa-solid fa-check"></i> <span id="resetPwBtnText">Reset Password</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Student & Section Modal (Admin Only) -->
+    <div id="editStudentModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeEditStudentModal()"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden border border-gray-100">
+                <div class="bg-[#668054] px-6 py-4 flex items-center justify-between text-white">
+                    <h3 class="font-bold text-base flex items-center gap-2">
+                        <i class="fa-solid fa-user-pen"></i> Edit Student & Section
+                    </h3>
+                    <button type="button" onclick="closeEditStudentModal()" class="text-white/80 hover:text-white transition-colors">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                <form id="editStudentForm" method="POST" action="" class="p-6 space-y-4">
+                    <input type="hidden" name="redirect_to" value="students_page">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Full Name</label>
+                        <input type="text" name="full_name" id="editStudentName" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-[#668054] focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Email Address</label>
+                        <input type="email" name="email" id="editStudentEmail" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-[#668054] focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Section</label>
+                        <select name="section" id="editStudentSection" class="w-full text-sm border border-gray-300 rounded-lg p-2.5 bg-white focus:ring-2 focus:ring-[#668054] focus:outline-none">
+                            <option value="">-- No Section / None --</option>
+                            {% for sec in sections %}
+                            <option value="{{ sec }}">{{ sec }}</option>
+                            {% endfor %}
+                        </select>
+                        <p class="text-[11px] text-gray-500 mt-1">
+                            <i class="fa-solid fa-circle-info text-[#668054] mr-1"></i> Changing section immediately updates their enrolled exam timetable.
+                        </p>
+                    </div>
+                    <div class="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
+                        <button type="button" onclick="closeEditStudentModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+                        <button type="submit" class="px-5 py-2 bg-[#668054] hover:bg-[#526843] text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-1.5">
+                            <i class="fa-solid fa-floppy-disk"></i> Save Changes
+                        </button>
                     </div>
                 </form>
             </div>
@@ -280,16 +365,6 @@
     </div>
 
     <script>
-        function toggleSidebar() {
-            const s = document.getElementById("sidebar"), m = document.getElementById("main-content");
-            if (s.classList.contains("w-64")) {
-                s.classList.replace("w-64","w-16"); m.classList.replace("ml-64","ml-16");
-                s.querySelectorAll(".nav-text").forEach(e => e.classList.add("hidden"));
-            } else {
-                s.classList.replace("w-16","w-64"); m.classList.replace("ml-16","ml-64");
-                s.querySelectorAll(".nav-text").forEach(e => e.classList.remove("hidden"));
-            }
-        }
         function filterStudents() {
             const q = document.getElementById("searchStudent").value.toLowerCase();
             document.querySelectorAll("tbody tr").forEach(r => r.style.display = r.innerText.toLowerCase().includes(q) ? "" : "none");
@@ -303,8 +378,20 @@
         }
         function submitBulk(formId, cbClass, action) {
             const ids = getChecked(cbClass);
-            if (!ids.length) { alert("Please select at least one student."); return; }
             const form = document.getElementById(formId);
+            if (!ids.length) {
+                openStudentConfirmModal({
+                    title: 'No Students Selected',
+                    message: 'Please select at least one student checkbox before executing this action.',
+                    sub: '',
+                    headerClass: 'bg-amber-600',
+                    btnClass: 'bg-amber-600 hover:bg-amber-700',
+                    iconClass: 'fa-solid fa-circle-exclamation',
+                    confirmText: 'Understood',
+                    onConfirm: null
+                });
+                return;
+            }
             const container = form.querySelector("div");
             container.innerHTML = "";
             ids.forEach(id => {
@@ -315,21 +402,231 @@
             form.querySelector("input[name=bulk_action]").value = action;
             form.submit();
         }
+        let _studentActionCallback = null;
+
+        function openStudentConfirmModal({ title, message, sub, headerClass, btnClass, iconClass, confirmText, onConfirm }) {
+            document.getElementById('studentActionHeader').className = 'px-6 py-4 flex items-center justify-between text-white ' + (headerClass || 'bg-red-600');
+            document.getElementById('studentActionIcon').className = (iconClass || 'fa-solid fa-triangle-exclamation') + ' text-lg';
+            document.getElementById('studentActionTitle').textContent = title || 'Confirm Action';
+            document.getElementById('studentActionMessage').innerHTML = message || '';
+            const subContainer = document.getElementById('studentActionSubContainer');
+            if (sub) {
+                document.getElementById('studentActionSub').innerHTML = sub;
+                subContainer.classList.remove('hidden');
+            } else {
+                subContainer.classList.add('hidden');
+            }
+            const btn = document.getElementById('studentActionConfirmBtn');
+            btn.className = 'px-4 py-2 rounded-lg text-xs font-bold text-white shadow-xs transition flex items-center gap-1.5 ' + (btnClass || 'bg-red-600 hover:bg-red-700');
+            btn.innerHTML = confirmText || 'Confirm';
+            _studentActionCallback = onConfirm;
+
+            document.getElementById('studentActionModal').classList.remove('hidden');
+            document.getElementById('studentActionModal').classList.add('flex');
+        }
+
+        function closeStudentActionModal() {
+            document.getElementById('studentActionModal').classList.add('hidden');
+            document.getElementById('studentActionModal').classList.remove('flex');
+            _studentActionCallback = null;
+        }
+
+        function confirmDeactivateStudent(id, name) {
+            openStudentConfirmModal({
+                title: 'Deactivate Student Account',
+                message: 'Are you sure you want to deactivate <strong>' + name + '</strong>?',
+                sub: 'The student will not be able to log in or view their exam schedule until reactivated by an admin.',
+                headerClass: 'bg-amber-600',
+                btnClass: 'bg-amber-600 hover:bg-amber-700',
+                iconClass: 'fa-solid fa-ban',
+                confirmText: '<i class="fa-solid fa-ban mr-1"></i> Yes, Deactivate',
+                onConfirm: () => {
+                    const f = document.getElementById('deactForm_' + id);
+                    if (f) f.submit();
+                }
+            });
+        }
+
+        function confirmDeleteStudent(id, name) {
+            openStudentConfirmModal({
+                title: 'Delete Student Account',
+                message: 'Are you sure you want to permanently delete <strong>' + name + '</strong>?',
+                sub: '<strong>Warning:</strong> This cannot be undone. All personal records and account credentials will be permanently erased.',
+                headerClass: 'bg-red-600',
+                btnClass: 'bg-red-600 hover:bg-red-700',
+                iconClass: 'fa-solid fa-trash-can',
+                confirmText: '<i class="fa-solid fa-trash mr-1"></i> Yes, Delete',
+                onConfirm: () => {
+                    const f = document.getElementById('delForm_' + id);
+                    if (f) f.submit();
+                }
+            });
+        }
+
+        function confirmRejectRegistration(id, name) {
+            openStudentConfirmModal({
+                title: 'Reject Registration',
+                message: 'Are you sure you want to reject and delete the registration for <strong>' + name + '</strong>?',
+                sub: 'The registration request will be discarded and the student will not be granted access.',
+                headerClass: 'bg-red-600',
+                btnClass: 'bg-red-600 hover:bg-red-700',
+                iconClass: 'fa-solid fa-times',
+                confirmText: '<i class="fa-solid fa-times mr-1"></i> Yes, Reject',
+                onConfirm: () => {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = '/students/reject/' + id;
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            });
+        }
+
         function confirmBulkDelete() {
             const ids = getChecked("active-cb");
-            if (!ids.length) { alert("Please select at least one student."); return; }
-            if (!confirm("Permanently delete " + ids.length + " student(s)? This cannot be undone.")) return;
-            submitBulk("activeBulkDel", "active-cb", "delete");
+            if (!ids.length) {
+                openStudentConfirmModal({
+                    title: 'No Students Selected',
+                    message: 'Please select at least one student using the checkboxes before performing bulk delete.',
+                    sub: '',
+                    headerClass: 'bg-gray-600',
+                    btnClass: 'bg-gray-600 hover:bg-gray-700',
+                    iconClass: 'fa-solid fa-circle-exclamation',
+                    confirmText: 'OK',
+                    onConfirm: null
+                });
+                return;
+            }
+            openStudentConfirmModal({
+                title: 'Bulk Delete Students',
+                message: 'Are you sure you want to permanently delete <strong>' + ids.length + '</strong> selected student(s)?',
+                sub: '<strong>Warning:</strong> This cannot be undone. All selected student accounts will be deleted immediately.',
+                headerClass: 'bg-red-600',
+                btnClass: 'bg-red-600 hover:bg-red-700',
+                iconClass: 'fa-solid fa-trash-can',
+                confirmText: '<i class="fa-solid fa-trash mr-1"></i> Delete ' + ids.length + ' Student(s)',
+                onConfirm: () => submitBulk("activeBulkDel", "active-cb", "delete")
+            });
         }
-        function openChangePwModal(userId, name) {
-            document.getElementById('changePwName').textContent = name;
-            document.getElementById('changePwForm').action = '/admin/change_password/' + userId;
-            document.getElementById('changePwModal').classList.remove('hidden');
+
+        function confirmBulkDeactivate() {
+            const ids = getChecked("active-cb");
+            if (!ids.length) {
+                openStudentConfirmModal({
+                    title: 'No Students Selected',
+                    message: 'Please select at least one student using the checkboxes before performing bulk deactivate.',
+                    sub: '',
+                    headerClass: 'bg-gray-600',
+                    btnClass: 'bg-gray-600 hover:bg-gray-700',
+                    iconClass: 'fa-solid fa-circle-exclamation',
+                    confirmText: 'OK',
+                    onConfirm: null
+                });
+                return;
+            }
+            openStudentConfirmModal({
+                title: 'Bulk Deactivate Students',
+                message: 'Are you sure you want to deactivate <strong>' + ids.length + '</strong> selected student(s)?',
+                sub: 'These students will lose portal access until reactivated by an admin.',
+                headerClass: 'bg-amber-600',
+                btnClass: 'bg-amber-600 hover:bg-amber-700',
+                iconClass: 'fa-solid fa-ban',
+                confirmText: '<i class="fa-solid fa-ban mr-1"></i> Deactivate ' + ids.length + ' Student(s)',
+                onConfirm: () => submitBulk('activeBulkDeact', 'active-cb', 'deactivate')
+            });
         }
-        function closeChangePwModal() {
-            document.getElementById('changePwModal').classList.add('hidden');
-            document.getElementById('changePwForm').reset();
+
+        function deriveLastnamePw(name) {
+            if (!name || !name.trim()) return 'password123';
+            let s = name.trim();
+            let last = s.includes(',') ? s.split(',')[0].trim() : s.split(/\s+/).pop().trim();
+            let clean = last.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+            return clean ? clean + '123' : 'password123';
         }
+
+        function confirmBulkResetPassword() {
+            const ids = getChecked("active-cb");
+            if (!ids.length) {
+                openStudentConfirmModal({
+                    title: 'No Students Selected',
+                    message: 'Please select at least one student using the checkboxes before resetting passwords.',
+                    sub: '',
+                    headerClass: 'bg-gray-600',
+                    btnClass: 'bg-gray-600 hover:bg-gray-700',
+                    iconClass: 'fa-solid fa-circle-exclamation',
+                    confirmText: 'OK',
+                    onConfirm: null
+                });
+                return;
+            }
+            openStudentConfirmModal({
+                title: 'Bulk Reset Passwords',
+                message: 'Reset passwords for <strong>' + ids.length + '</strong> selected student(s)?',
+                sub: 'Each student\'s password will be set to their respective default <strong>[lastname123]</strong> (e.g. <em>malagu123</em>, <em>delacruz123</em>).',
+                headerClass: 'bg-blue-600',
+                btnClass: 'bg-blue-600 hover:bg-blue-700',
+                iconClass: 'fa-solid fa-rotate-left',
+                confirmText: '<i class="fa-solid fa-rotate-left mr-1"></i> Reset Passwords',
+                onConfirm: () => submitBulk("activeBulkResetPw", "active-cb", "reset_password")
+            });
+        }
+
+        function confirmBulkPendingDelete() {
+            const ids = getChecked("pending-cb");
+            if (!ids.length) {
+                openStudentConfirmModal({
+                    title: 'No Registrations Selected',
+                    message: 'Please select at least one pending registration to delete.',
+                    sub: '',
+                    headerClass: 'bg-gray-600',
+                    btnClass: 'bg-gray-600 hover:bg-gray-700',
+                    iconClass: 'fa-solid fa-circle-exclamation',
+                    confirmText: 'OK',
+                    onConfirm: null
+                });
+                return;
+            }
+            openStudentConfirmModal({
+                title: 'Reject Selected Registrations',
+                message: 'Are you sure you want to permanently reject and delete <strong>' + ids.length + '</strong> selected registration(s)?',
+                sub: 'These pending registrations will be permanently deleted.',
+                headerClass: 'bg-red-600',
+                btnClass: 'bg-red-600 hover:bg-red-700',
+                iconClass: 'fa-solid fa-trash-can',
+                confirmText: '<i class="fa-solid fa-trash mr-1"></i> Delete ' + ids.length + ' Registration(s)',
+                onConfirm: () => submitBulk('pendingDeleteForm', 'pending-cb', 'delete')
+            });
+        }
+        function openResetPwModal(userId, name) {
+            const derivedPw = deriveLastnamePw(name);
+            document.getElementById('resetPwName').textContent = name;
+            document.getElementById('resetPwCode').textContent = derivedPw;
+            document.getElementById('resetPwBtnText').textContent = 'Reset to ' + derivedPw;
+            const np = document.getElementById('resetPwInputNewPw');
+            if (np) np.value = derivedPw;
+            const cp = document.getElementById('resetPwInputConfirmPw');
+            if (cp) cp.value = derivedPw;
+            document.getElementById('resetPwForm').action = '/admin/reset_password/' + userId;
+            document.getElementById('resetPwModal').classList.remove('hidden');
+        }
+        function closeResetPwModal() {
+            document.getElementById('resetPwModal').classList.add('hidden');
+        }
+        function openEditStudentModal(id, name, email, section) {
+            document.getElementById('editStudentName').value = name || '';
+            document.getElementById('editStudentEmail').value = email || '';
+            const secSelect = document.getElementById('editStudentSection');
+            if (secSelect) secSelect.value = section || '';
+            document.getElementById('editStudentForm').action = '/admin/edit_student/' + id;
+            document.getElementById('editStudentModal').classList.remove('hidden');
+        }
+        function closeEditStudentModal() {
+            document.getElementById('editStudentModal').classList.add('hidden');
+        }
+
+        // Backward-compatible aliases
+        const openChangePwModal = openResetPwModal;
+        const closeChangePwModal = closeResetPwModal;
     </script>
 
 <script>
@@ -349,5 +646,45 @@
     }
 </script>
 
+    <!-- Universal Student Action Confirmation Modal -->
+    <div id="studentActionModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-xs overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+        <div class="relative bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-150">
+            <div id="studentActionHeader" class="px-6 py-4 flex items-center justify-between text-white bg-red-600">
+                <div class="flex items-center gap-2.5">
+                    <i id="studentActionIcon" class="fa-solid fa-triangle-exclamation text-lg"></i>
+                    <h3 id="studentActionTitle" class="text-base font-bold">Confirm Action</h3>
+                </div>
+                <button onclick="closeStudentActionModal()" class="text-white/80 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+            <div class="p-6">
+                <p id="studentActionMessage" class="text-sm font-medium text-gray-800 leading-relaxed"></p>
+                <div id="studentActionSubContainer" class="mt-3 p-3 rounded-xl text-xs flex items-start gap-2 bg-amber-50 text-amber-900 border border-amber-200">
+                    <i id="studentActionSubIcon" class="fa-solid fa-circle-info text-amber-600 mt-0.5 flex-shrink-0"></i>
+                    <span id="studentActionSub"></span>
+                </div>
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" onclick="closeStudentActionModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 transition">
+                        Cancel
+                    </button>
+                    <button type="button" id="studentActionConfirmBtn" class="px-4 py-2 rounded-lg text-xs font-bold text-white shadow-xs transition flex items-center gap-1.5 bg-red-600 hover:bg-red-700">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const btn = document.getElementById('studentActionConfirmBtn');
+            if (btn) {
+                btn.addEventListener('click', function() {
+                    const cb = _studentActionCallback;
+                    closeStudentActionModal();
+                    if (cb) cb();
+                });
+            }
+        });
+    </script>
 </body>
 </html>

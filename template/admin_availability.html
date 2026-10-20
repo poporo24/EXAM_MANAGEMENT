@@ -8,10 +8,26 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        (function() {
+            try {
+                if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                    document.documentElement.classList.add('sidebar-collapsed');
+                }
+            } catch (e) {}
+        })();
+    </script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .sidebar-transition { transition: width 0.3s ease; }
         .content-transition { transition: margin-left 0.3s ease; }
+        html, body { overflow-x: hidden; }
+        #main-content { min-width: 0; max-width: 100%; }
+        html.sidebar-collapsed #sidebar { width: 4rem !important; }
+        html.sidebar-collapsed #main-content { margin-left: 4rem !important; }
+        html.sidebar-collapsed .nav-text { display: none !important; }
+        html.sidebar-collapsed .sidebar-header-container { justify-content: center !important; }
+        html.sidebar-collapsed .sidebar-header-container > div:first-child { display: none !important; }
     </style>
 
     <style>
@@ -30,7 +46,7 @@
     {% set active_page = 'faculty' %}
     {% include 'admin_sidebar.html' %}
 
-    <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen pb-16">
+    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen pb-16">
         <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
             <div class="flex items-center gap-3">
                 <button type="button" onclick="toggleSidebar()" class="text-gray-500 hover:text-gray-700 focus:outline-none">
@@ -62,7 +78,7 @@
                         <div class="text-sm text-gray-500 mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
                             <span><i class="fa-solid fa-building text-gray-400 mr-1"></i> {{ instructor.institute_name or 'No Institute' }}</span>
                             <span><i class="fa-solid fa-location-dot text-gray-400 mr-1"></i> Building: {{ instructor.building or 'Main Building' }}</span>
-                            <span><i class="fa-solid fa-clock text-gray-400 mr-1"></i> Total Proctor Hours: {{ instructor.total_hours or 0 }} hrs</span>
+                            <span><i class="fa-solid fa-clock text-gray-400 mr-1"></i> Total Proctor Hours: {{ (instructor.total_hours|float)|int if (instructor.total_hours|float) % 1 == 0 else (instructor.total_hours|float)|round(1) }} hrs</span>
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
@@ -282,17 +298,6 @@
         const EXAM_START = "{{ exam_start or '' }}";
         const EXAM_END   = "{{ exam_end or '' }}";
 
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const mainContent = document.getElementById('main-content');
-            sidebar.classList.toggle('w-64');
-            sidebar.classList.toggle('w-16');
-            mainContent.classList.toggle('ml-64');
-            mainContent.classList.toggle('ml-16');
-            
-            sidebar.querySelectorAll('.nav-text').forEach(el => el.classList.toggle('hidden'));
-        }
-
         function toggleRangeGenerator() {
             const panel = document.getElementById('rangeGeneratorPanel');
             panel.classList.toggle('hidden');
@@ -421,22 +426,29 @@
         }
 
         function clearAllRows() {
-            if (confirm('Are you sure you want to remove all configured availability dates?')) {
-                const container = document.getElementById('availabilityContainer');
-                container.innerHTML = '';
-                updateRowCount();
-            }
+            showConfirmModal({
+                title: 'Clear All Dates',
+                message: 'Are you sure you want to remove <strong>all configured availability dates</strong>?',
+                sub: 'This will empty the date list below until you add new dates or save.',
+                type: 'danger',
+                confirmText: '<i class="fa-solid fa-trash mr-1"></i> Clear All Dates',
+                onConfirm: function() {
+                    const container = document.getElementById('availabilityContainer');
+                    container.innerHTML = '';
+                    updateRowCount();
+                }
+            });
         }
 
         function fillExamPeriod() {
             if (!EXAM_START || !EXAM_END) {
-                alert('No active exam period configured in the system.');
+                showAlertModal('No active exam period is configured in the system.', 'Exam Period Missing', 'warning');
                 return;
             }
             const start = new Date(EXAM_START);
             const end   = new Date(EXAM_END);
             if (start > end) {
-                alert('Invalid exam period dates.');
+                showAlertModal('Invalid exam period dates.', 'Invalid Dates', 'warning');
                 return;
             }
 
@@ -468,13 +480,13 @@
             const etVal    = document.getElementById('rangeEndTime').value || '18:00';
 
             if (!startVal || !endVal) {
-                alert('Please select both a Start Date and an End Date.');
+                showAlertModal('Please select both a Start Date and an End Date.', 'Dates Required', 'warning');
                 return;
             }
             const start = new Date(startVal);
             const end   = new Date(endVal);
             if (start > end) {
-                alert('From Date cannot be later than To Date.');
+                showAlertModal('From Date cannot be later than To Date.', 'Invalid Date Range', 'warning');
                 return;
             }
 
@@ -520,5 +532,6 @@
             updateRowCount();
         });
     </script>
+    {% include 'confirm_modal.html' %}
 </body>
 </html>

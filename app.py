@@ -49,7 +49,7 @@ from system.database import (
     bulk_save_proctor_availability,
     get_proctor_exams,
     # timetable
-    get_public_timetable,
+    get_public_timetable, is_schedule_published, publish_schedule, unpublish_schedule,
     # relievers
     add_reliever, get_relievers_for_exam, get_all_relievers, remove_reliever,
     # secretary
@@ -62,6 +62,8 @@ from system.database import (
     mark_notification_read, mark_all_read, create_notification_for_role,
     # reports
     get_scheduling_report, get_assignment_report, get_student_exam_load_report,
+    # archives
+    create_exam_archive, get_exam_archives, get_exam_archive_by_id, delete_exam_archive,
     # period
     open_db,
 )
@@ -134,6 +136,16 @@ def add_cache_control_headers(response):
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
     return response
+
+@app.template_filter('clean_hours')
+def clean_hours_filter(val):
+    if val is None or val == '':
+        return 0
+    try:
+        f = float(val)
+        return int(f) if f.is_integer() or f % 1 == 0 else round(f, 1)
+    except (ValueError, TypeError):
+        return val
 
 def require_role(*roles):
     redir = require_login()
@@ -276,7 +288,9 @@ def login():
             return _redirect_by_role()
         all_exams = get_schedule_results()
         sections = sorted(list(set(e.get('section', '').strip() for e in all_exams if e.get('section', '').strip() and e.get('status') == 'Scheduled')))
-        return render_template("login.html", sections=sections)
+        # Toggle Demo Accounts card on login page (set SHOW_DEMO_ACCOUNTS=False in production / domain launch)
+        show_demo = os.environ.get('SHOW_DEMO_ACCOUNTS', 'True').lower() in ('true', '1', 'yes')
+        return render_template("login.html", sections=sections, show_demo=show_demo)
 
     
     # POST - process credentials
@@ -557,7 +571,8 @@ def generate_schedule():
             smtp_from=settings.get('smtp_from', ''),
             smtp_use_tls=settings.get('smtp_use_tls', 1),
             major_duration_hrs=settings.get('major_duration_hrs', 2.0),
-            minor_duration_hrs=settings.get('minor_duration_hrs', 1.0)
+            minor_duration_hrs=settings.get('minor_duration_hrs', 1.0),
+            max_daily_proctor_hrs=settings.get('max_daily_proctor_hrs', 4.0)
         )
         settings = get_system_settings() # reload
 
@@ -631,10 +646,50 @@ def generate_schedule():
 def reset_schedule_route():
     guard = require_role('admin')
     if guard: return guard
+    # Check if user requested archiving before resetting
+    if request.form.get('archive_before_reset') == '1':
+        term_tuple = get_exam_term()
+        exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
+        exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
+        ok, res = create_exam_archive(
+            academic_year="2025-2026",
+            exam_term=exam_term,
+            exam_semester=exam_semester,
+            archive_title=None,
+            notes="Automatically archived prior to schedule reset.",
+            user_id=session.get('user_id'),
+            user_name=session.get('full_name')
+        )
+        if ok:
+            flash("Archived a snapshot of the current schedule before resetting.", "info")
     reset_schedule()
     session.pop('last_failed', None)
     session.pop('last_scheduled_count', None)
     flash('Schedule reset. All exams are back to Pending.', 'success')
+    return redirect(url_for('schedule_view'))
+
+@app.route("/schedule/publish", methods=["POST"])
+def schedule_publish():
+    guard = require_role('admin')
+    if guard: return guard
+    from system.database import publish_schedule
+    ok, msg = publish_schedule(user_id=session.get('user_id'))
+    if ok:
+        flash("Exam timetable has been finalized and published! It is now live on Student and Proctor portals.", "success")
+    else:
+        flash(f"Failed to publish timetable: {msg}", "danger")
+    return redirect(url_for('schedule_view'))
+
+@app.route("/schedule/unpublish", methods=["POST"])
+def schedule_unpublish():
+    guard = require_role('admin')
+    if guard: return guard
+    from system.database import unpublish_schedule
+    ok, msg = unpublish_schedule(user_id=session.get('user_id'))
+    if ok:
+        flash("Exam timetable has been reverted to Draft mode. It is now hidden from students, proctors, and secretaries.", "warning")
+    else:
+        flash(f"Failed to unpublish timetable: {msg}", "danger")
     return redirect(url_for('schedule_view'))
 
 @app.route("/resolve_conflicts", methods=["POST"])
@@ -828,7 +883,8 @@ def schedule_view():
                            all_sections=all_sections,
                            filter_section=filter_section,
                            exam_term=get_exam_term()[0],
-                           exam_semester=get_exam_term()[1])
+                           exam_semester=get_exam_term()[1],
+                           is_published=is_schedule_published())
 
 @app.route("/api/auto_schedule_exam", methods=["POST"])
 def api_auto_schedule_exam():
@@ -870,6 +926,22 @@ def available_resources():
         return jsonify({'rooms': [], 'instructors': []})
     res = get_available_resources(exam_id, dt_str, duration)
     return jsonify(res)
+
+@app.route("/api/resource_availability", methods=["GET"])
+def api_resource_availability():
+    guard = require_role('admin', 'secretary', 'proctor')
+    if guard:
+        return jsonify({'error': 'Not authorised'}), 403
+    res_type = request.args.get('type', '').strip().lower()
+    res_id   = request.args.get('id', '').strip()
+    if not res_type or not res_id or not res_id.isdigit():
+        return jsonify({'error': 'Invalid resource parameters'}), 400
+    
+    from system.database import get_resource_schedule_details
+    details = get_resource_schedule_details(res_type, int(res_id))
+    if not details:
+        return jsonify({'error': 'Resource not found'}), 404
+    return jsonify(details)
 
 
 @app.route("/api/sister_sections", methods=["GET"])
@@ -1240,9 +1312,16 @@ def admin_proctor_availability(id):
     # Get instructor info
     db = open_db()
     cursor = db.cursor(dictionary=True)
-    cursor.execute("SELECT i.*, inst.name as institute_name FROM instructors i LEFT JOIN institutes inst ON i.institute_id = inst.id WHERE i.id = %s", (id,))
+    cursor.execute("""
+        SELECT i.*, inst.name as institute_name,
+               (SELECT ROUND(COALESCE(SUM(duration_minutes)/60.0, 0), 1) FROM exams WHERE instructor_id = i.id AND status = 'Scheduled') as total_hours
+        FROM instructors i LEFT JOIN institutes inst ON i.institute_id = inst.id WHERE i.id = %s
+    """, (id,))
     instructor = cursor.fetchone()
     db.close()
+    if instructor and instructor.get('total_hours') is not None:
+        tot = float(instructor['total_hours'])
+        instructor['total_hours'] = int(tot) if tot.is_integer() else round(tot, 1)
     
     if not instructor:
         flash("Instructor not found.", "danger")
@@ -1510,6 +1589,134 @@ def reports_page():
                            date_from=date_from, date_to=date_to,
                            unread_count=unread)
 
+# ── EXAM ARCHIVES (HISTORICAL RECORDS) ──────────────────────────────────────
+
+@app.route("/admin/archives")
+def admin_archives():
+    guard = require_role('admin', 'secretary')
+    if guard: return guard
+    archives = get_exam_archives()
+    term_tuple = get_exam_term()
+    exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
+    exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
+    unread = _get_unread(session['user_id'])
+    return render_template("archives.html",
+                           archives=archives,
+                           current_term=exam_term,
+                           current_semester=exam_semester,
+                           unread_count=unread)
+
+@app.route("/admin/archives/create", methods=["POST"])
+def admin_archives_create():
+    guard = require_role('admin')
+    if guard: return guard
+    academic_year = request.form.get("academic_year", "2025-2026").strip()
+    exam_term = request.form.get("exam_term", "Midterm").strip()
+    exam_semester = request.form.get("exam_semester", "1st Semester").strip()
+    archive_title = request.form.get("archive_title", "").strip()
+    notes = request.form.get("notes", "").strip()
+
+    ok, res = create_exam_archive(
+        academic_year=academic_year,
+        exam_term=exam_term,
+        exam_semester=exam_semester,
+        archive_title=archive_title or None,
+        notes=notes or None,
+        user_id=session.get('user_id'),
+        user_name=session.get('full_name')
+    )
+    if ok:
+        flash(f"Successfully created historical archive '{archive_title or f'A.Y. {academic_year} {exam_semester} {exam_term}'}'.", "success")
+    else:
+        flash(f"Failed to create archive: {res}", "danger")
+    return redirect(url_for('admin_archives'))
+
+@app.route("/admin/archives/<int:archive_id>")
+def admin_archive_view(archive_id):
+    guard = require_role('admin', 'secretary')
+    if guard: return guard
+    archive = get_exam_archive_by_id(archive_id)
+    if not archive:
+        flash("Archived record not found.", "danger")
+        return redirect(url_for('admin_archives'))
+    unread = _get_unread(session['user_id'])
+    return render_template("archive_view.html",
+                           archive=archive,
+                           unread_count=unread)
+
+@app.route("/admin/archives/<int:archive_id>/export_csv")
+def admin_archive_export_csv(archive_id):
+    guard = require_role('admin', 'secretary')
+    if guard: return guard
+    archive = get_exam_archive_by_id(archive_id)
+    if not archive:
+        flash("Archived record not found.", "danger")
+        return redirect(url_for('admin_archives'))
+
+    import csv
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Subject Name", "Subject Code", "Section", "Subject Type",
+        "Exam Date", "Start Time", "End Time", "Duration (min)",
+        "Room", "Building", "Floor", "Proctor", "Institute"
+    ])
+    for ex in archive.get('exams', []):
+        writer.writerow([
+            ex.get('subject_name', ''),
+            ex.get('subject_code', ''),
+            ex.get('section', ''),
+            ex.get('subject_type', ''),
+            ex.get('formatted_date') or (ex.get('exam_date_time')[:10] if ex.get('exam_date_time') else ''),
+            ex.get('formatted_time', ''),
+            ex.get('formatted_time_end', ''),
+            ex.get('duration_minutes', 60),
+            ex.get('room_name', ''),
+            ex.get('building', ''),
+            ex.get('floor', ''),
+            ex.get('instructor_name', ''),
+            ex.get('institute_name', '')
+        ])
+
+    csv_data = output.getvalue()
+    safe_title = "".join(c for c in archive.get('archive_title', 'archive') if c.isalnum() or c in (' ', '_', '-')).strip().replace(' ', '_')
+    filename = f"{safe_title}.csv"
+    response = make_response(csv_data)
+    response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+    response.headers["Content-Type"] = "text/csv; charset=utf-8"
+    return response
+
+@app.route("/admin/archives/<int:archive_id>/export_pdf")
+def admin_archive_export_pdf(archive_id):
+    guard = require_role('admin', 'secretary')
+    if guard: return guard
+    archive = get_exam_archive_by_id(archive_id)
+    if not archive:
+        flash("Archived record not found.", "danger")
+        return redirect(url_for('admin_archives'))
+
+    from system.exporter import export_archive_pdf
+    pdf_bytes = export_archive_pdf(archive)
+    safe_title = "".join(c for c in archive.get('archive_title', 'archive') if c.isalnum() or c in (' ', '_', '-')).strip().replace(' ', '_')
+    filename = f"{safe_title}.pdf"
+    return send_file(
+        io.BytesIO(pdf_bytes),
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=filename
+    )
+
+@app.route("/admin/archives/<int:archive_id>/delete", methods=["POST"])
+def admin_archive_delete(archive_id):
+    guard = require_role('admin')
+    if guard: return guard
+    ok, msg = delete_exam_archive(archive_id)
+    if ok:
+        flash(msg, "success")
+    else:
+        flash(f"Error deleting archive: {msg}", "danger")
+    return redirect(url_for('admin_archives'))
+
 # â”€â”€ SETTINGS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/settings")
@@ -1525,28 +1732,37 @@ def settings_save():
     guard = require_role('admin')
     if guard: return guard
     
+    cur_settings = get_system_settings() or {}
+
     def get_int(key, default):
         val = request.form.get(key, "").strip()
-        return int(val) if val else default
+        if val:
+            try: return int(val)
+            except ValueError: pass
+        return int(cur_settings.get(key, default) or default)
 
     def get_float(key, default):
         val = request.form.get(key, "").strip()
-        return float(val) if val else default
+        if val:
+            try: return float(val)
+            except ValueError: pass
+        return float(cur_settings.get(key, default) or default)
 
     save_system_settings(
-        day_start=request.form.get("day_start", "07:00"),
-        day_end=request.form.get("day_end", "20:00"),
+        day_start=request.form.get("day_start") or cur_settings.get("day_start", "07:00"),
+        day_end=request.form.get("day_end") or cur_settings.get("day_end", "20:00"),
         slot_interval_min=get_int("slot_interval_min", 60),
         max_proctor_hrs=get_int("max_consecutive_proctor_hrs", 3),
         travel_buffer_min=get_int("travel_buffer_min", 15),
-        smtp_host=request.form.get("smtp_host", ""),
+        smtp_host=request.form.get("smtp_host", cur_settings.get("smtp_host", "")),
         smtp_port=get_int("smtp_port", 587),
-        smtp_user=request.form.get("smtp_user", ""),
-        smtp_password=request.form.get("smtp_password", ""),
-        smtp_from=request.form.get("smtp_from", ""),
-        smtp_use_tls=1 if request.form.get("smtp_use_tls") else 0,
+        smtp_user=request.form.get("smtp_user", cur_settings.get("smtp_user", "")),
+        smtp_password=request.form.get("smtp_password", cur_settings.get("smtp_password", "")),
+        smtp_from=request.form.get("smtp_from", cur_settings.get("smtp_from", "")),
+        smtp_use_tls=1 if request.form.get("smtp_use_tls") else cur_settings.get("smtp_use_tls", 0),
         major_duration_hrs=get_float("major_duration_hrs", 2.0),
-        minor_duration_hrs=get_float("minor_duration_hrs", 1.0)
+        minor_duration_hrs=get_float("minor_duration_hrs", 1.0),
+        max_daily_proctor_hrs=get_float("max_daily_proctor_hrs", 4.0)
     )
     
     # Auto-update existing exams to match the new duration defaults
@@ -1667,6 +1883,54 @@ def admin_change_password(user_id):
             db.close()
     return redirect(url_for(redirect_to))
 
+def derive_user_reset_password(full_name):
+    """
+    Derives default reset password based on user's lastname + '123' (e.g. malagu123).
+    Supports formats:
+      - 'Lastname, Firstname' -> lastname123
+      - 'Firstname Lastname'  -> lastname123
+    """
+    import re
+    if not full_name or not full_name.strip():
+        return 'password123'
+    name = full_name.strip()
+    if ',' in name:
+        last_part = name.split(',')[0].strip()
+    else:
+        parts = name.split()
+        last_part = parts[-1].strip() if parts else 'password'
+    clean_last = re.sub(r'[^a-zA-Z0-9]', '', last_part).lower()
+    return f"{clean_last}123" if clean_last else 'password123'
+
+@app.route("/admin/reset_password/<int:user_id>", methods=["POST"])
+def admin_reset_password(user_id):
+    guard = require_role('admin')
+    if guard: return guard
+    redirect_to = request.form.get("redirect_to", "students_page")
+    db = open_db()
+    if db:
+        try:
+            import bcrypt as _bcrypt
+            c = db.cursor(dictionary=True)
+            c.execute("SELECT full_name, role FROM users WHERE id = %s", (user_id,))
+            user = c.fetchone()
+            if not user or user['role'] not in ('student', 'proctor'):
+                flash("User not found or not allowed.", "danger")
+                return redirect(url_for(redirect_to))
+            
+            # Reset to lastname123 or provided custom password
+            default_pw = request.form.get("new_password", "").strip() or derive_user_reset_password(user['full_name'])
+            hashed = _bcrypt.hashpw(default_pw.encode(), _bcrypt.gensalt()).decode()
+            c.execute("UPDATE users SET password = %s WHERE id = %s", (hashed, user_id))
+            db.commit()
+            flash(f"Password for {user['full_name']} has been reset to '{default_pw}'.", "success")
+        except Exception as e:
+            flash(f"Error resetting password: {e}", "danger")
+        finally:
+            db.close()
+    return redirect(url_for(redirect_to))
+
+
 # â”€â”€ STUDENTS (Admin-accessible) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/students")
@@ -1678,12 +1942,58 @@ def students_page():
     institutes       = get_all_institutes()
     unread           = _get_unread(session['user_id'])
     pending_count    = len(pending_students)
+    
+    db_conn = open_db()
+    sections = []
+    if db_conn:
+        try:
+            cur = db_conn.cursor()
+            cur.execute("SELECT DISTINCT section FROM (SELECT section FROM users WHERE section IS NOT NULL AND section != '' UNION SELECT section FROM exams WHERE section IS NOT NULL AND section != '') AS s ORDER BY section")
+            sections = [r[0] for r in cur.fetchall()]
+        finally:
+            db_conn.close()
+
     return render_template("students.html",
                            pending_students=pending_students,
                            all_students=all_students,
                            institutes=institutes,
                            unread_count=unread,
-                           pending_count=pending_count)
+                           pending_count=pending_count,
+                           sections=sections)
+
+@app.route("/admin/edit_student/<int:user_id>", methods=["POST"])
+def admin_edit_student(user_id):
+    guard = require_role('admin')
+    if guard: return guard
+    new_section = request.form.get("section", "").strip()
+    new_name = request.form.get("full_name", "").strip()
+    new_email = request.form.get("email", "").strip()
+    redirect_to = request.form.get("redirect_to", "students_page")
+    
+    db = open_db()
+    if db:
+        try:
+            cursor = db.cursor(dictionary=True)
+            cursor.execute("SELECT id, full_name FROM users WHERE id = %s AND role = 'student'", (user_id,))
+            student = cursor.fetchone()
+            if not student:
+                flash("Student not found.", "danger")
+                return redirect(url_for(redirect_to))
+            
+            cursor.execute("""
+                UPDATE users 
+                SET section = %s,
+                    full_name = CASE WHEN %s != '' THEN %s ELSE full_name END,
+                    email = CASE WHEN %s != '' THEN %s ELSE email END
+                WHERE id = %s AND role = 'student'
+            """, (new_section, new_name, new_name, new_email, new_email, user_id))
+            db.commit()
+            flash(f"Student '{student['full_name']}' updated successfully. Section is now '{new_section or 'None'}'.", "success")
+        except Exception as e:
+            flash(f"Error updating student: {e}", "danger")
+        finally:
+            db.close()
+    return redirect(url_for(redirect_to))
 
 @app.route("/students/approve/<int:id>", methods=["POST"])
 def admin_approve_student(id):
@@ -1743,6 +2053,25 @@ def students_bulk_action():
         for uid in user_ids:
             approve_student(uid)
         flash(f" {len(user_ids)} student(s) approved.", "success")
+    elif action == 'reset_password':
+        import bcrypt as _bcrypt
+        db = open_db()
+        if db:
+            try:
+                c = db.cursor(dictionary=True)
+                format_strings = ','.join(['%s'] * len(user_ids))
+                c.execute(f"SELECT id, full_name FROM users WHERE id IN ({format_strings}) AND role='student'", user_ids)
+                students = c.fetchall()
+                for st in students:
+                    pw = derive_user_reset_password(st['full_name'])
+                    hashed = _bcrypt.hashpw(pw.encode(), _bcrypt.gensalt()).decode()
+                    c.execute("UPDATE users SET password = %s WHERE id = %s", (hashed, st['id']))
+                db.commit()
+                flash(f"Password reset to [lastname123] for {len(students)} student(s).", "success")
+            except Exception as e:
+                flash(f"Error resetting passwords: {e}", "danger")
+            finally:
+                db.close()
     else:
         flash("Unknown action.", "danger")
     return redirect(url_for('students_page'))
@@ -1889,21 +2218,29 @@ def super_delete_user(id):
 def super_reset_password(id):
     guard = require_super_admin()
     if guard: return guard
-    new_password = request.form.get("new_password", "password123").strip()
-    if not new_password or len(new_password) < 6:
-        flash("Password must be at least 6 characters.", "danger")
-        return redirect(url_for('super_admin_page'))
     db = open_db()
     if db:
         try:
             import bcrypt as _bcrypt
-            hashed = _bcrypt.hashpw(new_password.encode(), _bcrypt.gensalt()).decode()
             c = db.cursor(dictionary=True)
+            c.execute("SELECT id, full_name, email, role FROM users WHERE id = %s", (id,))
+            target_user = c.fetchone()
+            if not target_user:
+                flash("User not found.", "danger")
+                return redirect(url_for('super_admin_page'))
+            
+            custom_pw = request.form.get("new_password", "").strip()
+            if custom_pw:
+                default_pw = custom_pw
+            else:
+                default_pw = derive_user_reset_password(target_user.get('full_name') or 'User')
+            
+            hashed = _bcrypt.hashpw(default_pw.encode(), _bcrypt.gensalt()).decode()
             c.execute("UPDATE users SET password = %s WHERE id = %s", (hashed, id))
             db.commit()
-            flash("Password reset to default (password123) successfully.", "success")
+            flash(f"Password for {target_user['full_name']} reset to default ({default_pw}) successfully.", "success")
         except Exception as e:
-            flash(f"Error: {e}", "danger")
+            flash(f"Error resetting password: {e}", "danger")
         finally:
             db.close()
     return redirect(url_for('super_admin_page'))
@@ -1914,20 +2251,26 @@ def super_reset_password(id):
 def proctor_dashboard():
     guard = require_role('proctor')
     if guard: return guard
+    is_pub = is_schedule_published()
     instructor_id = session.get('instructor_id')
-    exams = get_proctor_exams(instructor_id) if instructor_id else []
+    if not is_pub:
+        exams = []
+        total_hours = 0.0
+        sorted_groups = []
+    else:
+        exams = get_proctor_exams(instructor_id) if instructor_id else []
+        total_hours = get_proctor_total_hours(instructor_id) if instructor_id else 0.0
+        grouped = defaultdict(list)
+        for exam in exams:
+            dt = exam['exam_date_time']
+            if not dt: continue
+            if isinstance(dt, str):
+                dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+            exam['time'] = dt.strftime("%I:%M %p")
+            grouped[dt.strftime("%A, %B %d, %Y")].append(exam)
+        sorted_groups = sorted(grouped.items(),
+                               key=lambda x: datetime.strptime(x[0], "%A, %B %d, %Y"))
     saved_dates = get_proctor_availability_for(instructor_id) if instructor_id else []
-    total_hours = get_proctor_total_hours(instructor_id) if instructor_id else 0.0
-    grouped = defaultdict(list)
-    for exam in exams:
-        dt = exam['exam_date_time']
-        if not dt: continue
-        if isinstance(dt, str):
-            dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
-        exam['time'] = dt.strftime("%I:%M %p")
-        grouped[dt.strftime("%A, %B %d, %Y")].append(exam)
-    sorted_groups = sorted(grouped.items(),
-                           key=lambda x: datetime.strptime(x[0], "%A, %B %d, %Y"))
     period_start, period_end = get_exam_period()
     period_dates = []
     if period_start and period_end:
@@ -1944,7 +2287,8 @@ def proctor_dashboard():
                            period_start=str(period_start) if period_start else '',
                            period_end=str(period_end) if period_end else '',
                            total_hours=total_hours,
-                           unread_count=unread)
+                           unread_count=unread,
+                           is_published=is_pub)
 
 
 
@@ -2030,16 +2374,60 @@ def remove_reliever_route(id):
 def secretary_dashboard():
     guard = require_role('secretary', 'admin')
     if guard: return guard
+    is_pub = is_schedule_published()
     # Admins see all institutes; secretaries see only their own
     inst_id     = None if session.get('role') == 'admin' else session.get('institute_id')
-    exams       = get_exam_collection_status(institute_id=inst_id)
     instructors = get_active_instructors()
-    stats       = get_collection_stats(institute_id=inst_id)
     unread      = _get_unread(session['user_id'])
+    
+    if not is_pub and session.get('role') != 'admin':
+        exams = []
+        stats = {'total': 0, 'collected': 0, 'returned': 0, 'pending_collection': 0}
+        pending_absences = []
+    else:
+        exams       = get_exam_collection_status(institute_id=inst_id)
+        stats       = get_collection_stats(institute_id=inst_id)
+        from system.database import get_unresolved_absences
+        pending_absences = get_unresolved_absences(institute_id=inst_id)
+    
     return render_template("secretary.html",
                            exams=exams, instructors=instructors,
                            stats=stats, unread_count=unread,
-                           institute_id=inst_id)
+                           institute_id=inst_id,
+                           pending_absences=pending_absences,
+                           is_published=is_pub)
+
+@app.route("/api/substitute_candidates/<int:exam_id>", methods=["GET"])
+def api_substitute_candidates(exam_id):
+    guard = require_role('secretary', 'admin')
+    if guard: return jsonify({'error': 'Not authorised'}), 403
+    inst_id = None if session.get('role') == 'admin' else session.get('institute_id')
+    from system.database import get_substitute_candidates
+    data = get_substitute_candidates(exam_id, institute_id=inst_id)
+    if not data: return jsonify({'error': 'Exam not found'}), 404
+    return jsonify(data)
+
+@app.route("/secretary/assign_substitute", methods=["POST"])
+def secretary_assign_substitute():
+    guard = require_role('secretary', 'admin')
+    if guard: return guard
+    exam_id = request.form.get("exam_id")
+    new_inst_id = request.form.get("instructor_id")
+    new_room_id = request.form.get("room_id")
+    reason = request.form.get("reason", "").strip()
+
+    if not exam_id or not new_inst_id:
+        flash("Please select an exam and substitute proctor.", "warning")
+        return redirect(url_for('secretary_dashboard'))
+
+    from system.database import reassign_exam_proctor_room
+    ok, msg = reassign_exam_proctor_room(int(exam_id), int(new_inst_id), new_room_id=new_room_id, reason=reason, reassigned_by=session.get('user_id'))
+    if ok:
+        flash(msg, "success")
+    else:
+        flash(f"Failed to assign substitute: {msg}", "danger")
+    return redirect(url_for('secretary_dashboard'))
+
 
 @app.route("/secretary/collect/<int:exam_id>", methods=["POST"])
 def secretary_collect(exam_id):
@@ -2154,8 +2542,15 @@ def notifications_page():
     if guard: return guard
     notifs = get_notifications(session['user_id'])
     unread = _get_unread(session['user_id'])
+    pending_count = 0
+    if session.get('role') in ['admin', 'super_admin']:
+        try:
+            pending_count = len(get_pending_users())
+        except Exception:
+            pending_count = 0
     return render_template("notifications.html",
-                           notifications=notifs, unread_count=unread)
+                           notifications=notifs, unread_count=unread,
+                           pending_count=pending_count)
 
 @app.route("/notifications/mark_read/<int:id>", methods=["POST"])
 def mark_read(id):
@@ -2310,21 +2705,26 @@ def admin_print_section():
 def student_timetable():
     guard = require_role('student')
     if guard: return guard
+    is_pub = is_schedule_published()
     section      = session.get('section', '')
     institute_id = session.get('institute_id')
     full_name    = session.get('full_name', 'Student')
-    exams = get_public_timetable(section=section, institute_id=institute_id)
-    grouped = defaultdict(list)
-    for exam in exams:
-        dt = exam['exam_date_time']
-        if not dt: continue
-        if isinstance(dt, str):
-            dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
-        exam['time']     = dt.strftime("%I:%M %p")
-        exam['time_end'] = (dt + timedelta(minutes=int(exam['duration_minutes'] or 60))).strftime("%I:%M %p")
-        grouped[dt.strftime("%A, %B %d, %Y")].append(exam)
-    sorted_groups = sorted(grouped.items(),
-                           key=lambda x: datetime.strptime(x[0], "%A, %B %d, %Y"))
+    if not is_pub:
+        exams = []
+        sorted_groups = []
+    else:
+        exams = get_public_timetable(section=section, institute_id=institute_id)
+        grouped = defaultdict(list)
+        for exam in exams:
+            dt = exam['exam_date_time']
+            if not dt: continue
+            if isinstance(dt, str):
+                dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+            exam['time']     = dt.strftime("%I:%M %p")
+            exam['time_end'] = (dt + timedelta(minutes=int(exam['duration_minutes'] or 60))).strftime("%I:%M %p")
+            grouped[dt.strftime("%A, %B %d, %Y")].append(exam)
+        sorted_groups = sorted(grouped.items(),
+                               key=lambda x: datetime.strptime(x[0], "%A, %B %d, %Y"))
     # Get institute name
     institute_name = ''
     if institute_id:
@@ -2336,6 +2736,17 @@ def student_timetable():
     exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
     exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
     unread = _get_unread(session['user_id'])
+    
+    db_conn = open_db()
+    available_sections = []
+    if db_conn:
+        try:
+            cur = db_conn.cursor()
+            cur.execute("SELECT DISTINCT section FROM (SELECT section FROM users WHERE section IS NOT NULL AND section != '' UNION SELECT section FROM exams WHERE section IS NOT NULL AND section != '') AS s ORDER BY section")
+            available_sections = [r[0] for r in cur.fetchall()]
+        finally:
+            db_conn.close()
+
     return render_template("student_timetable.html",
                            grouped=sorted_groups,
                            total=len(exams),
@@ -2344,7 +2755,32 @@ def student_timetable():
                            institute_name=institute_name,
                            exam_term=exam_term,
                            exam_semester=exam_semester,
-                           unread_count=unread)
+                           unread_count=unread,
+                           is_published=is_pub,
+                           available_sections=available_sections)
+
+@app.route("/student/update_section", methods=["POST"])
+def student_update_section():
+    guard = require_role('student')
+    if guard: return guard
+    new_section = request.form.get("section", "").strip()
+    if not new_section:
+        flash("Please select a valid section.", "error")
+        return redirect(url_for('student_timetable'))
+    
+    db = open_db()
+    if db:
+        try:
+            cursor = db.cursor()
+            cursor.execute("UPDATE users SET section = %s WHERE id = %s", (new_section, session['user_id']))
+            db.commit()
+            session['section'] = new_section
+            flash(f"Section successfully updated to '{new_section}'. Timetable refreshed.", "success")
+        except Exception as e:
+            flash(f"Error updating section: {e}", "danger")
+        finally:
+            db.close()
+    return redirect(url_for('student_timetable'))
 
 # â”€â”€ MISC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 

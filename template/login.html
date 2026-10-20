@@ -127,12 +127,76 @@
                 <i class="fa-solid fa-magnifying-glass mr-2"></i> Find My Timetable
             </a>
         </div>
-        
 
+        {% if show_demo %}
+        <!-- Demo / Testing Accounts Quick Fill -->
+        <div id="demo-accounts-box" class="mt-6 pt-5 border-t border-gray-100">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
+                    <i class="fa-solid fa-flask-vial text-[#668054]"></i> Testing & Demo Logins
+                </span>
+                <span class="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    Dev Mode
+                </span>
+            </div>
+            <p class="text-[11px] text-gray-500 mb-3">
+                Click any role below to auto-fill credentials for testing:
+            </p>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+                <button type="button" onclick="fillDemo('admin@cca.edu.ph', 'admin123')"
+                        class="p-2.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-[#668054]/10 hover:border-[#668054] text-left transition-all group">
+                    <div class="flex items-center gap-1.5 font-bold text-gray-800 group-hover:text-[#668054]">
+                        <i class="fa-solid fa-shield-halved text-purple-600"></i> Admin
+                    </div>
+                    <div class="text-[11px] text-gray-400 mt-0.5 truncate">admin@cca.edu.ph</div>
+                </button>
+
+                <button type="button" onclick="fillDemo('secretary.ieas@cca.edu.ph', 'admin123')"
+                        class="p-2.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-[#668054]/10 hover:border-[#668054] text-left transition-all group">
+                    <div class="flex items-center gap-1.5 font-bold text-gray-800 group-hover:text-[#668054]">
+                        <i class="fa-solid fa-clipboard-user text-blue-600"></i> Secretary (IEAS)
+                    </div>
+                    <div class="text-[11px] text-gray-400 mt-0.5 truncate">secretary.ieas@cca.edu.ph</div>
+                </button>
+
+                <button type="button" onclick="fillDemo('babadilla.roan@cca.edu.ph', 'proctor123')"
+                        class="p-2.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-[#668054]/10 hover:border-[#668054] text-left transition-all group">
+                    <div class="flex items-center gap-1.5 font-bold text-gray-800 group-hover:text-[#668054]">
+                        <i class="fa-solid fa-chalkboard-user text-emerald-600"></i> Proctor
+                    </div>
+                    <div class="text-[11px] text-gray-400 mt-0.5 truncate">babadilla.roan@cca.edu.ph</div>
+                </button>
+
+                <button type="button" onclick="fillDemo('rlpangilinan23-0305@cca.edu.ph', 'malagu123')"
+                        class="p-2.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-[#668054]/10 hover:border-[#668054] text-left transition-all group">
+                    <div class="flex items-center gap-1.5 font-bold text-gray-800 group-hover:text-[#668054]">
+                        <i class="fa-solid fa-graduation-cap text-amber-600"></i> Student
+                    </div>
+                    <div class="text-[11px] text-gray-400 mt-0.5 truncate">rlpangilinan23-0305</div>
+                </button>
+            </div>
+        </div>
+        {% endif %}
 
     </div>
 
 <script>
+    function fillDemo(email, password) {
+        const emailInput = document.getElementById('email');
+        const pwInput = document.getElementById('password');
+        if (emailInput && pwInput) {
+            emailInput.value = email;
+            pwInput.value = password;
+            // Visual highlight animation
+            emailInput.classList.add('ring-2', 'ring-[#668054]');
+            pwInput.classList.add('ring-2', 'ring-[#668054]');
+            setTimeout(() => {
+                emailInput.classList.remove('ring-2', 'ring-[#668054]');
+                pwInput.classList.remove('ring-2', 'ring-[#668054]');
+            }, 600);
+        }
+    }
+
     function togglePassword(btn) {
         const container = btn.parentElement;
         const input = container.querySelector('input');

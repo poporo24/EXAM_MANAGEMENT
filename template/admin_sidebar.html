@@ -1,10 +1,58 @@
-<aside id="sidebar" class="bg-white border-r border-gray-200 fixed h-screen w-64 sidebar-transition z-20 flex flex-col overflow-hidden">
+<script>
+    (function() {
+        try {
+            if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                document.documentElement.classList.add('sidebar-collapsed');
+            }
+        } catch (e) {}
+    })();
+</script>
+<style>
+    /* Prevent window horizontal jump */
+    html, body {
+        overflow-x: hidden;
+    }
+    #main-content {
+        min-width: 0;
+        max-width: 100%;
+    }
+    /* Immediate collapsed state */
+    html.sidebar-collapsed #sidebar {
+        width: 4rem !important;
+    }
+    html.sidebar-collapsed #main-content {
+        margin-left: 4rem !important;
+    }
+    html.sidebar-collapsed .nav-text {
+        display: none !important;
+    }
+    html.sidebar-collapsed .sidebar-header-container {
+        justify-content: center !important;
+    }
+    html.sidebar-collapsed .sidebar-header-container > div.nav-text,
+    html.sidebar-collapsed .sidebar-header-container > div:first-child {
+        display: none !important;
+    }
+    html.sidebar-collapsed #sidebar .sidebar-footer {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    html.sidebar-collapsed #sidebar .user-profile-row {
+        justify-content: center !important;
+    }
+    html.sidebar-collapsed #sidebar .sidebar-footer a,
+    html.sidebar-collapsed #sidebar .sidebar-footer button {
+        justify-content: center !important;
+    }
+</style>
+
+<aside id="sidebar" class="no-print bg-white border-r border-gray-200 fixed h-screen w-64 sidebar-transition z-20 flex flex-col overflow-hidden">
     <div class="h-16 w-full flex items-center justify-between px-4 border-b border-gray-200 sidebar-header-container">
         <div class="flex-1 flex items-center gap-3 overflow-hidden whitespace-nowrap nav-text">
             <i class="fa-solid fa-graduation-cap text-2xl text-[#668054]"></i>
             <span class="font-bold text-lg">CCA Exams</span>
         </div>
-        <button onclick="toggleSidebar()" class="text-gray-500 hover:text-[#668054] focus:outline-none">
+        <button onclick="toggleSidebar()" class="text-gray-500 hover:text-[#668054] focus:outline-none" title="Toggle Sidebar">
             <i class="fa-solid fa-bars text-xl"></i>
         </button>
     </div>
@@ -20,6 +68,11 @@
         <a href="/schedule" class="flex items-center px-4 py-3 group {% if active_page == 'schedule' %}bg-green-50 text-[#668054] border-r-4 border-[#668054]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#668054]{% endif %}" title="Schedule">
             <i class="fa-solid fa-calendar-alt w-6 text-center text-lg"></i>
             <span class="ml-3 nav-text font-medium">Schedule</span>
+        </a>
+
+        <a href="/admin/archives" class="flex items-center px-4 py-3 group {% if active_page == 'archives' %}bg-green-50 text-[#668054] border-r-4 border-[#668054]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#668054]{% endif %}" title="Exam Archives">
+            <i class="fa-solid fa-box-archive w-6 text-center text-lg"></i>
+            <span class="ml-3 nav-text font-medium">Exam Archives</span>
         </a>
 
         <a href="/faculty" class="flex items-center px-4 py-3 group {% if active_page == 'faculty' %}bg-green-50 text-[#668054] border-r-4 border-[#668054]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#668054]{% endif %}" title="Faculty">
@@ -46,7 +99,7 @@
         </a>
         
         <a href="/reports" class="flex items-center px-4 py-3 group {% if active_page == 'reports' %}bg-green-50 text-[#668054] border-r-4 border-[#668054]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#668054]{% endif %}" title="Reports">
-            <i class="fa-solid fa-chart-pie w-6 text-center text-lg"></i>
+            <i class="fa-solid fa-chart-line w-6 text-center text-lg"></i>
             <span class="ml-3 nav-text font-medium">Reports</span>
         </a>
 
@@ -79,9 +132,9 @@
         {% endif %}
     </nav>
 
-    <div class="border-t border-gray-200 p-4">
-                <div class="flex items-center mb-4 overflow-hidden whitespace-nowrap">
-            <div class="w-8 h-8 rounded-full bg-[#829c74] text-white flex items-center justify-center font-bold uppercase">
+    <div class="border-t border-gray-200 p-4 sidebar-footer">
+        <div class="flex items-center mb-4 overflow-hidden whitespace-nowrap user-profile-row">
+            <div class="w-8 h-8 rounded-full bg-[#829c74] text-white flex items-center justify-center font-bold uppercase flex-shrink-0">
                 {{ session.get('full_name', 'A')[:1] }}
             </div>
             <div class="ml-3 nav-text">
@@ -105,3 +158,71 @@
         </a>
     </div>
 </aside>
+
+<script>
+    function toggleSidebar() {
+        const isCollapsed = document.documentElement.classList.toggle('sidebar-collapsed');
+        localStorage.setItem('sidebarCollapsed', isCollapsed ? 'true' : 'false');
+        
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('main-content');
+        
+        if (sidebar) {
+            if (isCollapsed) {
+                sidebar.classList.remove('w-64', 'w-20');
+                sidebar.classList.add('w-16');
+            } else {
+                sidebar.classList.remove('w-16', 'w-20');
+                sidebar.classList.add('w-64');
+            }
+            sidebar.querySelectorAll('.nav-text').forEach(el => {
+                if (isCollapsed) el.classList.add('hidden');
+                else el.classList.remove('hidden');
+            });
+            sidebar.querySelectorAll('.sidebar-header-container').forEach(h => {
+                if (isCollapsed) {
+                    h.classList.remove('justify-between');
+                    h.classList.add('justify-center');
+                } else {
+                    h.classList.add('justify-between');
+                    h.classList.remove('justify-center');
+                }
+            });
+        }
+        
+        if (mainContent) {
+            if (isCollapsed) {
+                mainContent.classList.remove('ml-64', 'ml-20');
+                mainContent.classList.add('ml-16');
+            } else {
+                mainContent.classList.remove('ml-16', 'ml-20');
+                mainContent.classList.add('ml-64');
+            }
+        }
+    }
+
+    // Sync state on DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', () => {
+        const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+        if (isCollapsed) {
+            document.documentElement.classList.add('sidebar-collapsed');
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('main-content');
+            if (sidebar) {
+                sidebar.classList.remove('w-64', 'w-20');
+                sidebar.classList.add('w-16');
+                sidebar.querySelectorAll('.nav-text').forEach(el => el.classList.add('hidden'));
+                sidebar.querySelectorAll('.sidebar-header-container').forEach(h => {
+                    h.classList.remove('justify-between');
+                    h.classList.add('justify-center');
+                });
+            }
+            if (mainContent) {
+                mainContent.classList.remove('ml-64', 'ml-20');
+                mainContent.classList.add('ml-16');
+            }
+        } else {
+            document.documentElement.classList.remove('sidebar-collapsed');
+        }
+    });
+</script>

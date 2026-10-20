@@ -117,38 +117,279 @@
 
         
         
+        @page {
+            size: landscape;
+            margin: 8mm 6mm;
+        }
+
         @media print {
-            @page { size: landscape; margin: 10mm; }
-            .timetable { table-layout: fixed; width: 100%; word-wrap: break-word; }
-            .timetable tr { page-break-inside: avoid; break-inside: avoid; }
-            .timetable th, .timetable td { overflow-wrap: break-word; font-size: 11px; padding: 4px !important; }
-            .exam-card { font-size: 10px !important; padding: 4px !important; margin-bottom: 2px !important; page-break-inside: avoid; break-inside: avoid; }
-            .exam-card .subject { font-size: 11px !important; white-space: normal !important; line-height: 1.1; }
-            .exam-card .meta { font-size: 9px !important; white-space: normal !important; line-height: 1.1; }
-            .badge { padding: 1px 4px !important; font-size: 8px !important; }
-            
-            .no-print { display: none !important; }
+            /* Hide non-printable elements */
+            #sidebar, aside, nav, header, .no-print,
+            .fa-pen-to-square, .exam-card .subject span,
+            button, form, .modal, [id*="Modal"] {
+                display: none !important;
+            }
 
-            body { background: white !important; margin: 0; padding: 0; font-family: "Inter", sans-serif; }
-            main { margin-left: 0 !important; padding: 0 !important; max-width: 100% !important; }
-            .timetable-wrapper { box-shadow: none; border: 1px solid #ddd; width: 100%; margin-top: 20px; }
-            .timetable-wrapper th { background-color: #668054 !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .timetable-wrapper .time-cell { background-color: #f9f9f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .timetable-wrapper td, .timetable-wrapper th { border-color: #ddd !important; }
-            
-            .print-only { display: block !important; }
-            .print-header { text-align: center; margin-bottom: 20px; padding: 20px 20px 0 20px; }
-            .print-logo-section { display: flex; align-items: center; justify-content: flex-start; margin-bottom: 15px; border-bottom: 2px solid #668054; padding-bottom: 10px; }
-            .print-logo-section i { font-size: 36px; color: #668054; margin-right: 15px; }
-            .print-univ-info h2 { margin: 0; font-size: 22px; font-weight: 700; color: #111; text-align: left; }
-            .print-univ-info p { margin: 2px 0 0; font-size: 12px; color: #555; text-align: left; }
-            .print-title-section h1 { font-size: 24px; font-weight: 800; color: #668054; margin: 0 0 5px; text-transform: uppercase; }
-            .print-title-section p { margin: 3px 0; font-size: 14px; font-weight: 600; color: #333; }
+            body {
+                display: block !important;
+                background: #ffffff !important;
+                color: #000000 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                min-height: auto !important;
+                font-family: "Inter", sans-serif;
+            }
+
+            main, #main-content {
+                margin-left: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                display: block !important;
+                min-height: auto !important;
+            }
+
+            #main-content > div {
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            /* Timetable structure */
+            .timetable-wrapper {
+                box-shadow: none !important;
+                border: 1px solid #cbd5e1 !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: visible !important;
+                display: block !important;
+                page-break-before: auto !important;
+                break-before: auto !important;
+            }
+
+            .overflow-x-auto {
+                overflow: visible !important;
+                display: block !important;
+                width: 100% !important;
+            }
+
+            .timetable {
+                table-layout: fixed !important;
+                width: 100% !important;
+                border-collapse: collapse !important;
+                word-wrap: break-word !important;
+            }
+
+            .timetable thead {
+                display: table-header-group !important;
+            }
+
+            .timetable thead th {
+                background-color: #668054 !important;
+                color: white !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                font-weight: 700 !important;
+                font-size: 10.5px !important;
+                padding: 5px 3px !important;
+                border: 1px solid #4d613f !important;
+                text-align: center !important;
+            }
+
+            .timetable th.time-col {
+                width: 60px !important;
+            }
+
+            .timetable td.time-cell {
+                background-color: #f8fafc !important;
+                font-weight: 700 !important;
+                font-size: 10px !important;
+                text-align: center !important;
+                width: 60px !important;
+                border: 1px solid #cbd5e1 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .timetable td {
+                border: 1px solid #cbd5e1 !important;
+                padding: 3px !important;
+                vertical-align: top !important;
+                font-size: 9.5px !important;
+            }
+
+            .timetable tr {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+
+            /* Clean Exam Cards */
+            .exam-card {
+                font-size: 9px !important;
+                padding: 3px 4px !important;
+                margin-bottom: 3px !important;
+                border: 1px solid #e2e8f0 !important;
+                border-radius: 4px !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                background: #ffffff !important;
+                box-shadow: none !important;
+                cursor: default !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .exam-card.conflict {
+                border-color: #fca5a5 !important;
+                background: #fef2f2 !important;
+            }
+
+            .exam-card .subject {
+                font-size: 9.5px !important;
+                font-weight: 700 !important;
+                color: #0f172a !important;
+                white-space: normal !important;
+                line-height: 1.15 !important;
+            }
+
+            .exam-card .subject span,
+            .exam-card .fa-pen-to-square {
+                display: none !important;
+            }
+
+            .exam-card .meta {
+                font-size: 8px !important;
+                color: #334155 !important;
+                white-space: normal !important;
+                line-height: 1.15 !important;
+                margin-top: 1px !important;
+            }
+
+            .exam-card .meta .fa-clock {
+                display: none !important;
+            }
+
+            .badge {
+                padding: 1px 3px !important;
+                font-size: 7px !important;
+                font-weight: 700 !important;
+                border-radius: 2px !important;
+                margin-top: 2px !important;
+                display: inline-block !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .badge-major {
+                background: #dbeafe !important;
+                color: #1e40af !important;
+            }
+
+            .badge-minor {
+                background: #fef3c7 !important;
+                color: #92400e !important;
+            }
+
+            .badge-ok {
+                background: #d1fae5 !important;
+                color: #065f46 !important;
+            }
+
+            /* Print Header */
+            .print-only {
+                display: block !important;
+            }
+
+            .print-header {
+                text-align: center !important;
+                margin-bottom: 8px !important;
+                padding: 0 !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+
+            .print-logo-section {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: flex-start !important;
+                margin-bottom: 6px !important;
+                border-bottom: 2px solid #668054 !important;
+                padding-bottom: 6px !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .print-logo-section i {
+                font-size: 26px !important;
+                color: #668054 !important;
+                margin-right: 12px !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .print-univ-info h2 {
+                margin: 0 !important;
+                font-size: 16px !important;
+                font-weight: 700 !important;
+                color: #111 !important;
+                text-align: left !important;
+            }
+
+            .print-univ-info p {
+                margin: 1px 0 0 !important;
+                font-size: 10px !important;
+                color: #555 !important;
+                text-align: left !important;
+            }
+
+            .print-title-section {
+                text-align: center !important;
+                margin-top: 2px !important;
+            }
+
+            .print-title-section h1 {
+                font-size: 16px !important;
+                font-weight: 800 !important;
+                color: #668054 !important;
+                margin: 0 0 2px !important;
+                text-transform: uppercase !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .print-title-section p {
+                margin: 1px 0 !important;
+                font-size: 11px !important;
+                font-weight: 600 !important;
+                color: #333 !important;
+            }
         }
+
         @media screen {
-            .print-only { display: none !important; }
+            .print-only {
+                display: none !important;
+            }
         }
 
+    <script>
+        (function() {
+            try {
+                if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                    document.documentElement.classList.add('sidebar-collapsed');
+                }
+            } catch (e) {}
+        })();
+    </script>
+    <style>
+        html, body { overflow-x: hidden; }
+        #main-content { min-width: 0; max-width: 100%; }
+        html.sidebar-collapsed #sidebar { width: 4rem !important; }
+        html.sidebar-collapsed #main-content { margin-left: 4rem !important; }
+        html.sidebar-collapsed .nav-text { display: none !important; }
+        html.sidebar-collapsed .sidebar-header-container { justify-content: center !important; }
+        html.sidebar-collapsed .sidebar-header-container > div:first-child { display: none !important; }
     </style>
 
     <style>
@@ -205,7 +446,7 @@
     {% include 'admin_sidebar.html' %}
 
     <!-- Main Content -->
-    <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
+    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen">
 
         <!-- Top header -->
         <header class="no-print bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
@@ -354,7 +595,12 @@
                            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm">
                             <i class="fa-solid fa-file-pdf"></i> Export PDF
                         </a>
+                        <a href="/admin/archives"
+                           class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-sm" title="View Historical Exam Archives">
+                            <i class="fa-solid fa-box-archive text-[#668054]"></i> Archives
+                        </a>
                         <form id="resetScheduleForm" method="POST" action="/reset_schedule" class="inline">
+                            <input type="hidden" name="archive_before_reset" value="1">
                             <button type="button" onclick="confirmResetSchedule()"
                                     class="inline-flex items-center gap-2 px-4 py-2 border border-red-300 rounded-lg text-sm font-medium text-red-600 bg-white hover:bg-red-50 transition-colors">
                                 <i class="fa-solid fa-rotate-left"></i> Reset
@@ -363,6 +609,55 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Publication Status Banner & Controls -->
+            {% if sched_count and sched_count > 0 %}
+            <div class="no-print mb-6 rounded-xl border p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 {% if is_published %}bg-emerald-50 border-emerald-300 text-emerald-950{% else %}bg-amber-50 border-amber-300 text-amber-950{% endif %}">
+                <div class="flex items-center gap-3.5">
+                    <div class="w-11 h-11 rounded-xl flex items-center justify-center text-xl shadow-xs flex-shrink-0 {% if is_published %}bg-emerald-600 text-white{% else %}bg-amber-500 text-white{% endif %}">
+                        <i class="fa-solid {% if is_published %}fa-bullhorn{% else %}fa-lock{% endif %}"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="text-sm font-bold">
+                                {% if is_published %}
+                                    Schedule Status: Official & Published
+                                {% else %}
+                                    Schedule Status: Draft (In-Review)
+                                {% endif %}
+                            </h3>
+                            <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full {% if is_published %}bg-emerald-200 text-emerald-800 border border-emerald-300{% else %}bg-amber-200 text-amber-800 border border-amber-300{% endif %}">
+                                {% if is_published %}
+                                    <i class="fa-solid fa-circle-check mr-1 text-[10px]"></i> Live for Students & Faculty
+                                {% else %}
+                                    <i class="fa-solid fa-eye-slash mr-1 text-[10px]"></i> Admin-Only Draft
+                                {% endif %}
+                            </span>
+                        </div>
+                        <p class="text-xs mt-0.5 {% if is_published %}text-emerald-800{% else %}text-amber-800{% endif %}">
+                            {% if is_published %}
+                                The timetable has been finalized and published. Students can view personal schedules, and proctoring assignments are officially dispatched.
+                            {% else %}
+                                This schedule is currently hidden from Students, Faculty Proctors, and Secretaries. Review and audit the timetable before publishing.
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 self-end sm:self-auto flex-shrink-0">
+                    {% if not is_published %}
+                    <button type="button" onclick="openPublishModal()"
+                            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-sm cursor-pointer hover:shadow">
+                        <i class="fa-solid fa-paper-plane"></i> Finalize & Publish Timetable
+                    </button>
+                    {% else %}
+                    <button type="button" onclick="openUnpublishModal()"
+                            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-amber-300 text-amber-900 bg-white hover:bg-amber-100 text-xs font-semibold transition-colors shadow-xs cursor-pointer">
+                        <i class="fa-solid fa-rotate-left text-amber-600"></i> Revert to Draft
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
 
             <!-- Stats strip -->
             <div class="no-print grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
@@ -441,10 +736,28 @@
                                             <span><i class="fa-solid fa-users fa-xs mr-1"></i>{{ exam.section or '—' }}</span>
                                         </div>
                                         <div class="meta">
-                                            <span><i class="fa-solid fa-door-open fa-xs mr-1"></i>{{ exam.room_name or '—' }}</span>
+                                            {% if exam.room_id %}
+                                            <span class="inline-flex items-center gap-1 hover:text-[#668054] hover:underline cursor-pointer transition-colors"
+                                                  onclick="event.stopPropagation(); openAvailabilityModal('room', '{{ exam.room_id }}', '{{ exam.room_name | e }}')"
+                                                  title="Click to check Room availability">
+                                                <i class="fa-solid fa-door-open fa-xs text-[#668054]"></i>{{ exam.room_name }}
+                                                <i class="fa-solid fa-clock text-[9px] text-gray-400"></i>
+                                            </span>
+                                            {% else %}
+                                            <span><i class="fa-solid fa-door-open fa-xs mr-1"></i>—</span>
+                                            {% endif %}
                                         </div>
                                         <div class="meta">
-                                            <span><i class="fa-solid fa-user fa-xs mr-1"></i>{{ exam.instructor_name or '—' }}</span>
+                                            {% if exam.instructor_id %}
+                                            <span class="inline-flex items-center gap-1 hover:text-[#668054] hover:underline cursor-pointer transition-colors"
+                                                  onclick="event.stopPropagation(); openAvailabilityModal('instructor', '{{ exam.instructor_id }}', '{{ exam.instructor_name | e }}')"
+                                                  title="Click to check Proctor availability">
+                                                <i class="fa-solid fa-user fa-xs text-[#668054]"></i>{{ exam.instructor_name }}
+                                                <i class="fa-solid fa-clock text-[9px] text-gray-400"></i>
+                                            </span>
+                                            {% else %}
+                                            <span><i class="fa-solid fa-user fa-xs mr-1"></i>—</span>
+                                            {% endif %}
                                         </div>
                                         <div class="mt-1">
                                             {% if exam.id in conflict_ids %}
@@ -578,8 +891,22 @@
                                     </span>
                                 </td>
                                 <td class="px-5 py-3 text-gray-600 whitespace-nowrap">{{ exam._date_str }} {{ exam._time_str }}</td>
-                                <td class="px-5 py-3 text-gray-600">{{ exam.room_name or '—' }}</td>
-                                <td class="px-5 py-3 text-gray-600">{{ exam.instructor_name or '—' }}</td>
+                                <td class="px-5 py-3 text-gray-600">
+                                    {% if exam.room_id %}
+                                    <span class="inline-flex items-center gap-1 cursor-pointer hover:text-[#668054] hover:underline"
+                                          onclick="openAvailabilityModal('room', '{{ exam.room_id }}', '{{ exam.room_name | e }}')">
+                                        <i class="fa-solid fa-door-open fa-xs text-[#668054]"></i>{{ exam.room_name }}
+                                    </span>
+                                    {% else %}—{% endif %}
+                                </td>
+                                <td class="px-5 py-3 text-gray-600">
+                                    {% if exam.instructor_id %}
+                                    <span class="inline-flex items-center gap-1 cursor-pointer hover:text-[#668054] hover:underline"
+                                          onclick="openAvailabilityModal('instructor', '{{ exam.instructor_id }}', '{{ exam.instructor_name | e }}')">
+                                        <i class="fa-solid fa-user fa-xs text-[#668054]"></i>{{ exam.instructor_name }}
+                                    </span>
+                                    {% else %}—{% endif %}
+                                </td>
                                 <td class="px-5 py-3">
                                     <div class="flex flex-wrap gap-1">
                                         {% if 'room' in reasons %}
@@ -776,7 +1103,13 @@
                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1">Room</label>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-xs font-semibold text-gray-600">Room</label>
+                                <button type="button" onclick="inspectSelectedResource('room')"
+                                        class="text-[11px] text-[#668054] hover:underline flex items-center gap-1">
+                                    <i class="fa-solid fa-clock text-[10px]"></i> Check Availability
+                                </button>
+                            </div>
                             <select name="room_id" id="edit_room_id" required onchange="checkConflict()"
                                     class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
                                 <option value="">Select Room</option>
@@ -786,7 +1119,13 @@
                             </select>
                         </div>
                         <div class="col-span-2">
-                            <label class="block text-xs font-semibold text-gray-600 mb-1">Proctor / Instructor</label>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-xs font-semibold text-gray-600">Proctor / Instructor</label>
+                                <button type="button" onclick="inspectSelectedResource('instructor')"
+                                        class="text-[11px] text-[#668054] hover:underline flex items-center gap-1">
+                                    <i class="fa-solid fa-clock text-[10px]"></i> Check Availability
+                                </button>
+                            </div>
                             <!-- Search box -->
                             <div class="relative mb-1">
                                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
@@ -821,6 +1160,86 @@
                     <button type="submit" form="editScheduleForm"
                             class="px-5 py-2 rounded-lg bg-[#668054] text-white text-sm font-semibold hover:bg-[#4b5e3d] transition-colors shadow-sm">
                         <i class="fa-solid fa-floppy-disk mr-1"></i> Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════ Availability & Schedule Inspector Modal ══════ -->
+    <div id="availabilityModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-900 bg-opacity-50 transition-opacity" onclick="closeModal('availabilityModal')"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="relative inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                <!-- Header -->
+                <div class="bg-[#668054] px-6 py-4 flex items-center justify-between text-white">
+                    <div class="flex items-center gap-3">
+                        <div id="avail_icon_box" class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-lg">
+                            <i id="avail_header_icon" class="fa-solid fa-clock"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 id="avail_resource_title" class="text-base font-bold text-white leading-tight">Loading...</h3>
+                                <span id="avail_resource_type_badge" class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-white/25 text-white">Resource</span>
+                            </div>
+                            <p id="avail_resource_subtitle" class="text-xs text-white/80 mt-0.5">Availability &amp; Schedule Details</p>
+                        </div>
+                    </div>
+                    <button onclick="closeModal('availabilityModal')" class="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+
+                <!-- Summary Bar -->
+                <div id="avail_summary_bar" class="px-6 py-3 bg-gray-50 border-b border-gray-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div class="bg-white p-2.5 rounded-lg border border-gray-200">
+                        <span class="text-gray-400 block font-medium">Department / Info</span>
+                        <span id="avail_stat_dept" class="font-bold text-gray-700 truncate block mt-0.5">—</span>
+                    </div>
+                    <div class="bg-white p-2.5 rounded-lg border border-gray-200">
+                        <span class="text-gray-400 block font-medium">Building</span>
+                        <span id="avail_stat_bldg" class="font-bold text-gray-700 truncate block mt-0.5">—</span>
+                    </div>
+                    <div class="bg-white p-2.5 rounded-lg border border-gray-200">
+                        <span class="text-gray-400 block font-medium">Scheduled Exams</span>
+                        <span id="avail_stat_exams" class="font-bold text-gray-700 block mt-0.5">0</span>
+                    </div>
+                    <div class="bg-white p-2.5 rounded-lg border border-gray-200">
+                        <span class="text-gray-400 block font-medium">Total Busy Hours</span>
+                        <span id="avail_stat_hours" class="font-bold text-[#668054] block mt-0.5">0.0 hrs</span>
+                    </div>
+                </div>
+
+                <!-- Modal Content Area -->
+                <div class="px-6 py-4 max-h-[60vh] overflow-y-auto">
+                    <!-- Loading Spinner -->
+                    <div id="avail_loading" class="py-12 text-center text-gray-500">
+                        <i class="fa-solid fa-spinner fa-spin text-2xl text-[#668054]"></i>
+                        <p class="text-sm mt-2 font-medium">Inspecting availability &amp; timetable...</p>
+                    </div>
+
+                    <!-- Error Box -->
+                    <div id="avail_error" class="hidden py-8 text-center text-red-500">
+                        <i class="fa-solid fa-circle-exclamation text-2xl"></i>
+                        <p id="avail_error_msg" class="text-sm mt-2 font-medium">Failed to load schedule.</p>
+                    </div>
+
+                    <!-- Daily Schedule Accordion / List -->
+                    <div id="avail_days_container" class="space-y-4 hidden">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="bg-gray-50 px-6 py-3 border-t border-gray-200 flex items-center justify-between">
+                    <div class="flex items-center gap-4 text-xs text-gray-500">
+                        <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Available / Free</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Scheduled / Busy</span>
+                    </div>
+                    <button type="button" onclick="closeModal('availabilityModal')"
+                            class="px-4 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-semibold transition-colors">
+                        Close
                     </button>
                 </div>
             </div>
@@ -901,35 +1320,6 @@
                 }
             });
         }
-
-        /* ── Sidebar Toggle ─────────────────────────────────────── */
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const main    = document.getElementById('main-content');
-            sidebar.classList.toggle('w-64');
-            sidebar.classList.toggle('w-16');
-            main.classList.toggle('ml-64');
-            main.classList.toggle('ml-16');
-            const collapsed = sidebar.classList.contains('w-16');
-            localStorage.setItem('sidebarCollapsed', collapsed);
-            sidebar.querySelectorAll('.nav-text').forEach(el => {
-                collapsed ? el.classList.add('hidden') : el.classList.remove('hidden');
-            });
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            if (localStorage.getItem('sidebarCollapsed') === 'true') {
-                const sidebar = document.getElementById('sidebar');
-                const main    = document.getElementById('main-content');
-                sidebar.classList.replace('w-64', 'w-16');
-                main.classList.replace('ml-64', 'ml-16');
-                sidebar.querySelectorAll('.nav-text').forEach(el => el.classList.add('hidden'));
-                document.querySelectorAll('.sidebar-header-container').forEach(h => {
-                    h.classList.remove('justify-between');
-                    h.classList.add('justify-center');
-                });
-            }
-        });
 
         /* ── Modal helpers ──────────────────────────────────────── */
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
@@ -1156,8 +1546,8 @@
     });
     function confirmResetSchedule() {
         warnConfirm({ title: 'Reset Schedule', message: 'This will reset all scheduled exams back to Pending status.',
-            sub: 'All assigned rooms, dates, and proctor assignments will be cleared. This CANNOT be undone.',
-            type: 'warning', confirmText: 'Yes, Reset Schedule',
+            sub: 'A backup archive snapshot will automatically be saved to Exam Archives so you can still check past data anytime. All active room and proctor assignments will be cleared.',
+            type: 'warning', confirmText: 'Yes, Archive & Reset Schedule',
             onConfirm: () => document.getElementById('resetScheduleForm').submit() });
     }
 
@@ -1223,9 +1613,328 @@ function filterSchedule() {
         </div>
     </div>
 
+    <!-- PUBLISH CONFIRMATION MODAL -->
+    <div id="publishModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all border border-gray-100">
+            <div class="bg-emerald-600 px-6 py-4 flex items-center justify-between text-white">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center text-white text-base">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold leading-tight">Finalize & Publish Timetable</h3>
+                        <p class="text-xs text-white/80">Make schedule live to all portals</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closePublishModal()" class="text-white/80 hover:text-white transition-colors">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="text-center py-1">
+                    <p class="text-sm text-gray-700 font-medium">
+                        Are you sure you want to officially publish this examination timetable?
+                    </p>
+                    <p class="text-xs text-gray-500 mt-1">
+                        Please review the current schedule summary before distributing:
+                    </p>
+                </div>
+
+                <!-- Summary Checklist Card -->
+                <div class="bg-emerald-50/70 border border-emerald-200 rounded-xl p-4 text-xs space-y-2 text-emerald-950">
+                    <div class="flex items-center justify-between pb-1.5 border-b border-emerald-200">
+                        <span class="text-gray-600">Total Scheduled Exams:</span>
+                        <span class="font-bold text-gray-900">{{ sched_count }}</span>
+                    </div>
+                    <div class="flex items-center justify-between pb-1.5 border-b border-emerald-200">
+                        <span class="text-gray-600">Active Conflict Flags:</span>
+                        {% if conflict_ids|length == 0 %}
+                            <span class="font-bold text-emerald-700"><i class="fa-solid fa-circle-check mr-1"></i>0 Conflicts (Clean)</span>
+                        {% else %}
+                            <span class="font-bold text-orange-700"><i class="fa-solid fa-triangle-exclamation mr-1"></i>{{ conflict_ids|length }} Conflict(s)</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-600">Distribution Target:</span>
+                        <span class="font-bold text-gray-900">Student & Proctor Dashboards</span>
+                    </div>
+                </div>
+
+                <p class="text-[11px] text-gray-500 leading-relaxed bg-gray-50 p-3 rounded-lg border border-gray-200">
+                    <i class="fa-solid fa-circle-info text-blue-600 mr-1"></i> Once published, students can immediately view their personalized room and time assignments, and proctors will receive their official assignments.
+                </p>
+
+                <form id="publishScheduleForm" method="POST" action="/schedule/publish">
+                    <div class="flex gap-2.5 justify-end pt-2 border-t border-gray-100">
+                        <button type="button" onclick="closePublishModal()"
+                                class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit"
+                                class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center gap-1.5">
+                            <i class="fa-solid fa-paper-plane"></i> Yes, Publish Timetable
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- REVERT TO DRAFT CONFIRMATION MODAL -->
+    <div id="unpublishModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all border border-gray-100">
+            <div class="bg-amber-600 px-6 py-4 flex items-center justify-between text-white">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center text-white text-base">
+                        <i class="fa-solid fa-rotate-left"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold leading-tight">Revert Timetable to Draft</h3>
+                        <p class="text-xs text-white/80">Temporarily hide schedule from portals</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeUnpublishModal()" class="text-white/80 hover:text-white transition-colors">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <p class="text-xs text-gray-700 leading-relaxed">
+                    Reverting to <strong>Draft Mode</strong> will immediately hide the timetable on Student and Proctor portals. You can safely inspect, modify, or regenerate the schedule in private, and publish it again when ready.
+                </p>
+                <form id="unpublishScheduleForm" method="POST" action="/schedule/unpublish">
+                    <div class="flex gap-2.5 justify-end pt-2 border-t border-gray-100">
+                        <button type="button" onclick="closeUnpublishModal()"
+                                class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit"
+                                class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center gap-1.5">
+                            <i class="fa-solid fa-rotate-left"></i> Yes, Revert to Draft
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <script>
-        
+    function openPublishModal() {
+        document.getElementById('publishModal').classList.remove('hidden');
+    }
+    function closePublishModal() {
+        document.getElementById('publishModal').classList.add('hidden');
+    }
+    function openUnpublishModal() {
+        document.getElementById('unpublishModal').classList.remove('hidden');
+    }
+    function closeUnpublishModal() {
+        document.getElementById('unpublishModal').classList.add('hidden');
+    }
+    function openAvailabilityModal(resourceType, resourceId, resourceName) {
+        if (!resourceId || resourceId === 'None' || resourceId === 'null') {
+            warnConfirm({
+                title: 'Resource Unavailable',
+                message: 'Availability and resource information is not available for this entry.',
+                type: 'warning',
+                confirmText: 'Understood'
+            });
+            return;
+        }
+        const modal = document.getElementById('availabilityModal');
+        modal.classList.remove('hidden');
+
+        const loading = document.getElementById('avail_loading');
+        const errorBox = document.getElementById('avail_error');
+        const daysContainer = document.getElementById('avail_days_container');
+        const title = document.getElementById('avail_resource_title');
+        const badge = document.getElementById('avail_resource_type_badge');
+        const icon = document.getElementById('avail_header_icon');
+        const subtitle = document.getElementById('avail_resource_subtitle');
+
+        title.textContent = resourceName || 'Resource Availability';
+        if (resourceType === 'instructor') {
+            badge.textContent = 'Proctor';
+            badge.className = 'px-2 py-0.5 text-[11px] font-semibold rounded-full bg-emerald-700 text-white';
+            icon.className = 'fa-solid fa-user-check';
+            subtitle.textContent = 'Faculty Proctor Availability & Daily Workload';
+        } else {
+            badge.textContent = 'Room';
+            badge.className = 'px-2 py-0.5 text-[11px] font-semibold rounded-full bg-blue-700 text-white';
+            icon.className = 'fa-solid fa-door-open';
+            subtitle.textContent = 'Examination Room Occupancy & Free Time Slots';
+        }
+
+        loading.classList.remove('hidden');
+        errorBox.classList.add('hidden');
+        daysContainer.classList.add('hidden');
+        daysContainer.innerHTML = '';
+
+        fetch('/api/resource_availability?type=' + encodeURIComponent(resourceType) + '&id=' + encodeURIComponent(resourceId))
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to load availability');
+                return response.json();
+            })
+            .then(data => {
+                loading.classList.add('hidden');
+                if (!data.success) {
+                    errorBox.classList.remove('hidden');
+                    document.getElementById('avail_error_msg').textContent = data.error || 'Could not find resource.';
+                    return;
+                }
+
+                title.textContent = data.resource_name;
+                const info = data.info || {};
+                document.getElementById('avail_stat_dept').textContent = info.institute_name || (info.capacity ? ('Cap: ' + info.capacity + ' seats') : 'General');
+                document.getElementById('avail_stat_bldg').textContent = info.building || 'Main Campus';
+                document.getElementById('avail_stat_exams').textContent = data.total_exams + ' exam(s)';
+                document.getElementById('avail_stat_hours').textContent = (data.total_busy_hours || 0) + ' hrs';
+
+                daysContainer.innerHTML = '';
+                if (!data.days || data.days.length === 0) {
+                    daysContainer.innerHTML = '<div class="py-8 text-center text-gray-400">No scheduled dates found in exam period.</div>';
+                    daysContainer.classList.remove('hidden');
+                    return;
+                }
+
+                data.days.forEach(day => {
+                    const dayCard = document.createElement('div');
+                    dayCard.className = 'border border-gray-200 rounded-xl overflow-hidden shadow-xs';
+
+                    let dailyLoadPill = '';
+                    if (resourceType === 'instructor' && day.max_daily_hours) {
+                        const isNearLimit = day.busy_hours >= day.max_daily_hours;
+                        dailyLoadPill = `<span class="text-xs px-2 py-0.5 rounded-md font-semibold ${isNearLimit ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-gray-100 text-gray-700'}">
+                            Daily: ${day.busy_hours} / ${day.max_daily_hours} hrs
+                        </span>`;
+                    } else if (resourceType === 'room') {
+                        dailyLoadPill = `<span class="text-xs px-2 py-0.5 rounded-md font-medium text-gray-500 bg-gray-100">
+                            ${day.busy_hours} hrs booked
+                        </span>`;
+                    }
+
+                    let busyHtml = '';
+                    if (day.busy_slots && day.busy_slots.length > 0) {
+                        busyHtml = `
+                            <div class="mb-3">
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-amber-700 mb-1.5 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-circle-dot text-amber-500 text-[9px]"></i> Booked / Occupied Slots (${day.busy_slots.length})
+                                </p>
+                                <div class="space-y-1.5">
+                                    ${day.busy_slots.map(s => `
+                                        <div class="bg-amber-50/80 border border-amber-200 rounded-lg p-2.5 flex items-center justify-between text-xs">
+                                            <div>
+                                                <span class="font-bold text-gray-900">${s.start_time} - ${s.end_time}</span>
+                                                <span class="text-gray-500 ml-1.5">(${s.duration_hours} hrs)</span>
+                                                <div class="text-gray-700 mt-0.5 font-medium">
+                                                    <span>${s.subject_name}</span>
+                                                    ${s.section ? `<span class="text-gray-500 font-normal"> · Section: ${s.section}</span>` : ''}
+                                                </div>
+                                            </div>
+                                            <div class="text-right">
+                                                <span class="inline-block px-2 py-0.5 rounded bg-white text-gray-700 border border-amber-200 text-[11px] font-medium">
+                                                    ${resourceType === 'instructor' ? ('<i class="fa-solid fa-door-open mr-1 text-gray-400"></i>' + (s.other_name || 'Room')) : ('<i class="fa-solid fa-user mr-1 text-gray-400"></i>' + (s.other_name || 'Proctor'))}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    let freeHtml = '';
+                    if (day.is_completely_free) {
+                        freeHtml = `
+                            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-xs flex items-center gap-2.5 text-emerald-800">
+                                <i class="fa-solid fa-circle-check text-emerald-600 text-base"></i>
+                                <div>
+                                    <span class="font-bold">Available All Day</span>
+                                    <p class="text-[11px] text-emerald-700 mt-0.5">Open for scheduling across the entire operational window (${day.work_window}).</p>
+                                </div>
+                            </div>
+                        `;
+                    } else if (day.free_slots && day.free_slots.length > 0) {
+                        freeHtml = `
+                            <div>
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-700 mb-1.5 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-circle-check text-emerald-500 text-[9px]"></i> Free / Available Windows (${day.free_slots.length})
+                                </p>
+                                <div class="flex flex-wrap gap-2">
+                                    ${day.free_slots.map(f => `
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold">
+                                            <i class="fa-regular fa-clock text-emerald-600"></i>
+                                            ${f.start_time} – ${f.end_time}
+                                            <span class="font-normal text-emerald-700 text-[11px]">(${f.duration_hours}h free)</span>
+                                        </span>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        freeHtml = `
+                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-xs text-gray-500 text-center">
+                                No available windows remaining on this date.
+                            </div>
+                        `;
+                    }
+
+                    dayCard.innerHTML = `
+                        <div class="bg-gray-100/70 px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-regular fa-calendar text-[#668054]"></i>
+                                <span class="text-sm font-bold text-gray-800">${day.date_label}</span>
+                                ${day.custom_avail ? '<span class="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">Custom Shift</span>' : ''}
+                            </div>
+                            ${dailyLoadPill}
+                        </div>
+                        <div class="p-4 bg-white space-y-3">
+                            ${busyHtml}
+                            ${freeHtml}
+                        </div>
+                    `;
+                    daysContainer.appendChild(dayCard);
+                });
+
+                daysContainer.classList.remove('hidden');
+            })
+            .catch(err => {
+                loading.classList.add('hidden');
+                errorBox.classList.remove('hidden');
+                document.getElementById('avail_error_msg').textContent = 'Error: ' + err.message;
+            });
+    }
+
+    function inspectSelectedResource(resourceType) {
+        if (resourceType === 'room') {
+            const select = document.getElementById('edit_room_id');
+            const val = select.value;
+            const text = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
+            if (!val) {
+                warnConfirm({
+                    title: 'Selection Required',
+                    message: 'Please select a room first from the dropdown list before checking availability.',
+                    type: 'warning',
+                    confirmText: 'Understood'
+                });
+                return;
+            }
+            openAvailabilityModal('room', val, text.split('(')[0].trim());
+        } else {
+            const select = document.getElementById('edit_proctor_id');
+            const val = select.value;
+            const text = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
+            if (!val) {
+                warnConfirm({
+                    title: 'Selection Required',
+                    message: 'Please select a proctor first from the dropdown list before checking availability.',
+                    type: 'warning',
+                    confirmText: 'Understood'
+                });
+                return;
+            }
+            openAvailabilityModal('instructor', val, text.trim());
+        }
+    }
     </script>
 </body>
 

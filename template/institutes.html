@@ -8,10 +8,26 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        (function() {
+            try {
+                if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                    document.documentElement.classList.add('sidebar-collapsed');
+                }
+            } catch (e) {}
+        })();
+    </script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .sidebar-transition { transition: width 0.3s ease; }
         .content-transition { transition: margin-left 0.3s ease; }
+        html, body { overflow-x: hidden; }
+        #main-content { min-width: 0; max-width: 100%; }
+        html.sidebar-collapsed #sidebar { width: 4rem !important; }
+        html.sidebar-collapsed #main-content { margin-left: 4rem !important; }
+        html.sidebar-collapsed .nav-text { display: none !important; }
+        html.sidebar-collapsed .sidebar-header-container { justify-content: center !important; }
+        html.sidebar-collapsed .sidebar-header-container > div:first-child { display: none !important; }
     </style>
 
     <style>
@@ -50,7 +66,7 @@
     {% set active_page = 'institutes' %}
     {% include 'admin_sidebar.html' %}
 
-    <main id="main-content" class="flex-1 ml-64 content-transition min-h-screen">
+    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen">
         <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
             <h1 class="text-xl font-semibold text-gray-800">Institute Management</h1>
         </header>
@@ -93,8 +109,8 @@
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ inst.code }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ inst.capacity_default }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button onclick="openEditInstModal('{{ inst.id }}', '{{ inst.name }}', '{{ inst.code }}', '{{ inst.capacity_default }}')" class="text-blue-600 hover:text-blue-900 mr-3"><i class="fa-solid fa-edit"></i></button>
-                                        <a href="/institutes/{{ inst.id }}/delete" onclick="return confirm('Delete this institute? This may break dependencies like users, rooms, and exams.')" class="text-red-600 hover:text-red-900"><i class="fa-solid fa-trash"></i></a>
+                                        <button onclick="openEditInstModal('{{ inst.id }}', '{{ inst.name }}', '{{ inst.code }}', '{{ inst.capacity_default }}')" class="text-blue-600 hover:text-blue-900 mr-3 cursor-pointer" title="Edit Institute"><i class="fa-solid fa-edit"></i></button>
+                                        <button type="button" onclick="confirmDeleteInstitute('{{ inst.id }}', '{{ inst.name|escape }}')" class="text-red-600 hover:text-red-900 cursor-pointer" title="Delete Institute"><i class="fa-solid fa-trash"></i></button>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -171,50 +187,6 @@
     </div>
 
     <script>
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const mainContent = document.getElementById('main-content');
-            sidebar.classList.toggle('w-64');
-            sidebar.classList.toggle('w-16');
-            mainContent.classList.toggle('ml-64');
-            mainContent.classList.toggle('ml-16');
-            
-            const headers = document.querySelectorAll('.sidebar-header-container');
-            headers.forEach(h => {
-                if (sidebar.classList.contains('w-16')) {
-                    h.classList.remove('justify-between');
-                    h.classList.add('justify-center');
-                } else {
-                    h.classList.add('justify-between');
-                    h.classList.remove('justify-center');
-                }
-            });
-            
-            const isCollapsed = sidebar.classList.contains('w-16');
-            localStorage.setItem('sidebarCollapsed', isCollapsed);
-            
-            sidebar.querySelectorAll('.nav-text').forEach(el => {
-                if (isCollapsed) el.classList.add('hidden');
-                else el.classList.remove('hidden');
-            });
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            if (localStorage.getItem('sidebarCollapsed') === 'true') {
-                const sidebar = document.getElementById('sidebar');
-                const mainContent = document.getElementById('main-content');
-                sidebar.classList.remove('w-64');
-                sidebar.classList.add('w-16');
-                mainContent.classList.remove('ml-64');
-                mainContent.classList.add('ml-16');
-                sidebar.querySelectorAll('.nav-text').forEach(el => el.classList.add('hidden'));
-                document.querySelectorAll('.sidebar-header-container').forEach(h => {
-                    h.classList.remove('justify-between');
-                    h.classList.add('justify-center');
-                });
-            }
-        });
-
         function closeModal(id) {
             document.getElementById(id).classList.add('hidden');
         }
@@ -230,6 +202,20 @@
             document.getElementById('edit_inst_capacity').value = capacity;
             openModal('editInstModal');
         }
+
+        function confirmDeleteInstitute(id, name) {
+            showConfirmModal({
+                title: 'Delete Institute',
+                message: 'Are you sure you want to delete institute <strong>' + name + '</strong>?',
+                sub: '<strong>Warning:</strong> Deleting this institute may impact associated faculty, rooms, subjects, and examination records.',
+                type: 'danger',
+                confirmText: '<i class="fa-solid fa-trash mr-1"></i> Delete Institute',
+                onConfirm: function() {
+                    window.location.href = '/institutes/' + id + '/delete';
+                }
+            });
+        }
     </script>
+    {% include 'confirm_modal.html' %}
 </body>
 </html>

@@ -32,14 +32,13 @@
 
     <style>
         /* Mobile Responsive Overrides */
-        @media (max-width: 768px) {
+        @media screen and (max-width: 768px) {
             #sidebar { width: 4rem !important; z-index: 50; }
             #main-content { margin-left: 4rem !important; width: calc(100% - 4rem) !important; }
             .nav-text { display: none !important; }
             
-            /* Make ALL tables horizontally scrollable */
-            table { display: block !important; width: 100% !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
-            th, td { white-space: nowrap !important; }
+            /* Responsive table scroll handled by wrapper */
+            .overflow-x-auto { width: 100% !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
             
             /* Make modals scrollable if they overflow */
             .fixed.inset-0 > div { padding: 1rem; overflow-y: auto; max-height: 100vh; }
@@ -83,15 +82,39 @@
             .border {
                 border-color: #cbd5e1 !important;
             }
+            @page {
+                size: auto;
+                margin: 10mm 12mm;
+            }
             table {
                 display: table !important;
                 width: 100% !important;
+                border-collapse: collapse !important;
+                border: 1px solid #334155 !important;
             }
             thead {
                 display: table-header-group !important;
             }
+            tbody {
+                display: table-row-group !important;
+            }
             tr {
+                display: table-row !important;
                 page-break-inside: avoid !important;
+            }
+            th, td {
+                display: table-cell !important;
+                border: 1px solid #cbd5e1 !important;
+                padding: 6px 10px !important;
+                font-size: 8.5pt !important;
+            }
+            thead th {
+                background-color: #f1f5f9 !important;
+                color: #0f172a !important;
+                font-weight: 700 !important;
+                border: 1px solid #334155 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
         }
     </style>

@@ -30,10 +30,84 @@
         html.sidebar-collapsed .sidebar-header-container > div:first-child { display: none !important; }
 
         @media print {
-            #sidebar, header, .no-print { display: none !important; }
-            #main-content { margin-left: 0 !important; width: 100% !important; padding: 0 !important; }
-            body { background: #fff !important; }
-            .print-only { display: block !important; }
+            @page {
+                size: landscape;
+                margin: 8mm 10mm;
+            }
+            #sidebar, header, nav, aside, .no-print,
+            button, form, input, select, textarea,
+            .search-bar, [id*="Toolbar"], [id*="toolbar"],
+            [id*="ActionBar"], [id*="actionBar"], [id*="action-bar"],
+            [id*="Modal"], [id*="modal"],
+            .alert, .pagination {
+                display: none !important;
+            }
+            html, body {
+                background: #ffffff !important;
+                color: #000000 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+                font-size: 8.5pt !important;
+            }
+            #main-content {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            .print-only {
+                display: block !important;
+            }
+            .overflow-x-auto {
+                overflow: visible !important;
+                display: block !important;
+                width: 100% !important;
+            }
+            .bg-white, .shadow-xs, .shadow-sm, .rounded-2xl, .border {
+                box-shadow: none !important;
+                border: none !important;
+                border-radius: 0 !important;
+                background: transparent !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            table, #archiveExamsTable {
+                display: table !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                table-layout: auto !important;
+                border-collapse: collapse !important;
+                border: 1px solid #334155 !important;
+                margin: 0 !important;
+            }
+            thead {
+                display: table-header-group !important;
+            }
+            tbody {
+                display: table-row-group !important;
+            }
+            tr {
+                display: table-row !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            th, td {
+                display: table-cell !important;
+                border: 1px solid #cbd5e1 !important;
+                padding: 5px 6px !important;
+                vertical-align: top !important;
+                white-space: normal !important;
+            }
+            thead th {
+                background-color: #3d5c2e !important;
+                color: #ffffff !important;
+                font-weight: 700 !important;
+                border: 1px solid #27361b !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
         }
         @media screen {
             .print-only { display: none !important; }

@@ -2945,6 +2945,16 @@ def admin_batch_print_sections():
             grid[t_str][d_str].append(exam)
             dates_set.add(d_str)
             times_set.add(t_str)
+            
+            # For multi-hour exams, also mark continuing hour slots
+            extra_hours = int((dur - 1) // 60)
+            for h in range(1, extra_hours + 1):
+                cont_dt = dt + timedelta(hours=h)
+                cont_t_str = cont_dt.strftime("%H:%M")
+                times_set.add(cont_t_str)
+                cont_exam = dict(exam)
+                cont_exam['is_continuation'] = True
+                grid[cont_t_str][d_str].append(cont_exam)
         section_grids[sec] = grid
         
     dates_list = sorted(list(dates_set))
@@ -2962,6 +2972,14 @@ def admin_batch_print_sections():
                 date_labels[dt.strftime("%Y-%m-%d")] = e['_date_label']
                 if 'time' in e:
                     time_labels[dt.strftime("%H:%M")] = e['time']
+
+    for t_str in times_list:
+        if t_str not in time_labels:
+            try:
+                t_obj = datetime.strptime(t_str, "%H:%M")
+                time_labels[t_str] = t_obj.strftime("%I:%M %p")
+            except Exception:
+                time_labels[t_str] = t_str
 
                 
     return render_template("batch_print.html",

@@ -51,6 +51,11 @@
         html.sidebar-collapsed .nav-text { display: none !important; }
         html.sidebar-collapsed .sidebar-header-container { justify-content: center !important; }
         html.sidebar-collapsed .sidebar-header-container > div:first-child { display: none !important; }
+
+        .overflow-x-auto::-webkit-scrollbar { height: 6px; }
+        .overflow-x-auto::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .overflow-x-auto::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .overflow-x-auto::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 
     <style>
@@ -98,7 +103,7 @@
             </button>
         </header>
 
-        <div class="p-8">
+        <div class="px-4 sm:px-6 lg:px-8 py-6">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     <div class="mb-6">
@@ -198,29 +203,29 @@
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Super Admin</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">User</th>
+                                <th class="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Role</th>
+                                <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Details</th>
+                                <th class="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Super Admin</th>
+                                <th class="px-3.5 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider sticky right-0 bg-gray-50 shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] z-10">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200" id="usersTableBody">
                             {% for user in users %}
                             <tr class="hover:bg-gray-50 user-row" data-role="{{ user.role }}">
-                                <td class="px-6 py-4 whitespace-nowrap">
+                                <td class="px-3.5 py-3 whitespace-nowrap">
                                     <div class="flex items-center">
-                                        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold">
+                                        <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs">
                                             {{ (user.name or user.full_name)[0] if (user.name or user.full_name) else 'U' }}
                                         </div>
-                                        <div class="ml-4">
-                                            <div class="text-sm font-medium text-gray-900">{{ user.name or user.full_name }}</div>
-                                            <div class="text-sm text-gray-500">{{ user.email }}</div>
+                                        <div class="ml-3">
+                                            <div class="text-sm font-semibold text-gray-900">{{ user.name or user.full_name }}</div>
+                                            <div class="text-xs text-gray-500 font-mono">{{ user.email }}</div>
                                         </div>
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                <td class="px-3 py-3 whitespace-nowrap text-center">
+                                    <span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full 
                                         {% if user.role == 'admin' %}bg-blue-100 text-blue-800
                                         {% elif user.role == 'student' %}bg-green-100 text-green-800
                                         {% elif user.role == 'proctor' %}bg-yellow-100 text-yellow-800
@@ -229,25 +234,25 @@
                                         {{ user.role|title }}
                                     </span>
                                 </td>
-                                                                  <td class="px-6 py-4 text-sm text-gray-500">
+                                <td class="px-3.5 py-3 text-xs text-gray-500">
                                       {% if user.role == 'student' %}
                                           {% if user.section %}<span class="block"><span class="font-medium text-gray-600">Section:</span> {{ user.section }}</span>{% endif %}
-                                          {% if user.institute_name %}<span class="block"><span class="font-medium text-gray-600">Institute:</span> {{ user.institute_name }}</span>{% endif %}
+                                          {% if user.institute_name %}<span class="block max-w-[210px] leading-snug"><span class="font-medium text-gray-600">Institute:</span> {{ user.institute_name }}</span>{% endif %}
                                           {% if not user.section and not user.institute_name %}<span class="text-gray-400 italic">No details</span>{% endif %}
                                       {% elif user.role == 'proctor' or user.role == 'secretary' %}
-                                          {% if user.institute_name %}<span class="block"><span class="font-medium text-gray-600">Institute:</span> {{ user.institute_name }}</span>{% else %}<span class="text-gray-400 italic">No institute assigned</span>{% endif %}
+                                          {% if user.institute_name %}<span class="block max-w-[210px] leading-snug"><span class="font-medium text-gray-600">Institute:</span> {{ user.institute_name }}</span>{% else %}<span class="text-gray-400 italic">No institute assigned</span>{% endif %}
                                       {% else %}
                                           <span class="text-gray-400">-</span>
                                       {% endif %}
-                                  </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                </td>
+                                <td class="px-3 py-3 whitespace-nowrap text-center text-sm text-gray-500">
                                     {% if user.is_super_admin %}
-                                        <i class="fa-solid fa-check-circle text-purple-600 text-lg"></i>
+                                        <i class="fa-solid fa-check-circle text-purple-600 text-base" title="Super Admin"></i>
                                     {% else %}
                                         -
                                     {% endif %}
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <td class="px-3.5 py-3 whitespace-nowrap text-right text-sm font-medium sticky right-0 bg-white shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] z-10">
                                     <button onclick="openEditUserModal('{{ user.id }}', '{{ (user.name or user.full_name)|e }}', '{{ user.email|e }}', '{{ user.role }}', '{{ user.section or '' }}', '{{ user.institute_id or '' }}', '{{ user.is_super_admin }}')" class="text-blue-600 hover:text-blue-900 mr-3" title="Edit"><i class="fa-solid fa-edit"></i></button>
                                     
                                     <button type="button" onclick="confirmSuperResetPassword('{{ user.id }}', '{{ (user.name or user.full_name)|e }}')" class="text-yellow-600 hover:text-yellow-900 mr-3" title="Reset Password"><i class="fa-solid fa-key"></i></button>

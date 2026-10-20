@@ -27,6 +27,11 @@
         html.sidebar-collapsed .nav-text { display: none !important; }
         html.sidebar-collapsed .sidebar-header-container { justify-content: center !important; }
         html.sidebar-collapsed .sidebar-header-container > div:first-child { display: none !important; }
+
+        .overflow-x-auto::-webkit-scrollbar { height: 6px; }
+        .overflow-x-auto::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .overflow-x-auto::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .overflow-x-auto::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 
     <style>
@@ -74,7 +79,7 @@
             </a>
         </header>
 
-        <div class="p-8">
+        <div class="px-4 sm:px-6 lg:px-8 py-6">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}<div class="mb-6">{% for category, message in messages %}
                 <div class="p-4 rounded-md shadow-sm mb-2 {% if category == 'danger' %}bg-red-50 text-red-700 border-l-4 border-red-500{% elif category == 'warning' %}bg-amber-50 text-amber-700 border-l-4 border-amber-500{% else %}bg-green-50 text-green-700 border-l-4 border-[#668054]{% endif %}">{{ message }}</div>
@@ -164,36 +169,38 @@
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50"><tr>
-                            <th class="px-4 py-3 w-10"><input type="checkbox" id="checkAllActive" onclick="toggleAll('active-cb')" class="rounded border-gray-300 text-[#668054]"></th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Section</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Registered</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            <th class="px-3 py-3 w-10"><input type="checkbox" id="checkAllActive" onclick="toggleAll('active-cb')" class="rounded border-gray-300 text-[#668054]"></th>
+                            <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
+                            <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Email</th>
+                            <th class="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Section</th>
+                            <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Registered</th>
+                            <th class="px-3.5 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider sticky right-0 bg-gray-50 shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] z-10">Actions</th>
                         </tr></thead>
                         <tbody class="bg-white divide-y divide-gray-100" id="studentBody">
                             {% if active_students %}
                                 {% for s in active_students %}
                                 <tr class="hover:bg-gray-50 student-row">
-                                    <td class="px-4 py-4"><input type="checkbox" name="active-cb" value="{{ s.id }}" class="active-cb rounded border-gray-300 text-[#668054]"></td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-9 h-9 rounded-full bg-[#d6e4cf] text-[#668054] flex items-center justify-center font-bold text-sm">{{ s.full_name[0]|upper }}</div>
-                                            <span class="text-sm font-medium text-gray-900">{{ s.full_name }}</span>
+                                    <td class="px-3 py-3 text-center"><input type="checkbox" name="active-cb" value="{{ s.id }}" class="active-cb rounded border-gray-300 text-[#668054]"></td>
+                                    <td class="px-3.5 py-3 whitespace-nowrap">
+                                        <div class="flex items-center gap-2.5">
+                                            <div class="w-8 h-8 rounded-full bg-[#d6e4cf] text-[#668054] flex items-center justify-center font-bold text-xs">{{ s.full_name[0]|upper }}</div>
+                                            <span class="text-sm font-semibold text-gray-900">{{ s.full_name }}</span>
                                         </div>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ s.email }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">{% if s.section %}<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{{ s.section }}</span>{% else %}<span class="text-gray-400">—</span>{% endif %}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ s.created_at.strftime("%b %d, %Y") if s.created_at else "—" }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap flex gap-2">
-                                        <button onclick="openEditStudentModal({{ s.id }}, '{{ s.full_name|e }}', '{{ s.email|e }}', '{{ (s.section or '')|e }}')" class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-[#668054] hover:bg-[#526843] shadow-xs" title="Edit Student & Section"><i class="fa-solid fa-pen-to-square mr-1"></i>Edit</button>
-                                        <button onclick="openResetPwModal({{ s.id }}, '{{ s.full_name|e }}')" class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 shadow-xs" title="Reset Password"><i class="fa-solid fa-rotate-left mr-1"></i>Reset Password</button>
-                                        <form action="/students/deactivate/{{ s.id }}" method="POST" id="deactForm_{{ s.id }}" class="inline">
-                                            <button type="button" onclick="confirmDeactivateStudent({{ s.id }}, '{{ s.full_name|e }}')" class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-amber-500 hover:bg-amber-600"><i class="fa-solid fa-ban mr-1"></i>Deactivate</button>
-                                        </form>
-                                        <form action="/students/reject/{{ s.id }}" method="POST" id="delForm_{{ s.id }}" class="inline">
-                                            <button type="button" onclick="confirmDeleteStudent({{ s.id }}, '{{ s.full_name|e }}')" class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-trash mr-1"></i>Delete</button>
-                                        </form>
+                                    <td class="px-3.5 py-3 whitespace-nowrap text-xs font-mono text-gray-600">{{ s.email }}</td>
+                                    <td class="px-3 py-3 whitespace-nowrap text-center">{% if s.section %}<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">{{ s.section }}</span>{% else %}<span class="text-gray-400">—</span>{% endif %}</td>
+                                    <td class="px-3.5 py-3 whitespace-nowrap text-xs text-gray-500">{{ s.created_at.strftime("%b %d, %Y") if s.created_at else "—" }}</td>
+                                    <td class="px-3.5 py-3 whitespace-nowrap text-right sticky right-0 bg-white shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] z-10">
+                                        <div class="inline-flex items-center justify-end gap-1.5">
+                                            <button onclick="openEditStudentModal({{ s.id }}, '{{ s.full_name|e }}', '{{ s.email|e }}', '{{ (s.section or '')|e }}')" class="p-1.5 rounded-md text-[#668054] hover:bg-green-50 transition-colors" title="Edit Student & Section"><i class="fa-solid fa-pen-to-square text-sm"></i></button>
+                                            <button onclick="openResetPwModal({{ s.id }}, '{{ s.full_name|e }}')" class="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 transition-colors" title="Reset Password"><i class="fa-solid fa-rotate-left text-sm"></i></button>
+                                            <form action="/students/deactivate/{{ s.id }}" method="POST" id="deactForm_{{ s.id }}" class="inline m-0 p-0">
+                                                <button type="button" onclick="confirmDeactivateStudent({{ s.id }}, '{{ s.full_name|e }}')" class="p-1.5 rounded-md text-amber-600 hover:bg-amber-50 transition-colors" title="Deactivate"><i class="fa-solid fa-ban text-sm"></i></button>
+                                            </form>
+                                            <form action="/students/reject/{{ s.id }}" method="POST" id="delForm_{{ s.id }}" class="inline m-0 p-0">
+                                                <button type="button" onclick="confirmDeleteStudent({{ s.id }}, '{{ s.full_name|e }}')" class="p-1.5 rounded-md text-red-600 hover:bg-red-50 transition-colors cursor-pointer" title="Delete"><i class="fa-solid fa-trash text-sm"></i></button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% endfor %}

@@ -2408,8 +2408,31 @@ def proctor_report_absence():
     if not exam_id:
         flash("Select an exam.", "warning")
         return redirect(url_for('proctor_dashboard'))
+    
+    # Prevent duplicate absence submissions for the same exam
+    db = open_db()
+    if db:
+        try:
+            c = db.cursor(dictionary=True)
+            c.execute("""
+                SELECT pa.id, (SELECT COUNT(*) FROM relievers rel WHERE rel.exam_id = %s) as has_reliever
+                FROM proctor_absence pa
+                WHERE pa.instructor_id = %s AND pa.exam_id = %s
+                ORDER BY pa.id DESC LIMIT 1
+            """, (exam_id, instructor_id, exam_id))
+            prev = c.fetchone()
+            if prev:
+                if prev.get('has_reliever'):
+                    flash("A substitute reliever has already been assigned for this exam.", "info")
+                    return redirect(url_for('proctor_dashboard'))
+                else:
+                    flash("An absence report is already pending administrative / secretary review for this exam.", "warning")
+                    return redirect(url_for('proctor_dashboard'))
+        finally:
+            db.close()
+
     record_proctor_absence(instructor_id, int(exam_id), reason, session['user_id'])
-    flash("Absence reported.", "info")
+    flash("Absence reported successfully. Your Institute Secretary has been notified.", "info")
     exam = get_exam_by_id(int(exam_id)) if exam_id else {}
     exam_label = f"{exam.get('subject_name', '')} ({exam.get('section', '')})" if exam else f"exam #{exam_id}"
     # Notify admin and secretary roles

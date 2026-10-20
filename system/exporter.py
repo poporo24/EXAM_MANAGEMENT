@@ -500,10 +500,16 @@ def export_proctor_duty_slip_pdf(proctor_name, exams, exam_term='Midterm', exam_
                 date_str = str(dt)
 
         subj = e.get('subject_name', '')
+        status_note = ""
+        if e.get('has_reliever'):
+            status_note = f"<br/><font color='#1d4ed8' size=6><b>[Relieved &bull; Sub: Prof. {e.get('reliever_name', 'Reliever')}]</b></font>"
+        elif e.get('is_absent_reported'):
+            status_note = "<br/><font color='#b45309' size=6><b>[Absence Reported &bull; Pending Reliever]</b></font>"
+
         if e.get('subject_code'):
-            subj_cell = Paragraph(f"<b>{subj}</b><br/><font color='#64748b' size=6>{e.get('subject_code')}</font>", td_left)
+            subj_cell = Paragraph(f"<b>{subj}</b>{status_note}<br/><font color='#64748b' size=6>{e.get('subject_code')}</font>", td_left)
         else:
-            subj_cell = Paragraph(f"<b>{subj}</b>", td_left)
+            subj_cell = Paragraph(f"<b>{subj}</b>{status_note}", td_left)
 
         table_data.append([
             Paragraph(str(idx), td_style),

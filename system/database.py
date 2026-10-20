@@ -1730,10 +1730,21 @@ def get_proctor_exams(instructor_id):
     try:
         cursor = db.cursor(dictionary=True)
         cursor.execute("""
-            SELECT e.id, e.subject_name, e.section, e.exam_date_time, e.duration_minutes, e.status, r.room_name, r.capacity
-            FROM exams e LEFT JOIN rooms r ON e.room_id = r.id
-            WHERE e.instructor_id = %s AND e.status = 'Scheduled' AND e.exam_date_time IS NOT NULL ORDER BY e.exam_date_time ASC, e.section ASC
-        """, (instructor_id,))
+            SELECT e.id, e.subject_name, e.section, e.subject_type, s.code as subject_code,
+                   e.exam_date_time, e.duration_minutes, e.status,
+                   r.room_name, r.capacity,
+                   (SELECT COUNT(*) FROM proctor_absence pa WHERE pa.exam_id = e.id AND pa.instructor_id = %s) as is_absent_reported,
+                   (SELECT pa.reason FROM proctor_absence pa WHERE pa.exam_id = e.id AND pa.instructor_id = %s ORDER BY pa.id DESC LIMIT 1) as absence_reason,
+                   (SELECT COUNT(*) FROM relievers rel WHERE rel.exam_id = e.id) as has_reliever,
+                   (SELECT inst.name FROM relievers rel LEFT JOIN instructors inst ON rel.instructor_id = inst.id WHERE rel.exam_id = e.id ORDER BY rel.id DESC LIMIT 1) as reliever_name
+            FROM exams e
+            LEFT JOIN rooms r ON e.room_id = r.id
+            LEFT JOIN subjects s ON e.subject_id = s.id
+            WHERE (e.instructor_id = %s OR e.id IN (SELECT exam_id FROM proctor_absence WHERE instructor_id = %s))
+              AND e.status = 'Scheduled'
+              AND e.exam_date_time IS NOT NULL
+            ORDER BY e.exam_date_time ASC, e.section ASC
+        """, (instructor_id, instructor_id, instructor_id, instructor_id))
         return cursor.fetchall()
     finally:
         db.close()
@@ -2765,6 +2776,8 @@ def get_resource_schedule_details(resource_type, resource_id):
 def get_unresolved_absences(institute_id=None):
     """
     Returns pending/unresolved proctor absences for a given institute (or all if None).
+    Matches if either the proctor belongs to the institute OR the exam belongs to the institute.
+    Deduplicates multiple reports for the same exam.
     """
     db = open_db()
     if not db: return []
@@ -2772,24 +2785,36 @@ def get_unresolved_absences(institute_id=None):
         cursor = db.cursor(dictionary=True)
         if institute_id:
             cursor.execute("""
-                SELECT p.*, i.name as instructor_name, e.subject_name, e.section, e.exam_date_time, e.institute_id,
+                SELECT p.id, p.instructor_id, p.exam_id, p.reason, p.reported_by, p.reported_at,
+                       i.name as instructor_name, e.subject_name, e.section, e.exam_date_time, e.institute_id,
                        e.duration_minutes, e.room_id, r.room_name, u.full_name as reported_by_name,
                        (SELECT COUNT(*) FROM relievers rel WHERE rel.exam_id = p.exam_id) as reliever_count
                 FROM proctor_absence p
+                INNER JOIN (
+                    SELECT exam_id, MAX(id) as max_id
+                    FROM proctor_absence
+                    GROUP BY exam_id
+                ) latest ON p.id = latest.max_id
                 LEFT JOIN instructors i ON p.instructor_id = i.id
                 LEFT JOIN exams e ON p.exam_id = e.id
                 LEFT JOIN rooms r ON e.room_id = r.id
                 LEFT JOIN users u ON p.reported_by = u.id
-                WHERE e.institute_id = %s
+                WHERE (i.institute_id = %s OR e.institute_id = %s)
                 HAVING reliever_count = 0
                 ORDER BY p.reported_at DESC
-            """, (institute_id,))
+            """, (institute_id, institute_id))
         else:
             cursor.execute("""
-                SELECT p.*, i.name as instructor_name, e.subject_name, e.section, e.exam_date_time, e.institute_id,
+                SELECT p.id, p.instructor_id, p.exam_id, p.reason, p.reported_by, p.reported_at,
+                       i.name as instructor_name, e.subject_name, e.section, e.exam_date_time, e.institute_id,
                        e.duration_minutes, e.room_id, r.room_name, u.full_name as reported_by_name,
                        (SELECT COUNT(*) FROM relievers rel WHERE rel.exam_id = p.exam_id) as reliever_count
                 FROM proctor_absence p
+                INNER JOIN (
+                    SELECT exam_id, MAX(id) as max_id
+                    FROM proctor_absence
+                    GROUP BY exam_id
+                ) latest ON p.id = latest.max_id
                 LEFT JOIN instructors i ON p.instructor_id = i.id
                 LEFT JOIN exams e ON p.exam_id = e.id
                 LEFT JOIN rooms r ON e.room_id = r.id
@@ -3022,6 +3047,15 @@ def reassign_exam_proctor_room(exam_id, new_instructor_id, new_room_id=None, rea
             cursor.execute("INSERT INTO notifications (user_id, title, message, created_at, is_read) VALUES (%s, %s, %s, NOW(), 0)",
                            (adm['id'], "Proctor Substitution Dispatched",
                             f"Substitute proctor {new_inst_name} was dispatched for {exam.get('subject_name')} ({exam.get('section')})."))
+
+        # 5. Notification for original proctor
+        if old_instructor_id and old_instructor_id != new_instructor_id:
+            cursor.execute("SELECT id FROM users WHERE instructor_id = %s", (old_instructor_id,))
+            orig_user = cursor.fetchone()
+            if orig_user:
+                cursor.execute("INSERT INTO notifications (user_id, title, message, created_at, is_read) VALUES (%s, %s, %s, NOW(), 0)",
+                               (orig_user['id'], "Reliever Assigned for Your Duty",
+                                f"Prof. {new_inst_name} has been assigned as your substitute reliever for {exam.get('subject_name')} ({exam.get('section')}). You have been excused from this duty."))
 
         db.commit()
         return True, f"Successfully assigned {new_inst_name} as substitute proctor."

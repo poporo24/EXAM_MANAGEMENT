@@ -258,9 +258,9 @@
             print-color-adjust: exact !important;
         }
         table.timetable th.time-col {
-            width: 80px !important;
-            min-width: 80px !important;
-            max-width: 80px !important;
+            width: 96px !important;
+            min-width: 96px !important;
+            max-width: 96px !important;
         }
         table.timetable th.date-col {
             width: auto !important;
@@ -275,14 +275,33 @@
         }
         table.timetable td.time-cell {
             background-color: #f8fafc !important;
-            font-weight: 700 !important;
-            font-size: 10px !important;
-            color: #1e293b !important;
             text-align: center !important;
             vertical-align: middle !important;
             border: 1px solid #cbd5e1 !important;
+            padding: 5px 3px !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+        }
+        .time-slot-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.15;
+        }
+        .time-slot-box .time-start,
+        .time-slot-box .time-end {
+            font-size: 9.5px;
+            font-weight: 700;
+            color: #1e293b;
+            white-space: nowrap;
+        }
+        .time-slot-box .time-sep {
+            font-size: 8px;
+            color: #64748b;
+            font-weight: 600;
+            margin: 1px 0;
+            text-transform: lowercase;
         }
 
         /* Exam Card Inside Cell */
@@ -412,16 +431,22 @@
             <table class="timetable">
                 <thead>
                     <tr>
-                        <th class="time-col"><i class="fa-regular fa-clock" style="margin-right: 3px;"></i> Time</th>
+                        <th class="time-col"><i class="fa-regular fa-clock" style="margin-right: 3px;"></i> Time Slot</th>
                         {% for d in dates %}
-                        <th class="date-col" style="width: calc((100% - 80px) / {{ dates | length }});">{{ date_labels.get(d, d) }}</th>
+                        <th class="date-col" style="width: calc((100% - 96px) / {{ dates | length }});">{{ date_labels.get(d, d) }}</th>
                         {% endfor %}
                     </tr>
                 </thead>
                 <tbody>
                     {% for row in rows %}
                     <tr>
-                        <td class="time-cell">{{ row.time_label }}</td>
+                        <td class="time-cell">
+                            <div class="time-slot-box">
+                                <span class="time-start">{{ row.time_start }}</span>
+                                <span class="time-sep">to</span>
+                                <span class="time-end">{{ row.time_end }}</span>
+                            </div>
+                        </td>
                         {% for cell in row.cells %}
                             {% if not cell.is_skipped %}
                                 {% if cell.exams %}

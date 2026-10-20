@@ -2967,12 +2967,14 @@ def admin_batch_print_sections():
                     time_labels[dt.strftime("%H:%M")] = e['time']
 
     for t_str in times_list:
-        if t_str not in time_labels:
-            try:
-                t_obj = datetime.strptime(t_str, "%H:%M")
-                time_labels[t_str] = t_obj.strftime("%I:%M %p")
-            except Exception:
-                time_labels[t_str] = t_str
+        try:
+            start_obj = datetime.strptime(t_str, "%H:%M")
+            end_obj = start_obj + timedelta(hours=1)
+            time_start_str = start_obj.strftime("%I:%M %p")
+            time_end_str = end_obj.strftime("%I:%M %p")
+            time_labels[t_str] = f"{time_start_str} - {time_end_str}"
+        except Exception:
+            time_labels[t_str] = t_str
 
     # Build merged-cell table rows with rowspan for each section
     section_tables = {}
@@ -2980,6 +2982,14 @@ def admin_batch_print_sections():
         active_spans = {d: 0 for d in dates_list}
         rows = []
         for t_idx, t in enumerate(times_list):
+            try:
+                start_obj = datetime.strptime(t, "%H:%M")
+                end_obj = start_obj + timedelta(hours=1)
+                t_start = start_obj.strftime("%I:%M %p")
+                t_end = end_obj.strftime("%I:%M %p")
+            except Exception:
+                t_start = t
+                t_end = ""
             row_cells = []
             for d in dates_list:
                 if active_spans[d] > 0:
@@ -3016,6 +3026,8 @@ def admin_batch_print_sections():
                         })
             rows.append({
                 'time_str': t,
+                'time_start': t_start,
+                'time_end': t_end,
                 'time_label': time_labels.get(t, t),
                 'cells': row_cells
             })

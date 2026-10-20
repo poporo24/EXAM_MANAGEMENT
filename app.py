@@ -2921,17 +2921,15 @@ def admin_batch_print_sections():
         if sec:
             sections_dict[sec].append(exam)
             
-    # For each section, build a grid
-    section_grids = {}
     dates_set = set()
     times_set = set()
+    sec_exams_by_start = defaultdict(lambda: defaultdict(list))
     
     for sec, exams in sections_dict.items():
-        grid = defaultdict(lambda: defaultdict(list))
         for exam in exams:
             dt = exam['exam_date_time']
             if isinstance(dt, str):
-                    dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+                dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
             d_str = dt.strftime("%Y-%m-%d")
             t_str = dt.strftime("%H:%M")
             exam['_date_label'] = dt.strftime("%a %b %d")
@@ -2942,25 +2940,20 @@ def admin_batch_print_sections():
             exam['time'] = dt.strftime("%I:%M %p")
             exam['time_end'] = end_dt.strftime("%I:%M %p")
             exam['time_range'] = f"{exam['time']} - {exam['time_end']}"
-            grid[t_str][d_str].append(exam)
+            
+            sec_exams_by_start[sec][(t_str, d_str)].append(exam)
             dates_set.add(d_str)
             times_set.add(t_str)
             
-            # For multi-hour exams, also mark continuing hour slots
+            # For multi-hour exams, ensure each hourly slot is in times_set
             extra_hours = int((dur - 1) // 60)
             for h in range(1, extra_hours + 1):
                 cont_dt = dt + timedelta(hours=h)
-                cont_t_str = cont_dt.strftime("%H:%M")
-                times_set.add(cont_t_str)
-                cont_exam = dict(exam)
-                cont_exam['is_continuation'] = True
-                grid[cont_t_str][d_str].append(cont_exam)
-        section_grids[sec] = grid
+                times_set.add(cont_dt.strftime("%H:%M"))
         
     dates_list = sorted(list(dates_set))
     times_list = sorted(list(times_set))
     
-
     date_labels = {}
     time_labels = {}
     for sec, exams in sections_dict.items():
@@ -2981,10 +2974,56 @@ def admin_batch_print_sections():
             except Exception:
                 time_labels[t_str] = t_str
 
+    # Build merged-cell table rows with rowspan for each section
+    section_tables = {}
+    for sec, exams_map in sec_exams_by_start.items():
+        active_spans = {d: 0 for d in dates_list}
+        rows = []
+        for t_idx, t in enumerate(times_list):
+            row_cells = []
+            for d in dates_list:
+                if active_spans[d] > 0:
+                    row_cells.append({'is_skipped': True, 'date': d})
+                    active_spans[d] -= 1
+                else:
+                    cell_exams = exams_map.get((t, d), [])
+                    if cell_exams:
+                        max_dur = max(int(e.get('duration_minutes') or 60) for e in cell_exams)
+                        start_dt = datetime.strptime(t, "%H:%M")
+                        end_dt = start_dt + timedelta(minutes=max_dur)
+                        span = 0
+                        for check_t in times_list[t_idx:]:
+                            c_dt = datetime.strptime(check_t, "%H:%M")
+                            if c_dt < end_dt:
+                                span += 1
+                            else:
+                                break
+                        span = max(span, 1)
+                        if span > 1:
+                            active_spans[d] = span - 1
+                        row_cells.append({
+                            'is_skipped': False,
+                            'rowspan': span,
+                            'exams': cell_exams,
+                            'date': d
+                        })
+                    else:
+                        row_cells.append({
+                            'is_skipped': False,
+                            'rowspan': 1,
+                            'exams': [],
+                            'date': d
+                        })
+            rows.append({
+                'time_str': t,
+                'time_label': time_labels.get(t, t),
+                'cells': row_cells
+            })
+        section_tables[sec] = rows
                 
     return render_template("batch_print.html",
                            time_labels=time_labels,
-                           section_grids=section_grids,
+                           section_tables=section_tables,
                            dates=dates_list,
                            times=times_list,
                            date_labels=date_labels,

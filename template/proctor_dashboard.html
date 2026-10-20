@@ -511,13 +511,17 @@
                                 </div>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {% for exam in exams %}
-                                    {% if exam.has_reliever %}
-                                    <!-- Relieved / Excused Duty -->
-                                    <div class="bg-blue-50/30 border-2 border-blue-200 rounded-xl p-5 hover:shadow-lg transition-all relative">
-                                        <div class="absolute top-4 right-4 flex items-center gap-1.5 text-[10px] font-bold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full uppercase tracking-wider border border-blue-200 shadow-2xs">
-                                            <i class="fa-solid fa-user-check"></i> Relieved / Excused
+                                    {% if exam.is_absent_reported %}
+                                    <!-- PROCTOR REPORTED ABSENT FOR THIS DUTY -->
+                                    <div class="{% if exam.has_reliever %}bg-amber-50/40 border-2 border-amber-300{% else %}bg-red-50/40 border-2 border-red-300{% endif %} rounded-xl p-5 hover:shadow-lg transition-all relative">
+                                        <div class="absolute top-4 right-4 flex items-center gap-1.5 text-[10px] font-bold {% if exam.has_reliever %}text-amber-800 bg-amber-100 border-amber-300{% else %}text-red-800 bg-red-100 border-red-300{% endif %} border px-2.5 py-1 rounded-full uppercase tracking-wider shadow-2xs">
+                                            {% if exam.has_reliever %}
+                                                <i class="fa-solid fa-user-xmark text-amber-700"></i> Reported Absent &bull; Relieved
+                                            {% else %}
+                                                <i class="fa-solid fa-triangle-exclamation text-red-600"></i> Reported Absent
+                                            {% endif %}
                                         </div>
-                                        <h4 class="text-base font-bold text-gray-900 tracking-tight pr-28 mb-2.5">{{ exam.subject_name }}</h4>
+                                        <h4 class="text-base font-bold text-gray-900 tracking-tight pr-36 mb-2.5">{{ exam.subject_name }}</h4>
                                         <div class="flex flex-wrap gap-1.5 mb-3">
                                             <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
                                                 <i class="fa-solid fa-users text-blue-600"></i> {{ exam.section }}
@@ -536,31 +540,52 @@
                                                 <span class="font-medium">{{ exam.room_name or 'TBA' }}</span>
                                             </div>
                                         </div>
-                                        <div class="p-2.5 bg-blue-100/70 border border-blue-200 rounded-lg text-xs mb-3">
-                                            <div class="font-bold text-blue-900 flex items-center gap-1.5 mb-0.5">
-                                                <i class="fa-solid fa-circle-check text-blue-600"></i> Substitute Reliever Assigned
+
+                                        {% if exam.has_reliever %}
+                                        <div class="p-3 bg-amber-100/70 border border-amber-300 rounded-lg text-xs mb-3">
+                                            <div class="font-bold text-amber-900 flex items-center gap-1.5 mb-0.5">
+                                                <i class="fa-solid fa-circle-check text-green-600"></i> Substitute Reliever Assigned &bull; You are Excused
                                             </div>
-                                            <p class="text-blue-800 text-[11px]">Covered by <strong class="font-semibold text-blue-950">Prof. {{ exam.reliever_name or 'Designated Reliever' }}</strong></p>
+                                            <p class="text-amber-900 text-[11px]">Duty reassigned to: <strong class="font-semibold text-gray-900">Prof. {{ exam.reliever_name or 'Designated Reliever' }}</strong></p>
                                             {% if exam.absence_reason %}
-                                            <p class="text-blue-700 text-[10px] mt-1 italic">Reason: "{{ exam.absence_reason }}"</p>
+                                            <p class="text-amber-800 text-[11px] mt-1 italic font-medium">Your reported reason: "{{ exam.absence_reason }}"</p>
                                             {% endif %}
                                         </div>
                                         <div class="border-t border-gray-100 pt-3 flex items-center justify-between text-xs">
                                             <span class="text-gray-500 text-[11px] flex items-center gap-1">
-                                                <i class="fa-solid fa-shield-check text-blue-600"></i> Duty transferred
+                                                <i class="fa-solid fa-shield-check text-green-600"></i> Duty transferred to reliever
                                             </span>
-                                            <span class="text-gray-400 bg-gray-100 font-semibold px-2.5 py-1 rounded-md text-[11px] cursor-not-allowed">
-                                                <i class="fa-solid fa-check mr-1"></i> Excused
+                                            <span class="text-amber-800 bg-amber-100 font-bold px-2.5 py-1 rounded-md text-[11px] cursor-not-allowed border border-amber-200">
+                                                <i class="fa-solid fa-user-xmark mr-1"></i> Reported Absent
                                             </span>
                                         </div>
+                                        {% else %}
+                                        <div class="p-3 bg-red-100/70 border border-red-300 rounded-lg text-xs mb-3">
+                                            <div class="font-bold text-red-900 flex items-center gap-1.5 mb-0.5">
+                                                <i class="fa-solid fa-clock-rotate-left text-red-600"></i> Absence Reported &bull; Awaiting Substitute Reliever
+                                            </div>
+                                            <p class="text-red-800 text-[11px]">You reported you cannot attend this duty. Your Department Secretary has been alerted to dispatch a reliever.</p>
+                                            {% if exam.absence_reason %}
+                                            <p class="text-red-700 text-[11px] mt-1 italic font-medium">Your reported reason: "{{ exam.absence_reason }}"</p>
+                                            {% endif %}
+                                        </div>
+                                        <div class="border-t border-gray-100 pt-3 flex items-center justify-between text-xs">
+                                            <span class="text-red-700 font-medium text-[11px] flex items-center gap-1">
+                                                <i class="fa-solid fa-hourglass-half"></i> Pending Secretary Dispatch
+                                            </span>
+                                            <span class="text-red-800 bg-red-100 font-bold px-2.5 py-1 rounded-md text-[11px] cursor-not-allowed border border-red-200">
+                                                <i class="fa-solid fa-triangle-exclamation mr-1"></i> Reported Absent
+                                            </span>
+                                        </div>
+                                        {% endif %}
                                     </div>
-                                    {% elif exam.is_absent_reported %}
-                                    <!-- Absent Reported (Pending Reliever) -->
-                                    <div class="bg-amber-50/30 border-2 border-amber-300 rounded-xl p-5 hover:shadow-lg transition-all relative">
-                                        <div class="absolute top-4 right-4 flex items-center gap-1.5 text-[10px] font-bold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-full uppercase tracking-wider border border-amber-300 shadow-2xs">
-                                            <i class="fa-solid fa-triangle-exclamation text-amber-600"></i> Absence Reported
+                                    {% elif exam.is_assigned_reliever %}
+                                    <!-- PROCTOR IS ASSIGNED AS THE SUBSTITUTE RELIEVER -->
+                                    <div class="bg-blue-50/20 border-2 border-blue-300 rounded-xl p-5 hover:shadow-lg transition-all relative">
+                                        <div class="absolute top-4 right-4 flex items-center gap-1.5 text-[10px] font-bold text-blue-800 bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                                            <i class="fa-solid fa-user-shield text-blue-600"></i> Confirmed (Reliever Duty)
                                         </div>
-                                        <h4 class="text-base font-bold text-gray-900 tracking-tight pr-32 mb-2.5">{{ exam.subject_name }}</h4>
+                                        <h4 class="text-base font-bold text-gray-900 tracking-tight pr-36 mb-2.5">{{ exam.subject_name }}</h4>
                                         <div class="flex flex-wrap gap-1.5 mb-3">
                                             <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
                                                 <i class="fa-solid fa-users text-blue-600"></i> {{ exam.section }}
@@ -579,26 +604,17 @@
                                                 <span class="font-medium">{{ exam.room_name or 'TBA' }}</span>
                                             </div>
                                         </div>
-                                        <div class="p-2.5 bg-amber-100/70 border border-amber-300 rounded-lg text-xs mb-3">
-                                            <div class="font-bold text-amber-900 flex items-center gap-1.5 mb-0.5">
-                                                <i class="fa-solid fa-clock-rotate-left text-amber-600"></i> Awaiting Substitute Reliever
-                                            </div>
-                                            <p class="text-amber-800 text-[11px]">Reported to Department Secretary for substitute dispatch.</p>
-                                            {% if exam.absence_reason %}
-                                            <p class="text-amber-700 text-[11px] mt-1 italic font-medium">"{{ exam.absence_reason }}"</p>
-                                            {% endif %}
+                                        <div class="p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs mb-3 text-blue-800">
+                                            <span class="font-semibold"><i class="fa-solid fa-info-circle mr-1 text-blue-600"></i> Reliever Assignment:</span> You were dispatched by the Department Secretary to cover this exam duty.
                                         </div>
-                                        <div class="border-t border-gray-100 pt-3 flex items-center justify-between text-xs">
-                                            <span class="text-amber-700 font-medium text-[11px] flex items-center gap-1">
-                                                <i class="fa-solid fa-hourglass-half"></i> Pending Secretary Reliever
-                                            </span>
-                                            <span class="text-amber-800 bg-amber-100 font-semibold px-2.5 py-1 rounded-md text-[11px] cursor-not-allowed border border-amber-200">
-                                                <i class="fa-solid fa-check mr-1"></i> Reported Absent
-                                            </span>
+                                        <div class="border-t border-gray-100 pt-3 flex justify-end">
+                                            <button onclick="openAbsenceModal('{{ exam.id }}', '{{ exam.subject_name }} - {{ exam.section }}', '{{ date }}', '{% if exam.time_end %}{{ exam.time }} &ndash; {{ exam.time_end }}{% else %}{{ exam.time }}{% endif %}')" class="inline-flex items-center text-xs font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg border border-red-100 transition-colors cursor-pointer">
+                                                <i class="fa-solid fa-triangle-exclamation mr-1.5 text-red-500"></i> Report Absence
+                                            </button>
                                         </div>
                                     </div>
                                     {% else %}
-                                    <!-- Normal Active Assignment -->
+                                    <!-- NORMAL ACTIVE PROCTOR ASSIGNMENT -->
                                     <div class="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-lg transition-all relative">
                                         <div class="absolute top-4 right-4 flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full uppercase tracking-wider">
                                             <i class="fa-solid fa-circle-check"></i> Confirmed
@@ -623,7 +639,7 @@
                                             </div>
                                         </div>
                                         <div class="border-t border-gray-100 pt-3 flex justify-end">
-                                            <button onclick="openAbsenceModal('{{ exam.id }}', '{{ exam.subject_name }} - {{ exam.section }}', '{{ date }}')" class="inline-flex items-center text-xs font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg border border-red-100 transition-colors cursor-pointer">
+                                            <button onclick="openAbsenceModal('{{ exam.id }}', '{{ exam.subject_name }} - {{ exam.section }}', '{{ date }}', '{% if exam.time_end %}{{ exam.time }} &ndash; {{ exam.time_end }}{% else %}{{ exam.time }}{% endif %}')" class="inline-flex items-center text-xs font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg border border-red-100 transition-colors cursor-pointer">
                                                 <i class="fa-solid fa-triangle-exclamation mr-1.5 text-red-500"></i> Report Absence
                                             </button>
                                         </div>
@@ -711,36 +727,164 @@
         </div>
     </main>
 
-    <!-- Absence Modal -->
+    <!-- Absence Reason Modal (Step 1) -->
     <div id="absenceModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
         <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal('absenceModal')"></div>
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-2">Report Absence</h3>
-                    <p class="text-sm text-gray-500 mb-4" id="absenceExamDetails"></p>
-                    <form action="/proctor/report_absence" method="POST" id="absenceForm" class="space-y-4">
+            <div class="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-5 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-lg flex-shrink-0">
+                            <i class="fa-solid fa-calendar-xmark"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">Report Duty Absence</h3>
+                            <p class="text-xs text-gray-500">Provide an explanation before confirming your absence report</p>
+                        </div>
+                    </div>
+                    
+                    <div class="p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs space-y-1.5 mb-4">
+                        <div class="flex items-center">
+                            <span class="font-bold text-gray-500 w-28">Examination:</span>
+                            <span class="font-bold text-gray-900" id="absenceModalSubject">—</span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="font-bold text-gray-500 w-28">Date &amp; Time:</span>
+                            <span class="font-medium text-gray-800" id="absenceModalDateTime">—</span>
+                        </div>
+                    </div>
+
+                    <form id="absenceForm" action="/proctor/report_absence" method="POST" onsubmit="event.preventDefault(); showAbsenceConfirmation();">
                         <input type="hidden" name="exam_id" id="absence_exam_id">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Reason for Absence</label>
-                            <textarea name="reason" required rows="4" class="mt-1 focus:ring-red-500 block w-full sm:text-sm border-gray-300 rounded-md border p-2"></textarea>
+                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                                Reason for Absence <span class="text-red-500">*</span>
+                            </label>
+                            <textarea name="reason" id="absence_reason" required rows="3" placeholder="Please state why you cannot attend this duty (e.g., Medical leave, official emergency)..." class="mt-1 focus:ring-red-500 focus:border-red-500 block w-full text-xs border-gray-300 rounded-lg border p-2.5 outline-none"></textarea>
+                            <p class="text-[11px] text-gray-400 mt-1">This report will be forwarded to your Department Secretary to arrange a substitute.</p>
                         </div>
                     </form>
                 </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                    <button type="submit" form="absenceForm" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-white hover:bg-red-700 sm:ml-3 sm:w-auto sm:text-sm">Submit Report</button>
-                    <button type="button" onclick="closeModal('absenceModal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                <div class="bg-gray-50 px-5 py-3.5 sm:px-6 flex flex-row-reverse gap-2">
+                    <button type="button" onclick="showAbsenceConfirmation()" class="inline-flex items-center justify-center rounded-lg shadow-sm px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold text-xs transition-colors cursor-pointer">
+                        Proceed to Confirm <i class="fa-solid fa-arrow-right ml-1.5"></i>
+                    </button>
+                    <button type="button" onclick="closeModal('absenceModal')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 font-semibold text-xs transition-colors cursor-pointer">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Explicit Confirmation Modal (Step 2) -->
+    <div id="absenceConfirmModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-xs transition-opacity" onclick="closeModal('absenceConfirmModal')"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full border-t-4 border-red-500">
+                <div class="bg-white px-5 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-11 h-11 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xl flex-shrink-0 shadow-inner">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-gray-900">Confirm Absence Report</h3>
+                            <p class="text-xs text-red-600 font-medium">Please review carefully before submitting</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 mb-4">
+                        <div class="font-bold flex items-center gap-1.5 mb-1">
+                            <i class="fa-solid fa-circle-exclamation text-amber-600"></i> Are you sure you cannot attend?
+                        </div>
+                        <p class="text-[11px] text-amber-800 leading-relaxed">
+                            Once confirmed, this exam duty will be marked as <strong>Reported Absent</strong> on your account, and your Department Secretary will immediately be notified to dispatch a substitute reliever.
+                        </p>
+                    </div>
+
+                    <div class="space-y-2 text-xs bg-gray-50 border border-gray-200 rounded-lg p-3.5 mb-2">
+                        <div>
+                            <span class="text-gray-400 uppercase font-bold text-[10px] block">Course &amp; Section</span>
+                            <span class="font-bold text-gray-900 text-sm" id="confirmModalSubject">—</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400 uppercase font-bold text-[10px] block">Scheduled Window</span>
+                            <span class="font-semibold text-gray-800" id="confirmModalDateTime">—</span>
+                        </div>
+                        <div class="pt-2 border-t border-gray-200">
+                            <span class="text-gray-400 uppercase font-bold text-[10px] block">Stated Reason</span>
+                            <span class="text-gray-800 italic font-medium" id="confirmModalReason">—</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-5 py-3.5 sm:px-6 flex flex-row-reverse gap-2">
+                    <button type="button" onclick="submitFinalAbsenceReport()" class="inline-flex items-center justify-center rounded-lg shadow-sm px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-colors cursor-pointer">
+                        <i class="fa-solid fa-check mr-1.5"></i> Yes, Confirm Absence
+                    </button>
+                    <button type="button" onclick="backToAbsenceForm()" class="inline-flex items-center justify-center rounded-lg border border-gray-300 shadow-sm px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 font-semibold text-xs transition-colors cursor-pointer">
+                        Back to Edit
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        function openAbsenceModal(exam_id, details, date) {
+        let currentAbsenceExam = {
+            id: null,
+            subject: '',
+            date: '',
+            timeWindow: ''
+        };
+
+        function openAbsenceModal(exam_id, details, date, timeWindow) {
+            currentAbsenceExam = {
+                id: exam_id,
+                subject: details,
+                date: date,
+                timeWindow: timeWindow || ''
+            };
             document.getElementById('absence_exam_id').value = exam_id;
-            document.getElementById('absenceExamDetails').innerText = `You are reporting an absence for: ${details} on ${date}. An admin will be notified to reassign this exam.`;
+            document.getElementById('absenceModalSubject').innerText = details;
+            document.getElementById('absenceModalDateTime').innerText = `${date}${timeWindow ? ' • ' + timeWindow : ''}`;
+            const reasonInput = document.getElementById('absence_reason');
+            if (reasonInput) {
+                reasonInput.value = '';
+                reasonInput.classList.remove('border-red-500', 'ring-1', 'ring-red-500');
+            }
             document.getElementById('absenceModal').classList.remove('hidden');
+        }
+
+        function showAbsenceConfirmation() {
+            const reasonInput = document.getElementById('absence_reason');
+            const reason = reasonInput.value.trim();
+            if (!reason) {
+                reasonInput.focus();
+                reasonInput.classList.add('border-red-500', 'ring-1', 'ring-red-500');
+                alert('Please provide a reason for your absence before continuing.');
+                return;
+            }
+            reasonInput.classList.remove('border-red-500', 'ring-1', 'ring-red-500');
+
+            // Populate confirmation modal fields
+            document.getElementById('confirmModalSubject').innerText = currentAbsenceExam.subject;
+            document.getElementById('confirmModalDateTime').innerText = `${currentAbsenceExam.date}${currentAbsenceExam.timeWindow ? ' • ' + currentAbsenceExam.timeWindow : ''}`;
+            document.getElementById('confirmModalReason').innerText = `"${reason}"`;
+
+            // Transition from step 1 to step 2
+            document.getElementById('absenceModal').classList.add('hidden');
+            document.getElementById('absenceConfirmModal').classList.remove('hidden');
+        }
+
+        function backToAbsenceForm() {
+            document.getElementById('absenceConfirmModal').classList.add('hidden');
+            document.getElementById('absenceModal').classList.remove('hidden');
+        }
+
+        function submitFinalAbsenceReport() {
+            document.getElementById('absenceForm').submit();
         }
 
         function closeModal(id) {

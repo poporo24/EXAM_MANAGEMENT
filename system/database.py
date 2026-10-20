@@ -1736,7 +1736,8 @@ def get_proctor_exams(instructor_id):
                    (SELECT COUNT(*) FROM proctor_absence pa WHERE pa.exam_id = e.id AND pa.instructor_id = %s) as is_absent_reported,
                    (SELECT pa.reason FROM proctor_absence pa WHERE pa.exam_id = e.id AND pa.instructor_id = %s ORDER BY pa.id DESC LIMIT 1) as absence_reason,
                    (SELECT COUNT(*) FROM relievers rel WHERE rel.exam_id = e.id) as has_reliever,
-                   (SELECT inst.name FROM relievers rel LEFT JOIN instructors inst ON rel.instructor_id = inst.id WHERE rel.exam_id = e.id ORDER BY rel.id DESC LIMIT 1) as reliever_name
+                   (SELECT inst.name FROM relievers rel LEFT JOIN instructors inst ON rel.instructor_id = inst.id WHERE rel.exam_id = e.id ORDER BY rel.id DESC LIMIT 1) as reliever_name,
+                   (SELECT COUNT(*) FROM relievers rel WHERE rel.exam_id = e.id AND rel.instructor_id = %s) as is_assigned_reliever
             FROM exams e
             LEFT JOIN rooms r ON e.room_id = r.id
             LEFT JOIN subjects s ON e.subject_id = s.id
@@ -1744,7 +1745,7 @@ def get_proctor_exams(instructor_id):
               AND e.status = 'Scheduled'
               AND e.exam_date_time IS NOT NULL
             ORDER BY e.exam_date_time ASC, e.section ASC
-        """, (instructor_id, instructor_id, instructor_id, instructor_id))
+        """, (instructor_id, instructor_id, instructor_id, instructor_id, instructor_id))
         return cursor.fetchall()
     finally:
         db.close()

@@ -600,14 +600,58 @@
                         </a>
                         <form id="resetScheduleForm" method="POST" action="/reset_schedule" class="inline">
                             <input type="hidden" name="archive_before_reset" value="1">
-                            <button type="button" onclick="confirmResetSchedule()"
-                                    class="inline-flex items-center gap-2 px-4 py-2 border border-red-300 rounded-lg text-sm font-medium text-red-600 bg-white hover:bg-red-50 transition-colors">
-                                <i class="fa-solid fa-rotate-left"></i> Reset
+                        {% if pending_reset_request %}
+                            <button type="button" class="inline-flex items-center gap-2 px-4 py-2 border border-amber-300 rounded-lg text-sm font-medium text-amber-800 bg-amber-50 cursor-not-allowed opacity-90 shadow-xs" title="A schedule reset request is currently pending Super Admin authorization" disabled>
+                                <i class="fa-solid fa-clock-rotate-left text-amber-600"></i> Reset Pending
                             </button>
+                        {% elif session.get('is_super_admin') %}
+                            <button type="button" onclick="confirmResetSchedule()"
+                                    class="inline-flex items-center gap-2 px-4 py-2 border border-red-300 rounded-lg text-sm font-medium text-red-600 bg-white hover:bg-red-50 transition-colors shadow-xs" title="Super Admin Direct Master Reset">
+                                <i class="fa-solid fa-rotate-left"></i> Reset Schedule
+                            </button>
+                        {% else %}
+                            <button type="button" onclick="openRequestResetModal()"
+                                    class="inline-flex items-center gap-2 px-4 py-2 border border-amber-300 rounded-lg text-sm font-medium text-amber-800 bg-white hover:bg-amber-50 transition-colors shadow-xs" title="Submit a schedule reset request for Super Admin authorization">
+                                <i class="fa-solid fa-rotate-left text-amber-600"></i> Request Reset
+                            </button>
+                        {% endif %}
                         </form>
                     </div>
                 </div>
             </div>
+
+            <!-- Pending Schedule Reset Request Banner (Four-Eyes Approval Rule) -->
+            {% if pending_reset_request %}
+            <div class="no-print mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-sm text-amber-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div class="flex items-start sm:items-center gap-3.5">
+                    <div class="w-11 h-11 rounded-xl flex items-center justify-center text-xl shadow-xs flex-shrink-0 bg-amber-500 text-white">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="text-sm font-bold text-amber-900">Schedule Reset Request Pending Super Admin Authorization</h3>
+                            <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-800 border border-amber-300">
+                                <i class="fa-solid fa-hourglass-half mr-1"></i> Awaiting Approval
+                            </span>
+                        </div>
+                        <p class="text-xs mt-1 text-amber-800">
+                            Requested by <b>{{ pending_reset_request.requested_by_name }}</b> on {{ pending_reset_request.requested_at.strftime('%b %d, %Y at %I:%M %p') if pending_reset_request.requested_at else '' }}:
+                            <span class="italic font-medium">"{{ pending_reset_request.reason }}"</span>
+                        </p>
+                    </div>
+                </div>
+                {% if session.get('is_super_admin') %}
+                <div class="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto justify-end">
+                    <button type="button" onclick="openApproveResetModal('{{ pending_reset_request.id }}', '{{ pending_reset_request.requested_by_name|e }}', '{{ pending_reset_request.reason|e }}')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-red-600 hover:bg-red-700 shadow-sm transition-colors cursor-pointer">
+                        <i class="fa-solid fa-check"></i> Approve & Reset Now
+                    </button>
+                    <button type="button" onclick="openRejectResetModal('{{ pending_reset_request.id }}', '{{ pending_reset_request.requested_by_name|e }}')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 shadow-xs transition-colors cursor-pointer">
+                        <i class="fa-solid fa-xmark"></i> Decline
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
 
             <!-- Publication Status Banner & Controls -->
             {% if sched_count and sched_count > 0 %}
@@ -1915,6 +1959,189 @@
         }
     }
     </script>
+
+    <!-- Request Schedule Reset Modal (Maker-Checker / Dual Authorization) -->
+    <div id="requestResetModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs">
+        <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-gray-100 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200">
+            <div class="bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-4 flex items-center justify-between text-white">
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-solid fa-shield-halved text-xl"></i>
+                    <h3 class="font-bold text-base">Request Schedule Reset</h3>
+                </div>
+                <button type="button" onclick="closeRequestResetModal()" class="text-white/80 hover:text-white transition-colors cursor-pointer text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form action="/admin/request_schedule_reset" method="POST" class="p-6 space-y-4">
+                <div class="p-3.5 bg-amber-50 rounded-xl border border-amber-200 flex items-start gap-3 text-amber-900">
+                    <i class="fa-solid fa-circle-exclamation text-amber-600 mt-0.5 flex-shrink-0"></i>
+                    <p class="text-xs leading-relaxed">
+                        To protect institutional timetable data, resetting the master examination schedule requires authorization from a <b>Super Administrator</b>. Your request will be queued for approval.
+                    </p>
+                </div>
+                <div>
+                    <label for="reset_reason" class="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                        Reason / Justification <span class="text-red-500">*</span>
+                    </label>
+                    <textarea name="reason" id="reset_reason" rows="3" required placeholder="e.g., Examination dates were shifted by the Academic Council; need to re-generate slots." class="w-full text-sm border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all placeholder:text-gray-400"></textarea>
+                    <p class="text-[11px] text-gray-500 mt-1">This justification is archived in the audit logs and sent to the Super Administrator.</p>
+                </div>
+                <div class="flex items-center justify-end gap-2.5 pt-2">
+                    <button type="button" onclick="closeRequestResetModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-5 py-2 rounded-lg text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 transition-colors shadow-sm cursor-pointer flex items-center gap-1.5">
+                        <i class="fa-solid fa-paper-plane text-[11px]"></i> Submit Reset Request
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openRequestResetModal() {
+            const m = document.getElementById('requestResetModal');
+            if (m) {
+                m.classList.remove('hidden');
+                const t = document.getElementById('reset_reason');
+                if (t) setTimeout(() => t.focus(), 50);
+            }
+        }
+        function closeRequestResetModal() {
+            const m = document.getElementById('requestResetModal');
+            if (m) m.classList.add('hidden');
+        }
+
+        function openApproveResetModal(reqId, requesterName, reason) {
+            const form = document.getElementById('approveResetForm');
+            if (form) form.action = '/super_admin/approve_schedule_reset/' + reqId;
+            const reqEl = document.getElementById('approveResetRequester');
+            if (reqEl) reqEl.textContent = requesterName || 'Administrator';
+            const reasonEl = document.getElementById('approveResetReason');
+            const reasonBox = document.getElementById('approveResetReasonBox');
+            if (reason && reason.trim()) {
+                if (reasonEl) reasonEl.textContent = '"' + reason.trim() + '"';
+                if (reasonBox) reasonBox.classList.remove('hidden');
+            } else {
+                if (reasonBox) reasonBox.classList.add('hidden');
+            }
+            const m = document.getElementById('approveResetModal');
+            if (m) m.classList.remove('hidden');
+        }
+
+        function closeApproveResetModal() {
+            const m = document.getElementById('approveResetModal');
+            if (m) m.classList.add('hidden');
+        }
+
+        function openRejectResetModal(reqId, requesterName) {
+            const form = document.getElementById('rejectResetForm');
+            if (form) form.action = '/super_admin/reject_schedule_reset/' + reqId;
+            const reqEl = document.getElementById('rejectResetRequester');
+            if (reqEl) reqEl.textContent = requesterName || 'Administrator';
+            const m = document.getElementById('rejectResetModal');
+            if (m) m.classList.remove('hidden');
+        }
+
+        function closeRejectResetModal() {
+            const m = document.getElementById('rejectResetModal');
+            if (m) m.classList.add('hidden');
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeApproveResetModal();
+                closeRejectResetModal();
+                closeRequestResetModal();
+            }
+        });
+    </script>
+
+    <!-- Approve Schedule Reset Confirmation Modal (Super Admin Authorization) -->
+    <div id="approveResetModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs" onclick="if(event.target === this) closeApproveResetModal()">
+        <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-gray-100 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-red-600 to-rose-700 px-6 py-4 flex items-center justify-between text-white">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                        <i class="fa-solid fa-triangle-exclamation text-base"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base leading-tight">Authorize Master Reset</h3>
+                        <p class="text-[11px] text-red-100 font-medium">Dual-Authorization Safeguard</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeApproveResetModal()" class="text-white/80 hover:text-white transition-colors cursor-pointer text-lg leading-none">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div class="p-6 space-y-4">
+                <div>
+                    <p class="text-sm font-semibold text-gray-900 leading-snug">
+                        Are you sure you want to authorize this schedule reset?
+                    </p>
+                    <p class="text-xs text-gray-500 mt-1">
+                        Requested by <span id="approveResetRequester" class="font-bold text-gray-800"></span>
+                    </p>
+                </div>
+
+                <!-- Justification Callout -->
+                <div id="approveResetReasonBox" class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 leading-relaxed">
+                    <span class="font-bold text-amber-950 block mb-0.5">Admin Justification:</span>
+                    <span id="approveResetReason" class="italic"></span>
+                </div>
+
+                <!-- Critical Safeguard Callout -->
+                <div class="p-3 bg-red-50 rounded-xl border border-red-200 flex items-start gap-2.5 text-xs text-red-950">
+                    <i class="fa-solid fa-shield-halved text-red-600 mt-0.5 flex-shrink-0 text-sm"></i>
+                    <div class="leading-relaxed">
+                        <strong>Critical Safeguard:</strong> An automatic backup snapshot will be archived in <b>Exam Archives</b> before wiping all active timetable allocations, proctor assignments, and room bookings back to <b>Pending</b>.
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <form id="approveResetForm" action="" method="POST" class="pt-2 flex items-center justify-end gap-2.5">
+                    <button type="button" onclick="closeApproveResetModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 transition-colors cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-5 py-2 rounded-lg text-xs font-bold text-white bg-red-600 hover:bg-red-700 shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Authorize & Reset Now
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Decline Schedule Reset Request Modal -->
+    <div id="rejectResetModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs" onclick="if(event.target === this) closeRejectResetModal()">
+        <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-gray-100 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200">
+            <div class="bg-gradient-to-r from-gray-700 to-gray-800 px-6 py-4 flex items-center justify-between text-white">
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-solid fa-ban text-lg text-red-400"></i>
+                    <h3 class="font-bold text-sm">Decline Schedule Reset Request</h3>
+                </div>
+                <button type="button" onclick="closeRejectResetModal()" class="text-white/80 hover:text-white transition-colors cursor-pointer text-lg leading-none">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="rejectResetForm" action="" method="POST" class="p-6 space-y-4">
+                <p class="text-xs text-gray-600">
+                    Provide an explanation for declining this reset request from <span id="rejectResetRequester" class="font-semibold text-gray-800"></span>. The requesting administrator will be notified.
+                </p>
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Reason for Declining (Optional)</label>
+                    <textarea name="rejection_reason" rows="3" placeholder="e.g., Timetable has already been finalized and published." class="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-gray-400 outline-none"></textarea>
+                </div>
+                <div class="flex justify-end gap-2.5 pt-2">
+                    <button type="button" onclick="closeRejectResetModal()" class="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg cursor-pointer transition-colors">Cancel</button>
+                    <button type="submit" class="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-xs cursor-pointer transition-colors">Confirm Decline</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 </body>
 
 </html>

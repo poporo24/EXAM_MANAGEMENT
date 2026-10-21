@@ -108,7 +108,7 @@
                 font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
                 color: #1e293b !important;
             }
-            .hero, .controls-bar, .ctrl-btn-logout, .info-strip, .main-content, .page-footer, #studentPwModal, #studentSectionModal, #change-password-modal, .no-print {
+            .hero, .controls-bar, .ctrl-btn-logout, .info-strip, .main-content, .page-footer, #studentPwModal, #change-password-modal, .no-print {
                 display: none !important;
             }
             .print-container {
@@ -520,9 +520,6 @@
         </a>
         {% endif %}
         {% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
-        <button class="ctrl-btn ctrl-btn-outline" onclick="openStudentSectionModal()">
-            <i class="fa-solid fa-users-rectangle"></i> Change Section
-        </button>
         <button class="ctrl-btn ctrl-btn-outline" onclick="openStudentPwModal()">
             <i class="fa-solid fa-key"></i> Change Password
         </button>
@@ -545,65 +542,22 @@
     </div>
 </header>
 
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div style="max-width:1200px; margin:16px auto 0; padding:0 24px;">
+            {% for category, message in messages %}
+                <div style="padding:12px 16px; border-radius:10px; font-size:13px; font-weight:500; margin-bottom:12px; display:flex; align-items:center; gap:10px; box-shadow:0 1px 3px rgba(0,0,0,0.05); {% if category == 'danger' or category == 'error' %}background:#fef2f2; color:#991b1b; border:1px solid #fecaca;{% elif category == 'warning' %}background:#fffbeb; color:#92400e; border:1px solid #fde68a;{% else %}background:#f0fdf4; color:#166534; border:1px solid #bbf7d0;{% endif %}">
+                    <i class="fa-solid {% if category in ['danger', 'error', 'warning'] %}fa-triangle-exclamation{% else %}fa-circle-check{% endif %}"></i>
+                    <span>{{ message }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+
 {% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
 {% include 'change_password_modal.html' %}
 
-<!-- Change Section Modal -->
-<div id="studentSectionModal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.55); align-items:center; justify-content:center;">
-    <div style="background:#fff; border-radius:16px; width:100%; max-width:440px; margin:20px; box-shadow:0 20px 60px rgba(0,0,0,0.3); overflow:hidden;">
-        <div style="background:var(--green-dark); padding:16px 20px; display:flex; align-items:center; justify-content:space-between;">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <i class="fa-solid fa-users-rectangle" style="color:#fff; font-size:18px;"></i>
-                <h3 style="color:#fff; font-size:16px; font-weight:700; margin:0;">Change My Section</h3>
-            </div>
-            <button onclick="closeStudentSectionModal()" style="background:none; border:none; color:rgba(255,255,255,0.7); font-size:18px; cursor:pointer;">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-        </div>
-        <form action="/student/update_section" method="POST" style="padding:22px;">
-            <div style="margin-bottom:14px;">
-                <label style="display:block; font-size:12px; font-weight:700; text-transform:uppercase; color:#374151; margin-bottom:6px;">
-                    Current Section
-                </label>
-                <div style="background:#f3f4f6; padding:8px 12px; border-radius:8px; font-size:13px; font-weight:600; color:#4b5563;">
-                    {{ section or 'No section currently assigned' }}
-                </div>
-            </div>
-
-            <div style="margin-bottom:16px;">
-                <label style="display:block; font-size:12px; font-weight:700; text-transform:uppercase; color:#374151; margin-bottom:6px;">
-                    Select Correct Section <span style="color:#dc2626;">*</span>
-                </label>
-                <select name="section" id="studentSectionSelect" required
-                        style="width:100%; border:1px solid #d1d5db; border-radius:8px; padding:10px 12px; font-size:14px; background:#fff; outline:none; font-family:'Inter', sans-serif;">
-                    <option value="">-- Choose Your Section --</option>
-                    {% for sec in available_sections %}
-                    <option value="{{ sec }}" {% if sec == section %}selected{% endif %}>{{ sec }}</option>
-                    {% endfor %}
-                </select>
-                <p style="font-size:11px; color:#6b7280; margin-top:5px;">
-                    Select the section you are currently officially enrolled in.
-                </p>
-            </div>
-
-            <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:10px 12px; margin-bottom:18px; font-size:12px; color:#92400e; display:flex; gap:8px;">
-                <i class="fa-solid fa-triangle-exclamation" style="margin-top:2px; flex-shrink:0;"></i>
-                <span>Updating your section will immediately reload your exam schedule and show examinations assigned to the selected section.</span>
-            </div>
-
-            <div style="display:flex; justify-content:flex-end; gap:10px;">
-                <button type="button" onclick="closeStudentSectionModal()"
-                        style="padding:8px 16px; border:1px solid var(--gray-200); border-radius:8px; background:#fff; font-size:13px; font-weight:600; color:var(--gray-700); cursor:pointer;">
-                    Cancel
-                </button>
-                <button type="submit"
-                        style="padding:8px 18px; border:none; border-radius:8px; background:var(--green-dark); font-size:13px; font-weight:700; color:#fff; cursor:pointer;">
-                    <i class="fa-solid fa-check" style="margin-right:6px;"></i>Update Section
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
 {% endif %}
 
 <div class="info-strip">
@@ -622,10 +576,10 @@
     {% if section %}
     <span class="student-info">
         <i class="fa-solid fa-user-graduate"></i>
-        {{ full_name }} &nbsp;&middot;&nbsp; 
+        <span>{{ full_name }}</span>
         {% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
-        <span onclick="openStudentSectionModal()" style="cursor:pointer; background:#e0ecd7; color:#2e4520; padding:2px 8px; border-radius:6px; font-weight:700; transition:background .15s;" title="Click to update section">
-            {{ section }} <i class="fa-solid fa-pen-to-square" style="font-size:10px; opacity:0.75; margin-left:3px;"></i>
+        <span style="background:#e0ecd7; color:#2e4520; padding:2px 8px; border-radius:6px; font-weight:700; display:inline-flex; align-items:center; gap:4px;" title="Official Enrolled Section (Managed by Department Administrator)">
+            <i class="fa-solid fa-lock" style="font-size:10px; opacity:0.65;"></i> {{ section }}
         </span>
         {% elif full_name == "Irregular Student Viewer" %}
         <a href="/public/timetable" style="text-decoration:none; background:#e0ecd7; color:#2e4520; padding:2px 8px; border-radius:6px; font-weight:700; transition:background .15s; display:inline-flex; align-items:center; gap:4px;" title="Click to change section">
@@ -710,12 +664,8 @@
         <div class="empty-state">
             <div class="empty-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
             <h3>No Section Assigned</h3>
-            <p>Your account does not have a section configured. Click below to select your current section and load your official exam timetable.</p>
-            {% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
-            <button onclick="openStudentSectionModal()" style="margin-top:16px; padding:9px 20px; background:#3d5c2e; color:#fff; border:none; border-radius:8px; font-weight:700; font-size:13px; cursor:pointer;">
-                <i class="fa-solid fa-users-rectangle mr-1"></i> Choose My Section
-            </button>
-            {% elif full_name == "Irregular Student Viewer" %}
+            <p>Your student profile currently has no assigned class section. Please contact your Department Administrator or Academic Head to assign your official section.</p>
+            {% if full_name == "Irregular Student Viewer" %}
             <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
                 <a href="/public/timetable" style="padding:9px 18px; background:#3d5c2e; color:#fff; text-decoration:none; border-radius:8px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; gap:6px;">
                     <i class="fa-solid fa-layer-group"></i> Select Section
@@ -808,21 +758,6 @@
         }
     }
 
-    // Section Modal handlers
-    function openStudentSectionModal() {
-        const modal = document.getElementById('studentSectionModal');
-        if (modal) modal.style.display = 'flex';
-    }
-    function closeStudentSectionModal() {
-        const modal = document.getElementById('studentSectionModal');
-        if (modal) modal.style.display = 'none';
-    }
-    const secModal = document.getElementById('studentSectionModal');
-    if (secModal) {
-        secModal.addEventListener('click', function(e) {
-            if (e.target === this) closeStudentSectionModal();
-        });
-    }
 
     // Close password modal on backdrop click
     const pwModal = document.getElementById('change-password-modal') || document.getElementById('studentPwModal');

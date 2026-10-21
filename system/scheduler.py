@@ -270,27 +270,44 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                 )
                 if not section_ok: continue
 
-                # capacity filter per exam
-                valid_rooms_per_exam = []
+                # Capacity requirements per exam
+                req_caps = []
                 for e in group_exams:
-                    req_cap = 0
-                    if e.get('institute_id'):
-                        pass
-                    free_rms = [r for r in rooms if room_free(r['id'], start_dt, end_dt)]
-                    valid_rooms_per_exam.append(free_rms)
-            
-                # Simple greedy room assign
-                free_rooms = [r for r in rooms if room_free(r['id'], start_dt, end_dt)]
+                    stu_cnt = int(e.get('section_student_count') or 0)
+                    inst_cap = int(e.get('institute_capacity_default') or 40)
+                    req_caps.append(stu_cnt if stu_cnt > 0 else inst_cap)
+                min_req_cap = min(req_caps) if req_caps else 40
+
+                # Filter unbooked rooms with sufficient capacity
+                free_rooms = [r for r in rooms if room_free(r['id'], start_dt, end_dt) and int(r.get('capacity', 0) or 0) >= min_req_cap]
                 if len(free_rooms) < n_needed: continue
 
                 candidate_insts = []
+                import re as _re
                 for i in instructors:
                     if not inst_free(i['id'], start_dt, end_dt): continue
                     if not inst_available(i['id'], start_dt, end_dt): continue
                 
-                    # Rule 2: No same subject
-                    subs_taught = [s.strip() for s in (i.get('subjects_taught') or '').split(',')]
-                    if any(str(e.get('subject_id')) in subs_taught for e in group_exams if e.get('subject_id')): continue
+                    # Rule 2: Academic Integrity - Strict Self-Proctoring Exclusion
+                    raw_subs = i.get('subjects_taught') or ''
+                    if raw_subs.strip():
+                        subs_taught = {s.strip().lower() for s in _re.split(r'[,|;]', raw_subs) if s.strip()}
+                        is_teaching_this_course = False
+                        for e in group_exams:
+                            s_name = (e.get('subject_name') or '').strip().lower()
+                            s_code = (e.get('subject_code') or '').strip().lower()
+                            s_id   = str(e.get('subject_id') or '')
+                            if s_name and (s_name in subs_taught or any(s_name == sub or sub in s_name for sub in subs_taught)):
+                                is_teaching_this_course = True
+                                break
+                            if s_code and s_code in subs_taught:
+                                is_teaching_this_course = True
+                                break
+                            if s_id and s_id in subs_taught:
+                                is_teaching_this_course = True
+                                break
+                        if is_teaching_this_course:
+                            continue
                 
                     # Rule 1: Max consec
                     if get_consecutive_hours(i['id'], ex_date, start_dt, end_dt) > max_consec_hrs: continue
@@ -325,9 +342,12 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                 
                     # Match suitable inst with suitable room
                     # available_insts is already sorted by fairness (least loaded first)
+                    needed_cap = req_caps[idx] if idx < len(req_caps) else 40
                     for i in available_insts:
                         last_b = inst_last_building[i['id']].get(ex_date)
                         for r in available_rooms:
+                            # Strict room capacity verification
+                            if int(r.get('capacity', 0) or 0) < needed_cap: continue
                             if i.get('is_pwd') and not r.get('is_pwd_accessible'): continue
                             if last_b:
                                 last_end, b_name = last_b

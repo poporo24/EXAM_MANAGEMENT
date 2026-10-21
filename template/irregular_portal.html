@@ -53,6 +53,22 @@
             <p class="text-sm text-gray-500 mt-2">Select your assigned section to view your schedule</p>
         </div>
 
+                {% if is_published is defined and not is_published %}
+        <div class="text-center py-4">
+            <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-amber-50 border border-amber-200 text-amber-600 mb-3 text-2xl shadow-xs">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <h2 class="text-base font-bold text-gray-900">Official Timetable Not Yet Released</h2>
+            <p class="text-xs text-gray-500 mt-1.5 leading-relaxed max-w-xs mx-auto">
+                The institutional examination schedule is currently in <strong>Draft Mode</strong> under administrative review and has not yet been officially published. Section schedules cannot be viewed until released.
+            </p>
+            <div class="mt-6">
+                <a href="/login" class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#668054] hover:bg-[#526843] text-white text-xs font-bold rounded-lg transition shadow-xs">
+                    <i class="fa-solid fa-arrow-left"></i> Return to Login
+                </a>
+            </div>
+        </div>
+        {% else %}
         <form action="/public/timetable" method="GET" class="space-y-6">
             <div>
                 <label for="section" class="block text-sm font-medium text-gray-700">Your Section</label>
@@ -81,6 +97,7 @@
                 <i class="fa-solid fa-arrow-left mr-1"></i> Back to Login
             </a>
         </div>
+        {% endif %}
     </div>
 </body>
 </html>

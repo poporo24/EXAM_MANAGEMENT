@@ -673,10 +673,13 @@ def export_proctor_duty_slip_pdf(proctor_name, exams, exam_term='Midterm', exam_
         elif e.get('is_absent_reported'):
             status_note = "<br/><font color='#b45309' size=6><b>[Absence Reported &bull; Pending Reliever]</b></font>"
 
+        claim_loc = e.get('claim_office') or (f"{e.get('offering_institute_code')} Dean's / Secretary Office" if e.get('offering_institute_code') and e.get('offering_institute_code') != 'N/A' else "Department Secretary Office")
+        claim_note = f"<br/><font color='#27361b' size=6><b>Claim Papers:</b> {claim_loc}</font>"
+
         if e.get('subject_code'):
-            subj_cell = Paragraph(f"<b>{subj}</b>{status_note}<br/><font color='#64748b' size=6>{e.get('subject_code')}</font>", td_left)
+            subj_cell = Paragraph(f"<b>{subj}</b>{status_note}<br/><font color='#64748b' size=6>{e.get('subject_code')}</font>{claim_note}", td_left)
         else:
-            subj_cell = Paragraph(f"<b>{subj}</b>{status_note}", td_left)
+            subj_cell = Paragraph(f"<b>{subj}</b>{status_note}{claim_note}", td_left)
 
         table_data.append([
             Paragraph(str(idx), td_style),
@@ -720,7 +723,7 @@ def export_proctor_duty_slip_pdf(proctor_name, exams, exam_term='Midterm', exam_
         textColor=colors.HexColor('#475569')
     )
     elements.append(Paragraph("<b>PROCTOR GUIDELINES:</b><br/>"
-                              "1. Claim exam test papers from Department Secretary 15 minutes prior to start.<br/>"
+                              "1. Claim exam test papers from designated Department / Institute Office (indicated per subject above) 15 minutes prior to start.<br/>"
                               "2. Verify student permits and CCA ID cards before admitting examinees.<br/>"
                               "3. Return all collected test papers and discrepancy forms directly after the session.", reminders_style))
     elements.append(Spacer(1, 24))

@@ -139,8 +139,8 @@
             </div>
             <div class="flex items-center gap-2.5">
                 {% if session.get('role') in ['admin', 'super_admin'] %}
-                <form action="/admin/archives/{{ archive.id }}/sync_durations" method="POST" class="inline" onsubmit="return confirm('Recalculate and synchronize all exam durations in this archive snapshot with current system settings? (Major: {{ settings.major_duration_hrs|default(3.0) }} hrs, Minor: {{ settings.minor_duration_hrs|default(1.0) }} hrs)');">
-                    <button type="submit" class="text-xs font-semibold px-3 py-2 border border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg shadow-xs flex items-center gap-1.5 transition" title="Sync durations and recalculate end times with current settings">
+                <form id="syncDurationsForm" action="/admin/archives/{{ archive.id }}/sync_durations" method="POST" class="inline">
+                    <button type="button" onclick="confirmSyncDurations()" class="text-xs font-semibold px-3 py-2 border border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg shadow-xs flex items-center gap-1.5 transition cursor-pointer" title="Sync durations and recalculate end times with current settings">
                         <i class="fa-solid fa-arrows-rotate text-emerald-600"></i> Sync Durations
                     </button>
                 </form>
@@ -409,6 +409,24 @@
                 noResults.classList.add('hidden');
             }
         }
+
+        function confirmSyncDurations() {
+            if (typeof showConfirmModal === 'function') {
+                showConfirmModal({
+                    title: 'Synchronize Durations',
+                    message: 'Recalculate and synchronize all exam durations in this archive snapshot with current system settings?',
+                    sub: 'Current settings: Major: {{ settings.major_duration_hrs|default(3.0) }} hrs, Minor: {{ settings.minor_duration_hrs|default(1.0) }} hrs.',
+                    type: 'warning',
+                    confirmText: 'Yes, Synchronize',
+                    onConfirm: function() {
+                        document.getElementById('syncDurationsForm').submit();
+                    }
+                });
+            } else {
+                document.getElementById('syncDurationsForm').submit();
+            }
+        }
     </script>
+    {% include 'confirm_modal.html' %}
 </body>
 </html>

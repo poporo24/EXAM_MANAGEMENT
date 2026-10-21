@@ -374,6 +374,9 @@
                                 {% if exam.subject_code %}
                                 <div class="subject-code">{{ exam.subject_code }}</div>
                                 {% endif %}
+                                <div style="font-size:7.5pt; color:#2e4520; font-weight:600; margin-top:2px;">
+                                    <i class="fa-solid fa-box-archive text-[#668054]"></i> Claim: {{ exam.claim_office }}
+                                </div>
                                 {% if exam.has_reliever %}
                                 <div style="display:inline-block; font-size:7pt; color:#1d4ed8; background:#eff6ff; border:1px solid #bfdbfe; padding:1px 5px; border-radius:3px; margin-top:3px; font-weight:600;">
                                     Relieved &bull; Sub: Prof. {{ exam.reliever_name }}
@@ -412,7 +415,7 @@
                 <div class="print-reminders">
                     <h4><i class="fa-solid fa-circle-info"></i> Important Invigilator Responsibilities:</h4>
                     <ol>
-                        <li>Claim examination envelopes and test materials from Department Secretary <strong>15 minutes prior</strong> to exam start.</li>
+                        <li>Claim examination envelopes and test materials from designated <strong>Offering Department / Dean's Office</strong> (indicated per subject above) <strong>15 minutes prior</strong> to exam start.</li>
                         <li>Check all examinee permits and valid CCA Student IDs before admitting examinees.</li>
                         <li>Turn over all collected examination booklets and attendance discrepancy forms immediately upon exam conclusion.</li>
                     </ol>
@@ -610,6 +613,25 @@
                                                 <span class="font-medium">{{ exam.room_name or 'TBA' }}</span>
                                             </div>
                                         </div>
+                                        <!-- Test Paper Claim Office Indicator -->
+                                        <div class="flex items-center justify-between gap-2 text-xs bg-emerald-50/70 border border-emerald-200/80 rounded-lg px-3 py-2.5 mb-3">
+                                            <div class="flex items-center gap-2 text-emerald-950">
+                                                <i class="fa-solid fa-box-archive text-emerald-700 text-sm"></i>
+                                                <div class="leading-tight">
+                                                    <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">Claim Test Papers At:</span>
+                                                    <span class="font-bold text-gray-900">{{ exam.claim_office }}</span>
+                                                </div>
+                                            </div>
+                                            {% if exam.offering_institute_code == 'ICSLIS' %}
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-[#668054] text-white tracking-wider shadow-2xs">
+                                                ICSLIS
+                                            </span>
+                                            {% elif exam.offering_institute_code and exam.offering_institute_code != 'N/A' %}
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-200 text-gray-800 tracking-wider">
+                                                {{ exam.offering_institute_code }}
+                                            </span>
+                                            {% endif %}
+                                        </div>
                                         <div class="p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs mb-3 text-blue-800">
                                             <span class="font-semibold"><i class="fa-solid fa-info-circle mr-1 text-blue-600"></i> Reliever Assignment:</span> You were dispatched by the Department Secretary to cover this exam duty.
                                         </div>
@@ -643,6 +665,25 @@
                                                 <i class="fa-solid fa-location-dot w-4 text-center text-[#829c74]"></i>
                                                 <span class="font-medium">{{ exam.room_name or 'TBA' }}</span>
                                             </div>
+                                        </div>
+                                        <!-- Test Paper Claim Office Indicator -->
+                                        <div class="flex items-center justify-between gap-2 text-xs bg-emerald-50/70 border border-emerald-200/80 rounded-lg px-3 py-2.5 mb-4">
+                                            <div class="flex items-center gap-2 text-emerald-950">
+                                                <i class="fa-solid fa-box-archive text-emerald-700 text-sm"></i>
+                                                <div class="leading-tight">
+                                                    <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">Claim Test Papers At:</span>
+                                                    <span class="font-bold text-gray-900">{{ exam.claim_office }}</span>
+                                                </div>
+                                            </div>
+                                            {% if exam.offering_institute_code == 'ICSLIS' %}
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-[#668054] text-white tracking-wider shadow-2xs">
+                                                ICSLIS
+                                            </span>
+                                            {% elif exam.offering_institute_code and exam.offering_institute_code != 'N/A' %}
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-200 text-gray-800 tracking-wider">
+                                                {{ exam.offering_institute_code }}
+                                            </span>
+                                            {% endif %}
                                         </div>
                                         <div class="border-t border-gray-100 pt-3 flex justify-end">
                                             <button onclick="openAbsenceModal('{{ exam.id }}', '{{ exam.subject_name }} - {{ exam.section }}', '{{ date }}', '{% if exam.time_end %}{{ exam.time }} &ndash; {{ exam.time_end }}{% else %}{{ exam.time }}{% endif %}')" class="inline-flex items-center text-xs font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg border border-red-100 transition-colors cursor-pointer">
@@ -735,9 +776,12 @@
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
                                 Reason for Absence <span class="text-red-500">*</span>
                             </label>
-                            <textarea name="reason" id="absence_reason" required rows="3" placeholder="Please state why you cannot attend this duty (e.g., Medical leave, official emergency)..." class="mt-1 focus:ring-red-500 focus:border-red-500 block w-full text-xs border-gray-300 rounded-lg border p-2.5 outline-none"></textarea>
+                            <textarea name="reason" id="absence_reason" required rows="3" placeholder="Please state why you cannot attend this duty (e.g., Medical leave, official emergency)..." class="mt-1 focus:ring-red-500 focus:border-red-500 block w-full text-xs border-gray-300 rounded-lg border p-2.5 outline-none transition-all"></textarea>
                             <p class="text-[11px] text-gray-400 mt-1">This report will be forwarded to your Department Secretary to arrange a substitute.</p>
                         </div>
+
+                        <!-- Error warning box matching substitute modal style -->
+                        <div id="absenceWarningAlert" class="hidden mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700"></div>
                     </form>
                 </div>
                 <div class="bg-gray-50 px-5 py-3.5 sm:px-6 flex flex-row-reverse gap-2">
@@ -828,18 +872,28 @@
                 reasonInput.value = '';
                 reasonInput.classList.remove('border-red-500', 'ring-1', 'ring-red-500');
             }
+            const warning = document.getElementById('absenceWarningAlert');
+            if (warning) {
+                warning.classList.add('hidden');
+                warning.textContent = '';
+            }
             document.getElementById('absenceModal').classList.remove('hidden');
         }
 
         function showAbsenceConfirmation() {
             const reasonInput = document.getElementById('absence_reason');
             const reason = reasonInput.value.trim();
+            const warning = document.getElementById('absenceWarningAlert');
             if (!reason) {
+                if (warning) {
+                    warning.textContent = 'Please provide a reason for your absence before continuing.';
+                    warning.classList.remove('hidden');
+                }
                 reasonInput.focus();
                 reasonInput.classList.add('border-red-500', 'ring-1', 'ring-red-500');
-                alert('Please provide a reason for your absence before continuing.');
                 return;
             }
+            if (warning) warning.classList.add('hidden');
             reasonInput.classList.remove('border-red-500', 'ring-1', 'ring-red-500');
 
             // Populate confirmation modal fields
@@ -904,6 +958,19 @@
     <script>
         function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const reasonInput = document.getElementById('absence_reason');
+            if (reasonInput) {
+                reasonInput.addEventListener('input', function() {
+                    if (this.value.trim()) {
+                        this.classList.remove('border-red-500', 'ring-1', 'ring-red-500');
+                        const warning = document.getElementById('absenceWarningAlert');
+                        if (warning) warning.classList.add('hidden');
+                    }
+                });
+            }
+        });
     </script>
     {% include 'confirm_modal.html' %}
 </body>

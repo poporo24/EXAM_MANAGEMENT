@@ -44,12 +44,14 @@ from system.database import (
     get_already_scheduled_slots, apply_schedule_results, reset_schedule, unschedule_exams,
     get_schedule_results, check_edit_conflicts, apply_exam_edit, get_available_resources,
     save_exam_period, save_exam_term, get_exam_term, get_exam_period,
+    create_schedule_reset_request, get_pending_schedule_reset_request,
+    get_all_schedule_reset_requests, approve_schedule_reset_request, reject_schedule_reset_request,
     # proctor availability
     get_proctor_availability, get_proctor_availability_for, save_proctor_availability,
     bulk_save_proctor_availability,
     get_proctor_exams,
     # timetable
-    get_public_timetable, is_schedule_published, publish_schedule, unpublish_schedule,
+    get_public_timetable, is_schedule_published, publish_schedule, unpublish_schedule, get_all_sections,
     # relievers
     add_reliever, get_relievers_for_exam, get_all_relievers, remove_reliever,
     # secretary
@@ -92,8 +94,31 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
     MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # 16 MB max upload limit
-    WTF_CSRF_TIME_LIMIT=7200  # 2 hours CSRF token validity
+    WTF_CSRF_TIME_LIMIT=7200,  # 2 hours CSRF token validity
+    PERMANENT_SESSION_LIFETIME=timedelta(minutes=20)
 )
+
+@app.before_request
+def check_session_inactivity():
+    # Skip idle check for static resources and public login/register/reset endpoints
+    if request.path.startswith('/static/') or request.endpoint in ('static', 'public_timetable', 'login', 'register_page', 'register_submit', 'forgot_password', 'reset_password'):
+        return None
+
+    if 'user_id' in session:
+        import time as _time
+        now = _time.time()
+        last_active = session.get('_last_active')
+        # Auto-logout after 20 minutes of inactivity (1200 seconds)
+        if last_active and (now - float(last_active) > 1200):
+            uid = session.get('user_id')
+            uname = session.get('full_name')
+            role = session.get('role')
+            session.clear()
+            log_audit_event('AUTH_SESSION_TIMEOUT', f"Session auto-terminated due to 20-minute inactivity for user {uname}", user_id=uid, user_name=uname, user_role=role, ip_address=request.remote_addr)
+            flash("Your session has expired due to 20 minutes of inactivity. Please log in again.", "warning")
+            return redirect(url_for('login'))
+        session['_last_active'] = now
+    return None
 
 # Automatically ensure database schema (tables & columns) exists
 try:
@@ -293,12 +318,17 @@ def index():
 
 @app.route("/public/timetable")
 def public_timetable():
+    is_pub = is_schedule_published()
+    if not is_pub:
+        # Strictly guard against viewing draft timetables via public portal
+        return render_template("irregular_portal.html", sections=[], is_published=False)
+
     section = request.args.get('section', '').strip()
     if not section:
         all_exams = get_schedule_results()
         sections = sorted(list(set(e.get('section', '').strip() for e in all_exams if e.get('section', '').strip() and e.get('status') == 'Scheduled')))
-        return render_template("irregular_portal.html", sections=sections)
-    
+        return render_template("irregular_portal.html", sections=sections, is_published=True)
+
     exams = get_public_timetable(section=section)
     grouped = defaultdict(list)
     for exam in exams:
@@ -309,9 +339,8 @@ def public_timetable():
         exam['time']     = dt.strftime("%I:%M %p")
         exam['time_end'] = (dt + timedelta(minutes=int(exam['duration_minutes'] or 60))).strftime("%I:%M %p")
         grouped[dt.strftime("%A, %B %d, %Y")].append(exam)
-    
     sorted_groups = sorted(grouped.items(), key=lambda x: datetime.strptime(x[0], "%A, %B %d, %Y"))
-    
+
     return render_template("student_timetable.html",
                            grouped=sorted_groups,
                            total=len(exams),
@@ -319,7 +348,8 @@ def public_timetable():
                            full_name="Irregular Student Viewer",
                            institute_name="City College of Angeles",
                            exam_term=get_exam_term()[0],
-                           exam_semester=get_exam_term()[1])
+                           exam_semester=get_exam_term()[1],
+                           is_published=True)
 
 
 @app.route("/forgot_password", methods=["GET", "POST"])
@@ -413,6 +443,8 @@ def login():
         session['is_super_admin'] = bool(user.get('is_super_admin', 0))
         session['section']        = user.get('section', '')
         session['institute_id']   = user.get('institute_id')
+        import time as _time
+        session['_last_active']   = _time.time()
         log_audit_event('AUTH_LOGIN_SUCCESS', f"User authenticated as {user.get('role')}", user_id=user['id'], user_name=user['full_name'], user_role=user.get('role'), ip_address=request.remote_addr)
         return _redirect_by_role()
     log_audit_event('AUTH_LOGIN_FAILED', f"Failed login attempt for: {email}", ip_address=request.remote_addr)
@@ -805,8 +837,16 @@ def generate_schedule():
 
     failed_ids = [f['exam_id'] for f in result['failed']]
     apply_schedule_results(result['scheduled'], failed_ids)
+    unpublish_schedule()  # Newly generated schedule starts in unapproved Draft mode
     session['last_failed']          = result['failed']
     session['last_scheduled_count'] = len(result['scheduled'])
+    log_audit_event('SCHEDULE_GENERATED',
+        f"Automated schedule generation run by {session.get('full_name')}. Scheduled: {len(result['scheduled'])}, Unscheduled: {len(failed_ids)}. Period: {period_start} to {period_end}.",
+        user_id=session.get('user_id'),
+        user_name=session.get('full_name'),
+        user_role=session.get('role'),
+        ip_address=request.remote_addr
+    )
 
     # Email notifications to assigned proctors
     db = open_db()
@@ -841,31 +881,98 @@ def generate_schedule():
           f"{len(result['failed'])} could not be placed.", "success")
     return redirect(url_for('schedule_view'))
 
-@app.route("/reset_schedule", methods=["GET", "POST"])
+@app.route("/reset_schedule", methods=["POST"])
 def reset_schedule_route():
     guard = require_role('admin')
     if guard: return guard
-    # Check if user requested archiving before resetting
-    if request.form.get('archive_before_reset') == '1':
-        term_tuple = get_exam_term()
-        exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
-        exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
-        ok, res = create_exam_archive(
-            academic_year="2025-2026",
-            exam_term=exam_term,
-            exam_semester=exam_semester,
-            archive_title=None,
-            notes="Automatically archived prior to schedule reset.",
-            user_id=session.get('user_id'),
-            user_name=session.get('full_name')
-        )
-        if ok:
-            flash("Archived a snapshot of the current schedule before resetting.", "info")
+
+    # Enforce Maker-Checker (Dual Authorization)
+    # Direct execution is reserved exclusively for Super Administrators
+    if not session.get('is_super_admin'):
+        flash("Direct schedule reset is restricted to Super Administrators. Please submit a Schedule Reset Request for administrative approval.", "warning")
+        return redirect(url_for('schedule_view'))
+
+    # Auto-archive snapshot before wiping
+    term_tuple = get_exam_term()
+    exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
+    exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
+    create_exam_archive(
+        academic_year="2025-2026",
+        exam_term=exam_term,
+        exam_semester=exam_semester,
+        archive_title=None,
+        notes="Automatically archived prior to Super Admin direct schedule reset.",
+        user_id=session.get('user_id'),
+        user_name=session.get('full_name')
+    )
     reset_schedule()
     session.pop('last_failed', None)
     session.pop('last_scheduled_count', None)
-    flash('Schedule reset. All exams are back to Pending.', 'success')
+
+    # Mark any pending requests as resolved
+    db = open_db()
+    if db:
+        try:
+            c = db.cursor()
+            c.execute("UPDATE schedule_reset_requests SET status = 'approved', reviewed_by_id = %s, reviewed_by_name = %s, reviewed_at = NOW() WHERE status = 'pending'", (session.get('user_id'), session.get('full_name')))
+            db.commit()
+        finally:
+            db.close()
+
+    log_audit_event('SCHEDULE_RESET_DIRECT', f"Super Admin {session.get('full_name')} performed direct schedule reset. Archive snapshot saved.", user_id=session.get('user_id'), user_name=session.get('full_name'), user_role='super_admin', ip_address=request.remote_addr)
+    flash('Schedule reset successfully. Current timetable was archived, and all exams have returned to Pending.', 'success')
     return redirect(url_for('schedule_view'))
+
+
+@app.route("/admin/request_schedule_reset", methods=["POST"])
+def admin_request_schedule_reset():
+    guard = require_role('admin')
+    if guard: return guard
+
+    reason = request.form.get("reason", "").strip()
+    if not reason:
+        flash("Please provide a justification/reason for requesting a schedule reset.", "warning")
+        return redirect(url_for('schedule_view'))
+
+    ok, msg = create_schedule_reset_request(session['user_id'], session.get('full_name', 'Admin'), reason)
+    if ok:
+        flash(msg, "info")
+    else:
+        flash(msg, "warning")
+    return redirect(url_for('schedule_view'))
+
+
+@app.route("/super_admin/approve_schedule_reset/<int:request_id>", methods=["POST"])
+def super_approve_schedule_reset(request_id):
+    guard = require_super_admin()
+    if guard: return guard
+
+    ok, msg = approve_schedule_reset_request(request_id, session['user_id'], session.get('full_name', 'Super Admin'))
+    if ok:
+        flash(msg, "success")
+    else:
+        flash(msg, "danger")
+    ref = request.referrer
+    if ref and ('schedule' in ref or 'super_admin' in ref):
+        return redirect(ref)
+    return redirect(url_for('super_admin_page'))
+
+
+@app.route("/super_admin/reject_schedule_reset/<int:request_id>", methods=["POST"])
+def super_reject_schedule_reset(request_id):
+    guard = require_super_admin()
+    if guard: return guard
+
+    rejection_reason = request.form.get("rejection_reason", "").strip()
+    ok, msg = reject_schedule_reset_request(request_id, session['user_id'], session.get('full_name', 'Super Admin'), rejection_reason)
+    if ok:
+        flash(msg, "info")
+    else:
+        flash(msg, "danger")
+    ref = request.referrer
+    if ref and ('schedule' in ref or 'super_admin' in ref):
+        return redirect(ref)
+    return redirect(url_for('super_admin_page'))
 
 @app.route("/schedule/publish", methods=["POST"])
 def schedule_publish():
@@ -874,6 +981,13 @@ def schedule_publish():
     from system.database import publish_schedule
     ok, msg = publish_schedule(user_id=session.get('user_id'))
     if ok:
+        log_audit_event('SCHEDULE_PUBLISHED',
+            f"Official master timetable published live to student and proctor portals by {session.get('full_name')}.",
+            user_id=session.get('user_id'),
+            user_name=session.get('full_name'),
+            user_role=session.get('role'),
+            ip_address=request.remote_addr
+        )
         flash("Exam timetable has been finalized and published! It is now live on Student and Proctor portals.", "success")
     else:
         flash(f"Failed to publish timetable: {msg}", "danger")
@@ -886,6 +1000,13 @@ def schedule_unpublish():
     from system.database import unpublish_schedule
     ok, msg = unpublish_schedule(user_id=session.get('user_id'))
     if ok:
+        log_audit_event('SCHEDULE_UNPUBLISHED',
+            f"Official master timetable reverted to draft mode by {session.get('full_name')}.",
+            user_id=session.get('user_id'),
+            user_name=session.get('full_name'),
+            user_role=session.get('role'),
+            ip_address=request.remote_addr
+        )
         flash("Exam timetable has been reverted to Draft mode. It is now hidden from students, proctors, and secretaries.", "warning")
     else:
         flash(f"Failed to unpublish timetable: {msg}", "danger")
@@ -1094,7 +1215,8 @@ def schedule_view():
                            filter_section=filter_section,
                            exam_term=get_exam_term()[0],
                            exam_semester=get_exam_term()[1],
-                           is_published=is_schedule_published())
+                           is_published=is_schedule_published(),
+                           pending_reset_request=get_pending_schedule_reset_request())
 
 @app.route("/api/auto_schedule_exam", methods=["POST"])
 def api_auto_schedule_exam():
@@ -1220,6 +1342,13 @@ def edit_exam_schedule(exam_id):
             return redirect(url_for('schedule_view'))
     ok = apply_exam_edit(exam_id, new_room_id, new_inst_id, new_dt_str, sync_all=sync_all, form_data=request.form)
     if ok:
+        log_audit_event('EXAM_SCHEDULE_MANUAL_OVERRIDE',
+            f"Admin {session.get('full_name')} manually edited exam #{exam_id} schedule: Datetime='{new_dt_str}', RoomID={new_room_id}, ProctorID={new_inst_id}, SyncAll={sync_all}.",
+            user_id=session.get('user_id'),
+            user_name=session.get('full_name'),
+            user_role=session.get('role'),
+            ip_address=request.remote_addr
+        )
         flash('Exam schedule updated.', 'success')
         # Also send email to the proctor as an extra channel
         try:
@@ -1815,9 +1944,16 @@ def export_collection_pdf():
 
 @app.route("/reports/clear_absence", methods=["POST"])
 def clear_absence_reports_route():
-    guard = require_role('admin', 'secretary')
+    guard = require_role('admin')
     if guard: return guard
     clear_absence_reports()
+    log_audit_event('ABSENCE_REPORTS_CLEARED',
+        f"Admin {session.get('full_name')} cleared proctor duty absence records.",
+        user_id=session.get('user_id'),
+        user_name=session.get('full_name'),
+        user_role=session.get('role'),
+        ip_address=request.remote_addr
+    )
     flash("Proctor absence reports cleared.", "success")
     return redirect(url_for('reports_page'))
 
@@ -1984,10 +2120,19 @@ def admin_archive_export_pdf(archive_id):
 
 @app.route("/admin/archives/<int:archive_id>/delete", methods=["POST"])
 def admin_archive_delete(archive_id):
-    guard = require_role('admin')
+    guard = require_super_admin()
     if guard: return guard
+    archive = get_exam_archive_by_id(archive_id)
+    archive_title = archive.get('archive_title', f"#{archive_id}") if archive else f"#{archive_id}"
     ok, msg = delete_exam_archive(archive_id)
     if ok:
+        log_audit_event(
+            'ARCHIVE_DELETED',
+            f"Super Admin {session.get('full_name')} permanently deleted historical snapshot archive '{archive_title}' (ID #{archive_id}).",
+            ip_address=request.remote_addr,
+            user_id=session.get('user_id'),
+            role=session.get('role')
+        )
         flash(msg, "success")
     else:
         flash(f"Error deleting archive: {msg}", "danger")
@@ -2033,7 +2178,7 @@ def settings_save():
         smtp_host=request.form.get("smtp_host", cur_settings.get("smtp_host", "")),
         smtp_port=get_int("smtp_port", 587),
         smtp_user=request.form.get("smtp_user", cur_settings.get("smtp_user", "")),
-        smtp_password=request.form.get("smtp_password", cur_settings.get("smtp_password", "")),
+        smtp_password=request.form.get("smtp_password", "").strip() or cur_settings.get("smtp_password", ""),
         smtp_from=request.form.get("smtp_from", cur_settings.get("smtp_from", "")),
         smtp_use_tls=1 if request.form.get("smtp_use_tls") else cur_settings.get("smtp_use_tls", 0),
         major_duration_hrs=get_float("major_duration_hrs", 2.0),
@@ -2057,11 +2202,7 @@ def settings_save():
         finally:
             db.close()
             
-    # Automatically synchronize all historical archives with the new duration settings
-    try:
-        sync_archive_durations()
-    except Exception as e:
-        print("Auto-sync archives error:", e)
+    # Note: Historical archives are permanently preserved as immutable snapshots (Audit compliance)
 
     _configure_mail()
     flash("Settings saved successfully.", "success")
@@ -2139,8 +2280,9 @@ def admin_change_password(user_id):
     new_password = request.form.get("new_password", "").strip()
     confirm_password = request.form.get("confirm_password", "").strip()
     redirect_to = request.form.get("redirect_to", "students_page")
-    if not new_password or len(new_password) < 6:
-        flash("Password must be at least 6 characters.", "danger")
+    is_valid, err_msg = validate_password_strength(new_password)
+    if not is_valid:
+        flash(err_msg, "danger")
         return redirect(url_for(redirect_to))
     if new_password != confirm_password:
         flash("Passwords do not match.", "danger")
@@ -2262,6 +2404,14 @@ def admin_edit_student(user_id):
                 WHERE id = %s AND role = 'student'
             """, (new_section, new_name, new_name, new_email, new_email, user_id))
             db.commit()
+            log_audit_event(
+                'STUDENT_UPDATED_BY_ADMIN',
+                f"Admin {session.get('full_name')} updated student #{user_id} ('{student['full_name']}') section to '{new_section or 'None'}'.",
+                user_id=session.get('user_id'),
+                user_name=session.get('full_name'),
+                user_role=session.get('role'),
+                ip_address=request.remote_addr
+            )
             flash(f"Student '{student['full_name']}' updated successfully. Section is now '{new_section or 'None'}'.", "success")
         except Exception as e:
             flash(f"Error updating student: {e}", "danger")
@@ -2360,11 +2510,15 @@ def super_admin_page():
     pending_students = get_pending_users()
     institutes       = get_all_institutes()
     unread           = _get_unread(session['user_id'])
+    pending_reset_requests = get_all_schedule_reset_requests(pending_only=True)
+    sections         = get_all_sections()
     return render_template("super_admin.html",
                            users=users,
                            pending_students=pending_students,
                            institutes=institutes,
                            roles=['admin', 'proctor', 'student', 'secretary'],
+                           pending_reset_requests=pending_reset_requests,
+                           sections=sections,
                            unread_count=unread)
 
 @app.route("/super_admin/approve_student/<int:id>", methods=["POST"])
@@ -2372,6 +2526,13 @@ def approve_student_route(id):
     guard = require_super_admin()
     if guard: return guard
     approve_student(id)
+    log_audit_event('STUDENT_APPROVED',
+        f"Super Admin {session.get('full_name')} approved student account ID #{id}.",
+        user_id=session.get('user_id'),
+        user_name=session.get('full_name'),
+        user_role='super_admin',
+        ip_address=request.remote_addr
+    )
     flash("Student account approved and notified.", "success")
     return redirect(url_for('super_admin_page'))
 
@@ -2383,6 +2544,13 @@ def reject_student_route(id):
     if err:
         flash(f"Could not reject: {err}", "danger")
     else:
+        log_audit_event('STUDENT_REJECTED',
+            f"Super Admin {session.get('full_name')} rejected student registration ID #{id}.",
+            user_id=session.get('user_id'),
+            user_name=session.get('full_name'),
+            user_role='super_admin',
+            ip_address=request.remote_addr
+        )
         flash("Student registration rejected and removed.", "success")
     return redirect(url_for('super_admin_page'))
 
@@ -2418,21 +2586,33 @@ def super_edit_user(id):
             flash("Invalid role selected.", "danger")
             return redirect(url_for('super_admin_page'))
 
-        # GET OLD EMAIL FIRST before updating DB!
+        # GET OLD USER DETAILS FIRST before updating DB!
         from system.database import open_db, update_user
         db = open_db()
-        old_email = None
+        old_user = None
         if db:
             try:
                 c = db.cursor(dictionary=True)
-                c.execute("SELECT email FROM users WHERE id = %s", (id,))
-                row = c.fetchone()
-                if row: old_email = row['email']
+                c.execute("SELECT email, role, is_super_admin, full_name FROM users WHERE id = %s", (id,))
+                old_user = c.fetchone()
             finally:
                 db.close()
 
         # Update local DB
         update_user(id, full_name, email, role, section, institute_id, is_sa)
+        
+        # Log role promotion or permissions elevation
+        if old_user:
+            old_role = old_user.get('role')
+            old_is_sa = old_user.get('is_super_admin', 0)
+            if old_role != role or bool(old_is_sa) != bool(is_sa):
+                log_audit_event('USER_ROLE_PROMOTION',
+                    f"Super Admin {session.get('full_name')} modified user ID #{id} ({full_name}) privileges: Role: '{old_role}' -> '{role}', SuperAdmin: {bool(old_is_sa)} -> {bool(is_sa)}.",
+                    user_id=session.get('user_id'),
+                    user_name=session.get('full_name'),
+                    user_role='super_admin',
+                    ip_address=request.remote_addr
+                )
         flash(f"User '{full_name}' updated successfully to role '{role}'.", "success")
     except Exception as e:
         flash(f"Error updating user: {str(e)}", "danger")
@@ -2481,10 +2661,31 @@ def super_delete_user(id):
     if id == session.get('user_id'):
         flash("Cannot delete your own account.", "danger")
         return redirect(url_for('super_admin_page'))
+    
+    # Retrieve user info for audit trace
+    target_info = f"User #{id}"
+    db = open_db()
+    if db:
+        try:
+            c = db.cursor(dictionary=True)
+            c.execute("SELECT full_name, email, role FROM users WHERE id = %s", (id,))
+            row = c.fetchone()
+            if row:
+                target_info = f"{row.get('full_name')} ({row.get('email')}, role: {row.get('role')})"
+        finally:
+            db.close()
+
     err = delete_user(id)
     if err:
         flash(f"Cannot delete: {err}", "danger")
     else:
+        log_audit_event('USER_DELETED',
+            f"Super Admin {session.get('full_name')} permanently deleted user account: {target_info}.",
+            user_id=session.get('user_id'),
+            user_name=session.get('full_name'),
+            user_role='super_admin',
+            ip_address=request.remote_addr
+        )
         flash("User deleted.", "success")
     return redirect(url_for('super_admin_page'))
 
@@ -2582,6 +2783,9 @@ def proctor_dashboard():
 def export_proctor_schedule_pdf_route():
     guard = require_role('proctor')
     if guard: return guard
+    if not is_schedule_published():
+        flash("The official examination timetable is currently in Draft mode under administrative review. Proctor duty slips cannot be downloaded yet.", "warning")
+        return redirect(url_for('proctor_dashboard'))
     instructor_id = session.get('instructor_id')
     if not instructor_id:
         flash("Instructor profile not linked to account.", "danger")
@@ -2757,10 +2961,65 @@ def secretary_dashboard():
                            pending_absences=pending_absences,
                            is_published=is_pub)
 
+def _can_secretary_access_exam(exam_id):
+    """
+    Enforces departmental boundaries (Principle of Least Privilege).
+    Admins can access all exams.
+    Secretaries can access an exam if:
+    1. The exam belongs to their assigned institute (exam['institute_id'] == sec_inst_id).
+    2. The assigned/absent proctor belongs to their assigned institute (instructor['institute_id'] == sec_inst_id),
+       allowing the proctor's home department to dispatch a substitute reliever.
+    3. An absence was reported for this exam involving a proctor from their institute.
+    """
+    if session.get('role') == 'admin':
+        return True
+    sec_inst_id = session.get('institute_id')
+    if not sec_inst_id:
+        return False
+    from system.database import get_exam_by_id, get_instructor_by_id
+    exam = get_exam_by_id(exam_id)
+    if not exam:
+        return False
+    
+    # 1. Direct match on exam's institute
+    if exam.get('institute_id') and int(exam['institute_id']) == int(sec_inst_id):
+        return True
+
+    # 2. Match on assigned instructor's home institute (for cross-department proctors)
+    if exam.get('instructor_id'):
+        instructor = get_instructor_by_id(exam['instructor_id'])
+        if instructor and instructor.get('institute_id') and int(instructor['institute_id']) == int(sec_inst_id):
+            return True
+
+    # 3. Match on proctor absence records for this exam
+    from system.database import open_db
+    db = open_db()
+    if db:
+        try:
+            c = db.cursor(dictionary=True)
+            c.execute("""
+                SELECT p.id FROM proctor_absence p
+                JOIN instructors i ON p.instructor_id = i.id
+                WHERE p.exam_id = %s AND i.institute_id = %s
+                LIMIT 1
+            """, (exam_id, sec_inst_id))
+            if c.fetchone():
+                return True
+        finally:
+            db.close()
+
+    # If exam has no institute assigned at all, allow access
+    if not exam.get('institute_id'):
+        return True
+
+    return False
+
 @app.route("/api/substitute_candidates/<int:exam_id>", methods=["GET"])
 def api_substitute_candidates(exam_id):
     guard = require_role('secretary', 'admin')
     if guard: return jsonify({'error': 'Not authorised'}), 403
+    if not _can_secretary_access_exam(exam_id):
+        return jsonify({'error': 'Access denied. Exam is outside your assigned department.'}), 403
     inst_id = None if session.get('role') == 'admin' else session.get('institute_id')
     from system.database import get_substitute_candidates
     data = get_substitute_candidates(exam_id, institute_id=inst_id)
@@ -2780,9 +3039,26 @@ def secretary_assign_substitute():
         flash("Please select an exam and substitute proctor.", "warning")
         return redirect(url_for('secretary_dashboard'))
 
+    try:
+        eid = int(exam_id)
+    except (ValueError, TypeError):
+        flash("Invalid exam identifier.", "danger")
+        return redirect(url_for('secretary_dashboard'))
+
+    if not _can_secretary_access_exam(eid):
+        flash("Access denied. You can only assign substitute proctors for exams within your assigned department.", "danger")
+        return redirect(url_for('secretary_dashboard'))
+
     from system.database import reassign_exam_proctor_room
-    ok, msg = reassign_exam_proctor_room(int(exam_id), int(new_inst_id), new_room_id=new_room_id, reason=reason, reassigned_by=session.get('user_id'))
+    ok, msg = reassign_exam_proctor_room(eid, int(new_inst_id), new_room_id=new_room_id, reason=reason, reassigned_by=session.get('user_id'))
     if ok:
+        log_audit_event('PROCTOR_SUBSTITUTE_ASSIGNED',
+            f"Secretary {session.get('full_name')} assigned substitute instructor #{new_inst_id} to exam #{eid}. Reason: '{reason}'.",
+            user_id=session.get('user_id'),
+            user_name=session.get('full_name'),
+            user_role=session.get('role'),
+            ip_address=request.remote_addr
+        )
         flash(msg, "success")
     else:
         flash(f"Failed to assign substitute: {msg}", "danger")
@@ -2793,9 +3069,19 @@ def secretary_assign_substitute():
 def secretary_collect(exam_id):
     guard = require_role('secretary', 'admin')
     if guard: return guard
+    if not _can_secretary_access_exam(exam_id):
+        flash("Access denied. You can only collect exams within your assigned department.", "danger")
+        return redirect(url_for('secretary_dashboard'))
     instructor_id = request.form.get("collected_by_instructor_id") or None
     notes         = request.form.get("notes", "")
     mark_exam_collected(exam_id, instructor_id, notes)
+    log_audit_event('EXAM_COLLECTED',
+        f"Secretary {session.get('full_name')} marked exam #{exam_id} as collected.",
+        user_id=session.get('user_id'),
+        user_name=session.get('full_name'),
+        user_role=session.get('role'),
+        ip_address=request.remote_addr
+    )
     flash("Marked as collected.", "success")
     return redirect(url_for('secretary_dashboard'))
 
@@ -2813,26 +3099,53 @@ def secretary_batch_collect():
     notes         = request.form.get("notes", "")
 
     collected_count = 0
+    skipped_count = 0
     for eid_str in raw_exam_ids:
         try:
             eid = int(eid_str)
+            if not _can_secretary_access_exam(eid):
+                skipped_count += 1
+                continue
             mark_exam_collected(eid, instructor_id, notes)
             collected_count += 1
         except (ValueError, TypeError):
             continue
 
     if collected_count > 0:
-        flash(f"Successfully marked {collected_count} exam envelope(s) as collected.", "success")
+        log_audit_event('EXAM_BATCH_COLLECTED',
+            f"Secretary {session.get('full_name')} marked {collected_count} exam envelope(s) as collected.",
+            user_id=session.get('user_id'),
+            user_name=session.get('full_name'),
+            user_role=session.get('role'),
+            ip_address=request.remote_addr
+        )
+        msg = f"Successfully marked {collected_count} exam envelope(s) as collected."
+        if skipped_count > 0:
+            msg += f" ({skipped_count} exam(s) outside your assigned department were skipped)."
+        flash(msg, "success")
     else:
-        flash("No valid exams were selected for collection.", "warning")
+        if skipped_count > 0:
+            flash(f"Access denied: {skipped_count} selected exam(s) belong to other departments.", "danger")
+        else:
+            flash("No valid exams were selected for collection.", "warning")
     return redirect(url_for('secretary_dashboard'))
 
 @app.route("/secretary/return/<int:exam_id>", methods=["POST"])
 def secretary_return(exam_id):
     guard = require_role('secretary', 'admin')
     if guard: return guard
+    if not _can_secretary_access_exam(exam_id):
+        flash("Access denied. You can only return exams within your assigned department.", "danger")
+        return redirect(url_for('secretary_dashboard'))
     notes = request.form.get("notes", "")
     mark_exam_returned(exam_id, notes)
+    log_audit_event('EXAM_RETURNED',
+        f"Secretary {session.get('full_name')} marked exam #{exam_id} as returned.",
+        user_id=session.get('user_id'),
+        user_name=session.get('full_name'),
+        user_role=session.get('role'),
+        ip_address=request.remote_addr
+    )
     flash("Marked as returned.", "success")
     return redirect(url_for('secretary_dashboard'))
 
@@ -2868,11 +3181,11 @@ def secretary_change_password():
                 flash("User not found.", "danger")
                 return redirect(url_for('secretary_dashboard'))
 
-            # Verify current password
+            # Verify current password strictly using Bcrypt (no plaintext fallback)
             try:
                 current_ok = _bcrypt.checkpw(current_password.encode(), user['password'].encode())
-            except ValueError:
-                current_ok = (current_password == user['password'])
+            except (ValueError, TypeError, Exception):
+                current_ok = False
 
             if not current_ok:
                 flash("Current password is incorrect.", "danger")
@@ -3012,8 +3325,8 @@ def change_my_password():
             stored_pw = user.get('password') or ''
             try:
                 current_ok = _bcrypt.checkpw(current_password.encode(), stored_pw.encode())
-            except (ValueError, TypeError):
-                current_ok = (current_password == stored_pw)
+            except (ValueError, TypeError, Exception):
+                current_ok = False
 
             if not current_ok:
                 flash("Current password is incorrect.", "danger")
@@ -3175,7 +3488,7 @@ def admin_print_section():
         flash("Please select a section.", "error")
         return redirect(url_for('schedule_view'))
     
-    exams = get_public_timetable(section=section)
+    exams = get_public_timetable(section=section, bypass_published_guard=True)
     grouped = defaultdict(list)
     for exam in exams:
         dt = exam['exam_date_time']
@@ -3201,6 +3514,21 @@ def admin_print_section():
 def student_timetable():
     guard = require_role('student')
     if guard: return guard
+    # Synchronize official section and institute from database
+    db_sync = open_db()
+    if db_sync:
+        try:
+            c_sync = db_sync.cursor(dictionary=True)
+            c_sync.execute('SELECT section, institute_id FROM users WHERE id = %s', (session['user_id'],))
+            u_row = c_sync.fetchone()
+            if u_row:
+                session['section'] = u_row.get('section') or ''
+                if u_row.get('institute_id'):
+                    session['institute_id'] = u_row['institute_id']
+        except Exception:
+            pass
+        finally:
+            db_sync.close()
     is_pub = is_schedule_published()
     section      = session.get('section', '')
     institute_id = session.get('institute_id')
@@ -3259,6 +3587,9 @@ def student_timetable():
 def export_student_schedule_pdf_route():
     guard = require_role('student')
     if guard: return guard
+    if not is_schedule_published():
+        flash("The official examination timetable is currently in Draft mode under administrative review. Examination permits cannot be downloaded yet.", "warning")
+        return redirect(url_for('student_timetable'))
     section      = session.get('section', '')
     institute_id = session.get('institute_id')
     full_name    = session.get('full_name', 'Student')
@@ -3290,23 +3621,16 @@ def export_student_schedule_pdf_route():
 def student_update_section():
     guard = require_role('student')
     if guard: return guard
+
     new_section = request.form.get("section", "").strip()
-    if not new_section:
-        flash("Please select a valid section.", "error")
-        return redirect(url_for('student_timetable'))
-    
-    db = open_db()
-    if db:
-        try:
-            cursor = db.cursor()
-            cursor.execute("UPDATE users SET section = %s WHERE id = %s", (new_section, session['user_id']))
-            db.commit()
-            session['section'] = new_section
-            flash(f"Section successfully updated to '{new_section}'. Timetable refreshed.", "success")
-        except Exception as e:
-            flash(f"Error updating section: {e}", "danger")
-        finally:
-            db.close()
+    log_audit_event('UNAUTHORIZED_SECTION_EDIT_ATTEMPT',
+        f"Student {session.get('full_name')} (ID #{session.get('user_id')}) attempted an unauthorized self-service section modification to '{new_section}'.",
+        user_id=session.get('user_id'),
+        user_name=session.get('full_name'),
+        user_role='student',
+        ip_address=request.remote_addr
+    )
+    flash("The official examination timetable and class sections are locked down. Section modifications are locked. Students cannot self-modify class sections. Please contact your Department Administrator or Academic Head to request an official change.", "warning")
     return redirect(url_for('student_timetable'))
 
 # â”€â”€ MISC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

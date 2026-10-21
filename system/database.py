@@ -130,6 +130,23 @@ def ensure_database_schema():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """)
 
+        # 4. Create schedule_reset_requests table for dual-authorization schedule reset workflow
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS schedule_reset_requests (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                requested_by_id INT NOT NULL,
+                requested_by_name VARCHAR(150) NOT NULL,
+                reason TEXT NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                reviewed_by_id INT NULL,
+                reviewed_by_name VARCHAR(150) NULL,
+                reviewed_at DATETIME NULL,
+                rejection_reason TEXT NULL,
+                archive_id INT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
+
         db.commit()
         return True, "Database schema is up to date."
     except Exception as e:
@@ -1082,9 +1099,12 @@ def get_pending_exams():
     try:
         cursor = db.cursor(dictionary=True)
         cursor.execute("""
-            SELECT e.*, s.content_group_id
+            SELECT e.*, s.content_group_id, s.code AS subject_code, s.name AS subject_catalog_name,
+                   COALESCE(inst.capacity_default, 40) AS institute_capacity_default,
+                   (SELECT COUNT(*) FROM users u WHERE u.role = 'student' AND u.section = e.section) AS section_student_count
             FROM exams e
             LEFT JOIN subjects s ON e.subject_id = s.id
+            LEFT JOIN institutes inst ON e.institute_id = inst.id
             WHERE e.exam_date_time IS NULL OR e.status IN ('Pending', 'Unscheduled')
         """)
         return cursor.fetchall()
@@ -1329,6 +1349,179 @@ def reset_schedule():
     finally:
         db.close()
 
+def create_schedule_reset_request(user_id, user_name, reason):
+    """
+    Submits a schedule reset request from a System Admin for Super Admin approval.
+    Enforces the 'Four-Eyes Principle' (Dual Authorization) to prevent accidental wipes.
+    """
+    if not reason or not reason.strip():
+        return False, "A reason explaining why the schedule must be reset is required."
+    
+    db = open_db()
+    if not db:
+        return False, "Database connection failed."
+    try:
+        cursor = db.cursor(dictionary=True)
+        # Check if there is already an active pending request
+        cursor.execute("SELECT id, requested_by_name, requested_at FROM schedule_reset_requests WHERE status = 'pending'")
+        existing = cursor.fetchone()
+        if existing:
+            return False, f"A schedule reset request is already pending Super Admin approval (submitted by {existing['requested_by_name']})."
+        
+        # Insert new request
+        cursor.execute("""
+            INSERT INTO schedule_reset_requests (requested_by_id, requested_by_name, reason, status, requested_at)
+            VALUES (%s, %s, %s, 'pending', NOW())
+        """, (user_id, user_name, reason.strip()))
+        req_id = cursor.lastrowid
+
+        # Notify all Super Admins
+        cursor.execute("SELECT id FROM users WHERE is_super_admin = 1 AND is_active = 1")
+        for sa in cursor.fetchall():
+            create_notification(
+                sa['id'],
+                "⚠️ Schedule Reset Request Pending",
+                f"Admin {user_name} has requested to reset the master timetable. Reason: \"{reason.strip()}\". Please review and approve/reject in the Super Admin panel."
+            )
+        
+        db.commit()
+        log_audit_event('SCHEDULE_RESET_REQUESTED', f"Admin {user_name} requested schedule reset. Reason: {reason.strip()}", user_id=user_id, user_name=user_name, user_role='admin')
+        return True, "Schedule reset request submitted. A Super Administrator has been notified to review and authorize the action."
+    except Exception as e:
+        return False, f"Failed to submit reset request: {e}"
+    finally:
+        db.close()
+
+def get_pending_schedule_reset_request():
+    """Returns the current pending schedule reset request, if any."""
+    db = open_db()
+    if not db: return None
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, requested_by_id, requested_by_name, reason, status, requested_at
+            FROM schedule_reset_requests
+            WHERE status = 'pending'
+            ORDER BY id DESC LIMIT 1
+        """)
+        return cursor.fetchone()
+    finally:
+        db.close()
+
+def get_all_schedule_reset_requests(pending_only=False):
+    """Returns schedule reset requests for review."""
+    db = open_db()
+    if not db: return []
+    try:
+        cursor = db.cursor(dictionary=True)
+        if pending_only:
+            cursor.execute("""
+                SELECT id, requested_by_id, requested_by_name, reason, status, requested_at
+                FROM schedule_reset_requests
+                WHERE status = 'pending'
+                ORDER BY id DESC
+            """)
+        else:
+            cursor.execute("""
+                SELECT id, requested_by_id, requested_by_name, reason, status, requested_at,
+                       reviewed_by_id, reviewed_by_name, reviewed_at, rejection_reason, archive_id
+                FROM schedule_reset_requests
+                ORDER BY id DESC LIMIT 50
+            """)
+        return cursor.fetchall()
+    finally:
+        db.close()
+
+def approve_schedule_reset_request(request_id, reviewer_id, reviewer_name):
+    """
+    Authorizes and executes a pending schedule reset request.
+    Automatically captures a permanent archive snapshot before wiping.
+    """
+    db = open_db()
+    if not db: return False, "Database connection failed."
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM schedule_reset_requests WHERE id = %s", (request_id,))
+        req = cursor.fetchone()
+        if not req:
+            return False, "Schedule reset request not found."
+        if req['status'] != 'pending':
+            return False, f"This request has already been {req['status']}."
+        
+        # 1. Capture snapshot before reset
+        term_tuple = get_exam_term()
+        exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
+        exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
+        ok_arch, res_arch = create_exam_archive(
+            academic_year="2025-2026",
+            exam_term=exam_term,
+            exam_semester=exam_semester,
+            archive_title=None,
+            notes=f"Archived prior to approved reset. (Requested by: {req['requested_by_name']}, Approved by: {reviewer_name}). Reason: {req['reason']}",
+            user_id=reviewer_id,
+            user_name=reviewer_name
+        )
+        archive_id = res_arch if (ok_arch and isinstance(res_arch, int)) else None
+
+        # 2. Execute master schedule reset
+        reset_schedule()
+
+        # 3. Update request record
+        cursor.execute("""
+            UPDATE schedule_reset_requests
+            SET status = 'approved', reviewed_by_id = %s, reviewed_by_name = %s, reviewed_at = NOW(), archive_id = %s
+            WHERE id = %s
+        """, (reviewer_id, reviewer_name, archive_id, request_id))
+        db.commit()
+
+        # 4. Notify requester
+        create_notification(
+            req['requested_by_id'],
+            "✅ Schedule Reset Approved",
+            f"Your schedule reset request has been approved by Super Admin {reviewer_name}. The schedule has been safely archived and reset to pending."
+        )
+
+        log_audit_event('SCHEDULE_RESET_APPROVED', f"Super Admin {reviewer_name} approved reset request #{request_id} from {req['requested_by_name']}. Archive created.", user_id=reviewer_id, user_name=reviewer_name, user_role='super_admin')
+        return True, "Schedule reset approved and executed. An archive snapshot has been saved."
+    except Exception as e:
+        return False, f"Error approving reset: {e}"
+    finally:
+        db.close()
+
+def reject_schedule_reset_request(request_id, reviewer_id, reviewer_name, rejection_reason=""):
+    """Rejects a pending schedule reset request."""
+    db = open_db()
+    if not db: return False, "Database connection failed."
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM schedule_reset_requests WHERE id = %s", (request_id,))
+        req = cursor.fetchone()
+        if not req:
+            return False, "Schedule reset request not found."
+        if req['status'] != 'pending':
+            return False, f"This request has already been {req['status']}."
+        
+        cursor.execute("""
+            UPDATE schedule_reset_requests
+            SET status = 'rejected', reviewed_by_id = %s, reviewed_by_name = %s, reviewed_at = NOW(), rejection_reason = %s
+            WHERE id = %s
+        """, (reviewer_id, reviewer_name, rejection_reason.strip() if rejection_reason else None, request_id))
+        db.commit()
+
+        # Notify requester
+        create_notification(
+            req['requested_by_id'],
+            "❌ Schedule Reset Request Declined",
+            f"Your schedule reset request was declined by Super Admin {reviewer_name}." + (f" Reason: {rejection_reason.strip()}" if rejection_reason else "")
+        )
+
+        log_audit_event('SCHEDULE_RESET_REJECTED', f"Super Admin {reviewer_name} rejected reset request #{request_id} from {req['requested_by_name']}. Reason: {rejection_reason}", user_id=reviewer_id, user_name=reviewer_name, user_role='super_admin')
+        return True, "Schedule reset request has been declined."
+    except Exception as e:
+        return False, f"Error rejecting request: {e}"
+    finally:
+        db.close()
+
 def unschedule_exams(exam_ids):
     if not exam_ids: return
     db = open_db()
@@ -1378,7 +1571,7 @@ def check_edit_conflicts(exam_id, new_room_id, new_instructor_id, new_datetime_s
             new_start = _dt.strptime(new_datetime_str, '%Y-%m-%d %H:%M:%S')
         new_end = new_start + _td(minutes=duration_minutes)
 
-        # Room conflict
+        # Room conflict & Capacity check
         if new_room_id:
             cursor.execute("SELECT subject_name, section, exam_date_time, duration_minutes FROM exams WHERE room_id=%s AND id!=%s AND status='Scheduled' AND exam_date_time IS NOT NULL", (new_room_id, exam_id))
             for row in cursor.fetchall():
@@ -1388,7 +1581,22 @@ def check_edit_conflicts(exam_id, new_room_id, new_instructor_id, new_datetime_s
                 if new_start < r_end and r_start < new_end:
                     conflicts.append(f"⚠️ Room conflict: room is already used by '{row['subject_name']}' at {r_start}")
 
-        # Proctor/instructor conflict
+            cursor.execute("SELECT room_name, capacity FROM rooms WHERE id = %s", (new_room_id,))
+            rm_data = cursor.fetchone()
+            if rm_data:
+                cursor.execute("""
+                    SELECT e.section, COALESCE(inst.capacity_default, 40) as inst_cap,
+                           (SELECT COUNT(*) FROM users u WHERE u.role = 'student' AND u.section = e.section) as stu_cnt
+                    FROM exams e
+                    LEFT JOIN institutes inst ON e.institute_id = inst.id
+                    WHERE e.id = %s
+                """, (exam_id,))
+                ex_info = cursor.fetchone() or {}
+                needed_cap = ex_info.get('stu_cnt') or ex_info.get('inst_cap') or 40
+                if rm_data.get('capacity', 0) < needed_cap:
+                    conflicts.append(f"⚠️ Room Capacity Warning: Room '{rm_data['room_name']}' has only {rm_data['capacity']} seats, but section '{ex_info.get('section')}' requires at least {needed_cap} seats.")
+
+        # Proctor/instructor conflict & Self-Proctoring Exclusion check
         if new_instructor_id:
             cursor.execute("SELECT subject_name, section, exam_date_time, duration_minutes FROM exams WHERE instructor_id=%s AND id!=%s AND status='Scheduled' AND exam_date_time IS NOT NULL", (new_instructor_id, exam_id))
             for row in cursor.fetchall():
@@ -1397,6 +1605,18 @@ def check_edit_conflicts(exam_id, new_room_id, new_instructor_id, new_datetime_s
                 r_end = r_start + _td(minutes=row['duration_minutes'] or 60)
                 if new_start < r_end and r_start < new_end:
                     conflicts.append(f"⚠️ Instructor conflict: proctor is already assigned to '{row['subject_name']}' at {r_start}")
+
+            import re
+            cursor.execute("SELECT name, subjects_taught FROM instructors WHERE id = %s", (new_instructor_id,))
+            inst_data = cursor.fetchone()
+            if inst_data and inst_data.get('subjects_taught'):
+                inst_subs = {s.strip().lower() for s in re.split(r'[,|;]', inst_data['subjects_taught']) if s.strip()}
+                cursor.execute("SELECT subject_name FROM exams WHERE id = %s", (exam_id,))
+                cur_ex = cursor.fetchone()
+                if cur_ex and cur_ex.get('subject_name'):
+                    s_name = cur_ex['subject_name'].strip().lower()
+                    if s_name in inst_subs or any(s_name == sub or sub in s_name for sub in inst_subs):
+                        conflicts.append(f"⚠️ Academic Integrity Rule: Instructor '{inst_data['name']}' teaches '{cur_ex.get('subject_name')}' and is strictly prohibited from proctoring their own course.")
 
 
 
@@ -1590,7 +1810,10 @@ def apply_exam_edit(exam_id, new_room_id, new_instructor_id, new_datetime_str, s
     finally:
         db.close()
 
-def get_public_timetable(section=None, institute_id=None):
+def get_public_timetable(section=None, institute_id=None, bypass_published_guard=False):
+    # Protect draft schedules from unauthenticated public leakage
+    if not bypass_published_guard and not is_schedule_published():
+        return []
     # A student must have a section assigned — if not, show nothing.
     if not section or not section.strip():
         return []
@@ -1619,6 +1842,28 @@ def get_public_timetable(section=None, institute_id=None):
         query += " ORDER BY e.exam_date_time ASC"
         cursor.execute(query, tuple(params))
         return cursor.fetchall()
+    finally:
+        db.close()
+
+def get_all_sections():
+    """
+    Returns a sorted list of all unique class sections in the system
+    (derived from both users and examination allocations).
+    """
+    db = open_db()
+    if not db: return []
+    try:
+        cur = db.cursor()
+        cur.execute("""
+            SELECT DISTINCT section FROM (
+                SELECT section FROM users WHERE section IS NOT NULL AND section != ''
+                UNION
+                SELECT section FROM exams WHERE section IS NOT NULL AND section != ''
+            ) AS s ORDER BY section ASC
+        """)
+        return [r[0] for r in cur.fetchall() if r[0]]
+    except Exception:
+        return []
     finally:
         db.close()
 
@@ -1817,6 +2062,8 @@ def get_proctor_exams(instructor_id):
             SELECT e.id, e.subject_name, e.section, e.subject_type, s.code as subject_code,
                    e.exam_date_time, e.duration_minutes, e.status,
                    r.room_name, r.capacity,
+                   COALESCE(dept_inst.code, 'N/A') as offering_institute_code,
+                   COALESCE(dept_inst.name, 'Department') as offering_institute_name,
                    (SELECT COUNT(*) FROM proctor_absence pa WHERE pa.exam_id = e.id AND pa.instructor_id = %s) as is_absent_reported,
                    (SELECT pa.reason FROM proctor_absence pa WHERE pa.exam_id = e.id AND pa.instructor_id = %s ORDER BY pa.id DESC LIMIT 1) as absence_reason,
                    (SELECT COUNT(*) FROM relievers rel WHERE rel.exam_id = e.id) as has_reliever,
@@ -1825,12 +2072,20 @@ def get_proctor_exams(instructor_id):
             FROM exams e
             LEFT JOIN rooms r ON e.room_id = r.id
             LEFT JOIN subjects s ON e.subject_id = s.id
+            LEFT JOIN institutes dept_inst ON dept_inst.id = COALESCE(e.institute_id, s.institute_id)
             WHERE (e.instructor_id = %s OR e.id IN (SELECT exam_id FROM proctor_absence WHERE instructor_id = %s))
               AND e.status = 'Scheduled'
               AND e.exam_date_time IS NOT NULL
             ORDER BY e.exam_date_time ASC, e.section ASC
         """, (instructor_id, instructor_id, instructor_id, instructor_id, instructor_id))
-        return cursor.fetchall()
+        rows = cursor.fetchall()
+        for r in rows:
+            inst_code = (r.get('offering_institute_code') or '').strip()
+            if inst_code and inst_code != 'N/A':
+                r['claim_office'] = f"{inst_code} Dean's / Secretary Office"
+            else:
+                r['claim_office'] = "Department Secretary Office"
+        return rows
     finally:
         db.close()
 

@@ -217,6 +217,52 @@
                 {% endif %}
             {% endwith %}
 
+                        <!-- ── Pending Schedule Reset Requests (Four-Eyes Principle / Dual Authorization) ── -->
+            {% if pending_reset_requests %}
+            <div class="bg-white shadow-sm rounded-xl border border-red-200 overflow-hidden mb-8 no-print animate-in fade-in duration-200">
+                <div class="px-6 py-4 border-b border-red-200 bg-red-50 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-red-600 text-white flex items-center justify-center text-base shadow-xs">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-bold text-red-950 text-sm sm:text-base">Schedule Reset Authorization Required</h2>
+                            <p class="text-xs text-red-700">Administrative requests to clear and reset the master timetable require Super Admin authorization.</p>
+                        </div>
+                    </div>
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">
+                        {{ pending_reset_requests|length }} pending
+                    </span>
+                </div>
+                <div class="p-6 divide-y divide-gray-100">
+                    {% for req in pending_reset_requests %}
+                    <div class="py-4 first:pt-0 last:pb-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div class="space-y-1.5 flex-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-bold text-gray-900 text-sm">{{ req.requested_by_name }}</span>
+                                <span class="text-xs text-gray-400">•</span>
+                                <span class="text-xs text-gray-500">{{ req.requested_at.strftime('%B %d, %Y at %I:%M %p') if req.requested_at else 'Recent' }}</span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">System Admin Request</span>
+                            </div>
+                            <div class="text-xs text-gray-700 bg-amber-50/60 p-3 rounded-lg border border-amber-200/80">
+                                <span class="font-bold text-amber-950 block mb-0.5">Stated Justification:</span>
+                                <p class="italic text-gray-800">"{{ req.reason }}"</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2.5 flex-shrink-0 self-end md:self-center">
+                            <button type="button" onclick="confirmSuperApproveReset('{{ req.id }}', '{{ req.requested_by_name|e }}', '{{ req.reason|e }}')" class="inline-flex items-center px-4 py-2 border border-transparent text-xs font-bold rounded-lg text-white bg-red-600 hover:bg-red-700 shadow-sm transition-colors cursor-pointer">
+                                <i class="fa-solid fa-check mr-1.5"></i> Authorize & Reset
+                            </button>
+                            <button type="button" onclick="openRejectResetModal('{{ req.id }}', '{{ req.requested_by_name|e }}')" class="inline-flex items-center px-4 py-2 border border-gray-300 text-xs font-semibold rounded-lg text-gray-700 bg-white hover:bg-gray-100 transition-colors shadow-xs cursor-pointer">
+                                <i class="fa-solid fa-xmark mr-1.5"></i> Decline
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
             {% if pending_students %}
             <!-- ── Pending Student Approvals ───────────────────────────── -->
             <div class="bg-white shadow-sm rounded-xl border border-amber-200 overflow-hidden mb-8 no-print">
@@ -442,7 +488,12 @@
                         </div>
                         <div id="section_container">
                             <label class="block text-sm font-medium text-gray-700">Section (Students only)</label>
-                            <input type="text" name="section" id="edit_section" class="mt-1 focus:ring-purple-500 block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            <select name="section" id="edit_section" class="mt-1 focus:ring-purple-500 block w-full sm:text-sm border-gray-300 rounded-md border p-2 bg-white">
+                                <option value="">-- No Section / None --</option>
+                                {% for sec in sections %}
+                                <option value="{{ sec }}">{{ sec }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
                         <div id="institute_container">
                             <label class="block text-sm font-medium text-gray-700">Institute</label>
@@ -558,7 +609,26 @@
 
               document.getElementById('edit_email').value = email;
               document.getElementById('edit_role').value = role;
-              document.getElementById('edit_section').value = section !== 'None' ? section : '';
+              const secSelect = document.getElementById('edit_section');
+              if (secSelect) {
+                  const cleanSec = (section && section !== 'None' && section !== 'null') ? section : '';
+                  if (cleanSec) {
+                      let found = false;
+                      for (let i = 0; i < secSelect.options.length; i++) {
+                          if (secSelect.options[i].value === cleanSec) {
+                              found = true;
+                              break;
+                          }
+                      }
+                      if (!found) {
+                          const opt = document.createElement('option');
+                          opt.value = cleanSec;
+                          opt.textContent = cleanSec;
+                          secSelect.appendChild(opt);
+                      }
+                  }
+                  secSelect.value = cleanSec;
+              }
               document.getElementById('edit_institute').value = institute_id !== 'None' ? institute_id : '';
               document.getElementById('edit_super_admin').checked = is_super_admin === 'True' || is_super_admin === 'true' || is_super_admin === true;
             
@@ -718,6 +788,30 @@
             document.getElementById('superActionSubmitBtn').className = 'px-4 py-2 rounded-lg text-xs font-bold text-white shadow-xs transition flex items-center gap-1.5 bg-red-600 hover:bg-red-700';
             document.getElementById('superActionSubmitBtn').innerHTML = '<i class="fa-solid fa-times mr-1"></i> Reject Registration';
             document.getElementById('superActionForm').action = '/super_admin/reject_student/' + studentId;
+            document.getElementById('superActionForm').onsubmit = null;
+            
+            document.getElementById('superActionModal').classList.remove('hidden');
+            document.getElementById('superActionModal').classList.add('flex');
+        }
+
+        function confirmSuperApproveReset(reqId, requesterName, reason) {
+            var np = document.getElementById('superActionNewPassword');
+            if (np) np.value = '';
+            document.getElementById('superActionHeader').className = 'px-6 py-4 flex items-center justify-between text-white bg-red-600';
+            document.getElementById('superActionIcon').className = 'fa-solid fa-triangle-exclamation text-lg';
+            document.getElementById('superActionTitle').textContent = 'Authorize Master Schedule Reset';
+            
+            var msg = 'Are you sure you want to authorize the master schedule reset requested by <strong>' + (requesterName || 'Administrator') + '</strong>?';
+            if (reason && reason.trim()) {
+                msg += '<div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 leading-relaxed text-left"><span class="font-bold text-amber-950 block mb-0.5">Stated Justification:</span><em>"' + reason.trim() + '"</em></div>';
+            }
+            document.getElementById('superActionMessage').innerHTML = msg;
+            document.getElementById('superActionSubContainer').className = 'mt-3 p-3 rounded-xl text-xs flex items-start gap-2 bg-red-50 text-red-900 border border-red-200';
+            document.getElementById('superActionSub').innerHTML = '<strong>Critical Safeguard:</strong> An automated archive snapshot will be captured in Exam Archives. All current timetable slots, room allocations, and proctor assignments will be wiped back to Pending.';
+            document.getElementById('superActionSubmitBtn').className = 'px-4 py-2 rounded-lg text-xs font-bold text-white shadow-xs transition flex items-center gap-1.5 bg-red-600 hover:bg-red-700 cursor-pointer';
+            document.getElementById('superActionSubmitBtn').innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i> Authorize & Reset Now';
+            document.getElementById('superActionForm').action = '/super_admin/approve_schedule_reset/' + reqId;
+            document.getElementById('superActionForm').onsubmit = null;
             
             document.getElementById('superActionModal').classList.remove('hidden');
             document.getElementById('superActionModal').classList.add('flex');
@@ -743,5 +837,47 @@
             document.getElementById('superActionModal').classList.add('flex');
         }
     </script>
+
+    <!-- Decline Reset Request Modal -->
+    <div id="rejectResetModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-xs">
+        <div class="bg-white rounded-xl max-w-md w-full shadow-xl border border-gray-200 overflow-hidden">
+            <div class="bg-gray-50 px-6 py-4 flex items-center justify-between border-b border-gray-200">
+                <div class="flex items-center gap-2 text-gray-800">
+                    <i class="fa-solid fa-shield-xmark text-red-500"></i>
+                    <h3 class="font-bold text-sm">Decline Schedule Reset Request</h3>
+                </div>
+                <button type="button" onclick="closeRejectResetModal()" class="text-gray-400 hover:text-gray-600 cursor-pointer">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="rejectResetForm" action="" method="POST" class="p-6 space-y-4">
+                <p class="text-xs text-gray-600">
+                    Provide an explanation for declining this reset request. The requesting administrator will be notified.
+                </p>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Reason for Declining (Optional)</label>
+                    <textarea name="rejection_reason" rows="3" placeholder="e.g., Please resolve conflicts manually using the Interactive Editor instead." class="w-full text-sm border border-gray-300 rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-gray-400"></textarea>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeRejectResetModal()" class="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg cursor-pointer">Cancel</button>
+                    <button type="submit" class="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg cursor-pointer">Decline Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openRejectResetModal(reqId, requesterName) {
+            const form = document.getElementById('rejectResetForm');
+            if (form) form.action = '/super_admin/reject_schedule_reset/' + reqId;
+            const m = document.getElementById('rejectResetModal');
+            if (m) m.classList.remove('hidden');
+        }
+        function closeRejectResetModal() {
+            const m = document.getElementById('rejectResetModal');
+            if (m) m.classList.add('hidden');
+        }
+    </script>
+
 </body>
 </html>

@@ -192,9 +192,10 @@
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">SMTP Password</label>
-                                <div class="relative w-full"><input type="password" name="smtp_password" value="{{ settings.smtp_password|default('') }}" placeholder="••••••••" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2 pr-10"><div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" onclick="togglePassword(this)">
+                                <div class="relative w-full"><input type="password" name="smtp_password" value="" placeholder="{% if settings.smtp_password %}•••••••• (Saved Password Unchanged){% else %}Enter SMTP App Password{% endif %}" autocomplete="new-password" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2 pr-10"><div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" onclick="togglePassword(this)">
     <i class="fa-regular fa-eye text-gray-400 hover:text-gray-600"></i>
 </div></div>
+                                <p class="text-[11px] text-gray-500 mt-1">Leave blank to retain current password.</p>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">From Email Address</label>

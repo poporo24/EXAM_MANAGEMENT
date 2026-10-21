@@ -272,7 +272,7 @@
                                            class="px-2.5 py-1.5 border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-lg font-semibold text-xs inline-flex items-center gap-1 transition" title="Download CSV">
                                             <i class="fa-solid fa-file-csv text-emerald-600"></i> CSV
                                         </a>
-                                        {% if session.get('role') == 'admin' %}
+                                        {% if session.get('is_super_admin') %}
                                         <button onclick="confirmDeleteArchive('{{ a.id }}', '{{ a.archive_title }}')"
                                                 class="px-2.5 py-1.5 border border-gray-200 text-gray-400 hover:text-rose-600 hover:border-rose-300 rounded-lg text-xs transition" title="Delete Archive">
                                             <i class="fa-solid fa-trash-can"></i>
@@ -375,6 +375,7 @@
         </div>
     </div>
 
+    {% if session.get('is_super_admin') %}
     <!-- Modal: Delete Confirmation -->
     <div id="deleteArchiveModal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs hidden items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl p-6 border border-gray-100 text-center">
@@ -395,6 +396,7 @@
             </form>
         </div>
     </div>
+    {% endif %}
 
     <script>
         function openCreateArchiveModal() {
@@ -405,6 +407,7 @@
             document.getElementById('createArchiveModal').classList.add('hidden');
             document.getElementById('createArchiveModal').classList.remove('flex');
         }
+        {% if session.get('is_super_admin') %}
         function confirmDeleteArchive(archiveId, title) {
             document.getElementById('deleteArchiveTitle').textContent = '"' + title + '"';
             document.getElementById('deleteArchiveForm').action = '/admin/archives/' + archiveId + '/delete';
@@ -415,6 +418,7 @@
             document.getElementById('deleteArchiveModal').classList.add('hidden');
             document.getElementById('deleteArchiveModal').classList.remove('flex');
         }
+        {% endif %}
         function filterArchives() {
             const query = document.getElementById('archiveSearchInput').value.toLowerCase().trim();
             const rows = document.querySelectorAll('.archive-row');

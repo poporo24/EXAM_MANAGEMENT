@@ -43,7 +43,7 @@ from system.database import (
     # scheduling
     get_already_scheduled_slots, apply_schedule_results, reset_schedule, unschedule_exams,
     get_schedule_results, check_edit_conflicts, apply_exam_edit, get_available_resources,
-    save_exam_period, save_exam_term, get_exam_term, get_exam_period, save_exam_term, get_exam_term,
+    save_exam_period, save_exam_term, get_exam_term, get_exam_period,
     # proctor availability
     get_proctor_availability, get_proctor_availability_for, save_proctor_availability,
     bulk_save_proctor_availability,
@@ -64,21 +64,35 @@ from system.database import (
     get_scheduling_report, get_assignment_report, get_student_exam_load_report,
     # archives
     create_exam_archive, get_exam_archives, get_exam_archive_by_id, delete_exam_archive, sync_archive_durations,
-    # period
-    open_db, ensure_database_schema,
+    # period & audit
+    open_db, ensure_database_schema, log_audit_event,
 )
 from system.scheduler import run_scheduler
-from system.logic import verify_login, is_super_admin, hash_password
+from system.logic import verify_login, is_super_admin, hash_password, validate_password_strength
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_limiter.errors import RateLimitExceeded
 
 # â”€â”€ FLASK APP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 app = Flask(__name__, template_folder='template')
+from flask_wtf.csrf import CSRFProtect, generate_csrf, CSRFError
+csrf = CSRFProtect(app)
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=["2500 per day", "600 per hour"],
+    storage_uri="memory://"
+)
+
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "cca_exam_management_secret_key_v2")
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
-    MAX_CONTENT_LENGTH=16 * 1024 * 1024  # 16 MB max upload limit
+    MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # 16 MB max upload limit
+    WTF_CSRF_TIME_LIMIT=7200  # 2 hours CSRF token validity
 )
 
 # Automatically ensure database schema (tables & columns) exists
@@ -94,12 +108,13 @@ def _configure_mail():
         s = get_system_settings()
     except Exception:
         s = {}
-    app.config['MAIL_SERVER']         = s.get('smtp_host', '') or ''
-    app.config['MAIL_PORT']           = int(s.get('smtp_port') or 587)
-    app.config['MAIL_USERNAME']       = s.get('smtp_user', '') or ''
-    app.config['MAIL_PASSWORD']       = s.get('smtp_password', '') or ''
-    app.config['MAIL_DEFAULT_SENDER'] = s.get('smtp_from', '') or ''
-    app.config['MAIL_USE_TLS']        = bool(s.get('smtp_use_tls', 1))
+    # Prioritize secure environment variables over database storage
+    app.config['MAIL_SERVER']         = os.environ.get('SMTP_HOST') or s.get('smtp_host', '') or ''
+    app.config['MAIL_PORT']           = int(os.environ.get('SMTP_PORT') or s.get('smtp_port') or 587)
+    app.config['MAIL_USERNAME']       = os.environ.get('SMTP_USER') or s.get('smtp_user', '') or ''
+    app.config['MAIL_PASSWORD']       = os.environ.get('SMTP_PASSWORD') or s.get('smtp_password', '') or ''
+    app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('SMTP_FROM') or s.get('smtp_from', '') or ''
+    app.config['MAIL_USE_TLS']        = bool(int(os.environ.get('SMTP_USE_TLS', s.get('smtp_use_tls', 1))))
     app.config['MAIL_USE_SSL']        = False
     app.config['MAIL_TIMEOUT']        = 5
     app.config['MAIL_SUPPRESS_SEND']  = not bool(app.config['MAIL_SERVER'])
@@ -142,11 +157,40 @@ def require_super_admin():
     return None
 
 @app.after_request
-def add_cache_control_headers(response):
+def add_security_and_cache_headers(response):
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
+    # Security Headers (Addresses MED-03 Clickjacking & MIME-Sniffing)
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    
+    # Auto-inject CSRF meta tag and auto-protection script into HTML responses
+    if response.mimetype == 'text/html' and response.status_code == 200:
+        html = response.get_data(as_text=True)
+        if '</head>' in html and 'csrf.js' not in html:
+            token = generate_csrf()
+            csrf_tags = (
+                f'<meta name="csrf-token" content="{token}">\n'
+                f'<script src="/static/js/csrf.js"></script>\n'
+            )
+            response.set_data(html.replace('</head>', f'{csrf_tags}</head>', 1))
     return response
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    if request.is_json or request.path.startswith('/api/'):
+        return jsonify({'error': 'CSRF token missing or invalid', 'message': str(e.description)}), 400
+    flash(f"Security notice: {e.description}. Please refresh the page and try again.", "warning")
+    return redirect(request.referrer or url_for('login'))
+
+@app.errorhandler(RateLimitExceeded)
+def handle_ratelimit_error(e):
+    if request.is_json or request.path.startswith('/api/'):
+        return jsonify({'error': 'Rate limit exceeded', 'message': 'Too many requests. Please slow down.'}), 429
+    flash("Too many requests from your network. Please wait a moment before trying again.", "warning")
+    return redirect(request.referrer or url_for('login'))
 
 @app.template_filter('clean_hours')
 def clean_hours_filter(val):
@@ -226,9 +270,15 @@ def _get_unread(user_id):
 @app.context_processor
 def inject_notifications_unread():
     uid = session.get('user_id')
-    if uid:
-        return {'unread_count': _get_unread(uid)}
-    return {'unread_count': 0}
+    role = session.get('role')
+    unread = _get_unread(uid) if uid else 0
+    pending_count = 0
+    if role in ('admin', 'super_admin') or session.get('is_super_admin'):
+        try:
+            pending_count = len(get_pending_users())
+        except Exception:
+            pending_count = 0
+    return {'unread_count': unread, 'pending_count': pending_count}
 
 # â”€â”€ AUTH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -273,6 +323,7 @@ def public_timetable():
 
 
 @app.route("/forgot_password", methods=["GET", "POST"])
+@limiter.limit("5 per minute", methods=["POST"])
 def forgot_password():
     if request.method == "POST":
         email = request.form.get("email", "").strip()
@@ -297,6 +348,7 @@ def forgot_password():
     return render_template("forgot_password.html")
 
 @app.route("/reset_password/<token>", methods=["GET", "POST"])
+@limiter.limit("5 per minute", methods=["POST"])
 def reset_password(token):
     user = get_user_by_reset_token(token)
     
@@ -313,8 +365,9 @@ def reset_password(token):
         new_password = request.form.get("password")
         confirm = request.form.get("confirm_password")
         
-        if not new_password or len(new_password) < 6:
-            flash("Password must be at least 6 characters.", "error")
+        is_valid, err_msg = validate_password_strength(new_password)
+        if not is_valid:
+            flash(err_msg, "error")
             return render_template("reset_password.html", token=token)
             
         if new_password != confirm:
@@ -331,14 +384,15 @@ def reset_password(token):
     return render_template("reset_password.html", token=token)
 
 @app.route("/login", methods=["GET", "POST"])
+@limiter.limit("15 per minute", methods=["POST"])
 def login():
     if request.method == "GET":
         if 'user_id' in session and session.get('role'):
             return _redirect_by_role()
         all_exams = get_schedule_results()
         sections = sorted(list(set(e.get('section', '').strip() for e in all_exams if e.get('section', '').strip() and e.get('status') == 'Scheduled')))
-        # Toggle Demo Accounts card on login page (set SHOW_DEMO_ACCOUNTS=False in production / domain launch)
-        show_demo = os.environ.get('SHOW_DEMO_ACCOUNTS', 'True').lower() in ('true', '1', 'yes')
+        # Toggle Demo Accounts card on login page (defaults to False for security)
+        show_demo = os.environ.get('SHOW_DEMO_ACCOUNTS', 'False').lower() in ('true', '1', 'yes')
         return render_template("login.html", sections=sections, show_demo=show_demo)
 
     
@@ -359,13 +413,16 @@ def login():
         session['is_super_admin'] = bool(user.get('is_super_admin', 0))
         session['section']        = user.get('section', '')
         session['institute_id']   = user.get('institute_id')
+        log_audit_event('AUTH_LOGIN_SUCCESS', f"User authenticated as {user.get('role')}", user_id=user['id'], user_name=user['full_name'], user_role=user.get('role'), ip_address=request.remote_addr)
         return _redirect_by_role()
+    log_audit_event('AUTH_LOGIN_FAILED', f"Failed login attempt for: {email}", ip_address=request.remote_addr)
     flash("Invalid email or password.", "error")
     return redirect(url_for('login'))
 
 
 @app.route("/logout")
 def logout():
+    log_audit_event('AUTH_LOGOUT', "User logged out", user_id=session.get('user_id'), user_name=session.get('full_name'), user_role=session.get('role'), ip_address=request.remote_addr)
     session.clear()
     return redirect(url_for('login'))
 
@@ -400,6 +457,7 @@ def register_page():
     return render_template("register.html", institutes=institutes, sections=sections)
 
 @app.route("/register", methods=["POST"])
+@limiter.limit("10 per minute")
 def register_submit():
     first_name   = request.form.get("first_name", "").strip()
     last_name    = request.form.get("last_name", "").strip()
@@ -424,9 +482,9 @@ def register_submit():
         flash("Registration is restricted to @cca.edu.ph email addresses only.", "danger")
         return redirect(url_for('register_page'))
         
-    import re as regex
-    if len(password) < 8 or not regex.search(r'[A-Z]', password) or not regex.search(r'\d', password):
-        flash("Password must be at least 8 characters long and contain at least one uppercase letter and one number.", "danger")
+    is_valid, err_msg = validate_password_strength(password)
+    if not is_valid:
+        flash(err_msg, "danger")
         return redirect(url_for('register_page'))
 
     if not full_name or not email or not password:
@@ -530,6 +588,60 @@ def create_room():
     flash("Room added successfully.", "success")
     return redirect(url_for('dashboard') + '#rooms')
 
+@app.route("/edit_room/<int:id>", methods=["POST"])
+@app.route("/rooms/<int:id>/edit", methods=["POST"])
+def edit_room_route(id):
+    guard = require_role('admin')
+    if guard: return guard
+    room_name = request.form.get("room_name", "").strip()
+    try:
+        capacity = int(request.form.get("capacity") or 0)
+    except (ValueError, TypeError):
+        capacity = 0
+    building = request.form.get("building", "").strip()
+    try:
+        floor = int(request.form.get("floor") or 1)
+    except (ValueError, TypeError):
+        floor = 1
+    institute_id = request.form.get("institute_id") or None
+    is_pwd_accessible = 1 if request.form.get("is_pwd_accessible") else 0
+    edit_room(id, room_name, capacity, building, floor, institute_id, is_pwd_accessible)
+    flash(f"Room '{room_name}' updated successfully.", "success")
+    return redirect(url_for('dashboard') + '#rooms')
+
+@app.route("/delete_room/<int:id>", methods=["POST"])
+@app.route("/rooms/<int:id>/delete", methods=["POST"])
+def delete_room_route(id):
+    guard = require_role('admin')
+    if guard: return guard
+    err = delete_room(id)
+    if err:
+        flash(f"Could not delete room: {err}", "danger")
+    else:
+        flash("Room deleted successfully.", "success")
+    return redirect(url_for('dashboard') + '#rooms')
+
+@app.route("/rooms/bulk_delete", methods=["POST"])
+def rooms_bulk_delete():
+    guard = require_role('admin')
+    if guard: return guard
+    ids = request.form.getlist("room_ids")
+    deleted, errors = 0, []
+    for rid in ids:
+        try:
+            err = delete_room(int(rid))
+            if err:
+                errors.append(err)
+            else:
+                deleted += 1
+        except Exception as e:
+            errors.append(str(e))
+    if deleted:
+        flash(f"{deleted} room(s) deleted successfully.", "success")
+    if errors:
+        flash(f"{len(errors)} room(s) could not be deleted: {errors[0]}", "warning")
+    return redirect(url_for('dashboard') + '#rooms')
+
 @app.route("/add_instructor", methods=["POST"])
 def add_instructor_route():
     guard = require_role('admin')
@@ -559,8 +671,8 @@ def add_instructor_route():
     flash("Instructor added.", "success")
     return redirect(url_for('faculty_page'))
 
-@app.route("/delete_instructor/<int:id>")
-@app.route("/faculty/<int:id>/delete")
+@app.route("/delete_instructor/<int:id>", methods=["POST"])
+@app.route("/faculty/<int:id>/delete", methods=["POST"])
 def remove_instructor(id):
     guard = require_role('admin')
     if guard: return guard
@@ -572,6 +684,7 @@ def remove_instructor(id):
     return redirect(url_for('faculty_page'))
 
 @app.route("/faculty/bulk_delete", methods=["POST"])
+@app.route("/instructors/bulk_delete", methods=["POST"])
 def faculty_bulk_delete():
     guard = require_role('admin')
     if guard: return guard
@@ -590,14 +703,18 @@ def faculty_bulk_delete():
         flash(f"{deleted} instructor(s) deleted successfully.", "success")
     if errors:
         flash(f"{len(errors)} instructor(s) could not be deleted: " + "; ".join(errors), "warning")
+    ref = request.referrer or ''
+    if 'dashboard' in ref:
+        return redirect(url_for('dashboard') + '#instructors')
     return redirect(url_for('faculty_page'))
 
 
-@app.route("/delete_exam/<int:id>")
+@app.route("/delete_exam/<int:id>", methods=["POST"])
 def remove_exam(id):
     guard = require_role('admin')
     if guard: return guard
     delete_exam(id)
+    log_audit_event('EXAM_DELETE', f"Deleted exam ID {id}", user_id=session.get('user_id'), user_name=session.get('full_name'), user_role=session.get('role'), ip_address=request.remote_addr)
     flash('Exam deleted.', 'success')
     return redirect(url_for('dashboard') + '#exams')
 
@@ -606,6 +723,7 @@ def remove_all_exams():
     guard = require_role('admin')
     if guard: return guard
     count = delete_all_exams()
+    log_audit_event('EXAM_DELETE_ALL', f"Purged all {count} exams from system", user_id=session.get('user_id'), user_name=session.get('full_name'), user_role=session.get('role'), ip_address=request.remote_addr)
     flash(f' All {count} exam(s) deleted successfully.', 'success')
     return redirect(url_for('dashboard') + '#exams')
 
@@ -651,7 +769,7 @@ def generate_schedule():
             smtp_password=settings.get('smtp_password', ''),
             smtp_from=settings.get('smtp_from', ''),
             smtp_use_tls=settings.get('smtp_use_tls', 1),
-            major_duration_hrs=settings.get('major_duration_hrs', 2.0),
+            major_duration_hrs=settings.get('major_duration_hrs', 3.0),
             minor_duration_hrs=settings.get('minor_duration_hrs', 1.0),
             max_daily_proctor_hrs=settings.get('max_daily_proctor_hrs', 4.0)
         )
@@ -1175,7 +1293,7 @@ def edit_institute_route(id):
     flash("Institute updated.", "success")
     return redirect(url_for('institutes_page'))
 
-@app.route("/institutes/<int:id>/delete")
+@app.route("/institutes/<int:id>/delete", methods=["POST"])
 def delete_institute_route(id):
     guard = require_role('admin')
     if guard: return guard
@@ -1272,7 +1390,7 @@ def edit_subject_route(id):
     flash("Subject updated.", "success")
     return redirect(url_for('subjects_page'))
 
-@app.route("/subjects/<int:id>/delete")
+@app.route("/subjects/<int:id>/delete", methods=["POST"])
 def delete_subject_route(id):
     guard = require_role('admin')
     if guard: return guard
@@ -1352,6 +1470,7 @@ def faculty_page():
                            exam_start=exam_start, exam_end=exam_end)
 
 @app.route("/faculty/<int:id>/edit", methods=["POST"])
+@app.route("/edit_instructor/<int:id>", methods=["POST"])
 def faculty_edit(id):
     guard = require_role('admin')
     if guard: return guard
@@ -1378,22 +1497,33 @@ def faculty_edit(id):
         request.form.get("subjects_taught", "")
     )
     flash("Instructor updated.", "success")
+    ref = request.referrer or ''
+    if 'dashboard' in ref:
+        return redirect(url_for('dashboard') + '#instructors')
     return redirect(url_for('faculty_page'))
 
 @app.route("/faculty/<int:id>/deactivate", methods=["POST"])
+@app.route("/deactivate_instructor/<int:id>", methods=["POST"])
 def faculty_deactivate(id):
     guard = require_role('admin')
     if guard: return guard
     deactivate_instructor(id)
     flash("Instructor deactivated.", "warning")
+    ref = request.referrer or ''
+    if 'dashboard' in ref:
+        return redirect(url_for('dashboard') + '#instructors')
     return redirect(url_for('faculty_page'))
 
 @app.route("/faculty/<int:id>/activate", methods=["POST"])
+@app.route("/activate_instructor/<int:id>", methods=["POST"])
 def faculty_activate(id):
     guard = require_role('admin')
     if guard: return guard
     activate_instructor(id)
     flash("Instructor activated.", "success")
+    ref = request.referrer or ''
+    if 'dashboard' in ref:
+        return redirect(url_for('dashboard') + '#instructors')
     return redirect(url_for('faculty_page'))
 
 @app.route("/admin/proctor_availability/<int:id>", methods=["GET", "POST"])
@@ -2035,24 +2165,15 @@ def admin_change_password(user_id):
             db.close()
     return redirect(url_for(redirect_to))
 
-def derive_user_reset_password(full_name):
+def derive_user_reset_password(full_name=None):
     """
-    Derives default reset password based on user's lastname + '123' (e.g. malagu123).
-    Supports formats:
-      - 'Lastname, Firstname' -> lastname123
-      - 'Firstname Lastname'  -> lastname123
+    Generates a secure, cryptographically random temporary password for administrative reset.
+    Complies with NIST SP 800-63B guidelines (high entropy, non-predictable).
+    Format: CCA-XXXX-XXXX (e.g., CCA-8F2B-4A19)
     """
-    import re
-    if not full_name or not full_name.strip():
-        return 'password123'
-    name = full_name.strip()
-    if ',' in name:
-        last_part = name.split(',')[0].strip()
-    else:
-        parts = name.split()
-        last_part = parts[-1].strip() if parts else 'password'
-    clean_last = re.sub(r'[^a-zA-Z0-9]', '', last_part).lower()
-    return f"{clean_last}123" if clean_last else 'password123'
+    import secrets
+    token = secrets.token_hex(4).upper()
+    return f"CCA-{token[:4]}-{token[4:]}"
 
 @app.route("/admin/reset_password/<int:user_id>", methods=["POST"])
 def admin_reset_password(user_id):
@@ -2070,12 +2191,13 @@ def admin_reset_password(user_id):
                 flash("User not found or not allowed.", "danger")
                 return redirect(url_for(redirect_to))
             
-            # Reset to lastname123 or provided custom password
+            # Reset to custom password or generate cryptographically random temporary password
             default_pw = request.form.get("new_password", "").strip() or derive_user_reset_password(user['full_name'])
             hashed = _bcrypt.hashpw(default_pw.encode(), _bcrypt.gensalt()).decode()
             c.execute("UPDATE users SET password = %s WHERE id = %s", (hashed, user_id))
             db.commit()
-            flash(f"Password for {user['full_name']} has been reset to '{default_pw}'.", "success")
+            log_audit_event('USER_PASSWORD_RESET', f"Admin reset password for user ID {user_id} ({user['full_name']})", user_id=session.get('user_id'), user_name=session.get('full_name'), user_role=session.get('role'), ip_address=request.remote_addr)
+            flash(f"Password for {user['full_name']} has been reset to temporary password: '{default_pw}'. Please provide this to the user.", "success")
         except Exception as e:
             flash(f"Error resetting password: {e}", "danger")
         finally:
@@ -2219,7 +2341,7 @@ def students_bulk_action():
                     hashed = _bcrypt.hashpw(pw.encode(), _bcrypt.gensalt()).decode()
                     c.execute("UPDATE users SET password = %s WHERE id = %s", (hashed, st['id']))
                 db.commit()
-                flash(f"Password reset to [lastname123] for {len(students)} student(s).", "success")
+                flash(f"Secure randomized temporary passwords generated for {len(students)} student(s).", "success")
             except Exception as e:
                 flash(f"Error resetting passwords: {e}", "danger")
             finally:
@@ -2584,7 +2706,7 @@ def add_reliever_route():
         flash("Select both exam and instructor.", "warning")
     return redirect(url_for('faculty_page'))
 
-@app.route("/relievers/remove/<int:id>")
+@app.route("/relievers/remove/<int:id>", methods=["POST"])
 def remove_reliever_route(id):
     guard = require_role('admin')
     if guard: return guard
@@ -2727,8 +2849,9 @@ def secretary_change_password():
     if not current_password or not new_password or not confirm_password:
         flash("All password fields are required.", "danger")
         return redirect(url_for('secretary_dashboard'))
-    if len(new_password) < 6:
-        flash("New password must be at least 6 characters.", "danger")
+    is_valid, err_msg = validate_password_strength(new_password)
+    if not is_valid:
+        flash(err_msg, "danger")
         return redirect(url_for('secretary_dashboard'))
     if new_password != confirm_password:
         flash("New passwords do not match.", "danger")
@@ -2864,8 +2987,9 @@ def change_my_password():
     if not current_password or not new_password or not confirm_password:
         flash("All password fields are required.", "danger")
         return get_redirect()
-    if len(new_password) < 6:
-        flash("New password must be at least 6 characters.", "danger")
+    is_valid, err_msg = validate_password_strength(new_password)
+    if not is_valid:
+        flash(err_msg, "danger")
         return get_redirect()
     if new_password != confirm_password:
         flash("New passwords do not match.", "danger")

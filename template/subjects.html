@@ -775,7 +775,7 @@
                 type: 'danger',
                 confirmText: '<i class="fa-solid fa-trash mr-1"></i> Delete Subject',
                 onConfirm: function() {
-                    window.location.href = '/subjects/' + id + '/delete';
+                    submitPostAction('/subjects/' + id + '/delete');
                 }
             });
         }

@@ -202,7 +202,7 @@
         </div>
     </main>
 
-    {% include 'change_password_modal.html' %}
+    {% if session.get('role') == 'student' %}{% include 'change_password_modal.html' %}{% endif %}
 
     <script>
         function openModal(id) {
@@ -235,10 +235,10 @@
         }
 
         function validateChangePw() {
-            const p1 = document.getElementById('cp_new').value;
-            const p2 = document.getElementById('cp_confirm').value;
-            const err = document.getElementById('cp_match_err');
-            if (p1 !== p2) {
+            const p1 = document.getElementById('ucp_new');
+            const p2 = document.getElementById('ucp_confirm');
+            const err = document.getElementById('ucp_match_err');
+            if (p1 && p2 && p1.value !== p2.value) {
                 if (err) err.classList.remove('hidden');
                 return false;
             }

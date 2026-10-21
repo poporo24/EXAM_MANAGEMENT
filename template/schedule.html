@@ -1573,31 +1573,7 @@
 </script>
 
 
-<script>
-function filterSchedule() {
-    const q = document.getElementById('searchSchedule').value.toLowerCase();
-    document.querySelectorAll('.exam-card').forEach(card => {
-        card.style.display = card.innerText.toLowerCase().includes(q) ? "" : "none";
-    });
-}
 
-        function showSaveConfirmation() {
-            // Check if Sync All is checked to give a stronger warning
-            const syncChecked = document.getElementById('sync_all_sections') && document.getElementById('sync_all_sections').checked;
-            const textEl = document.getElementById('saveConfirmText');
-            
-            if (syncChecked) {
-                textEl.innerHTML = "You are about to modify <b>ALL sections</b> of this subject simultaneously.<br><br>Are you sure you want to proceed?";
-                textEl.classList.add('text-orange-600');
-            } else {
-                textEl.innerHTML = "Are you sure you want to save these schedule changes?";
-                textEl.classList.remove('text-orange-600');
-            }
-            
-            document.getElementById('saveConfirmModal').classList.remove('hidden');
-        }
-
-</script>
 
     <!-- SAVE CONFIRMATION MODAL -->
     <div id="saveConfirmModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">

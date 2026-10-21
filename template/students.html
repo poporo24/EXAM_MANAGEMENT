@@ -648,11 +648,11 @@
         }
 
         function deriveLastnamePw(name) {
-            if (!name || !name.trim()) return 'password123';
-            let s = name.trim();
-            let last = s.includes(',') ? s.split(',')[0].trim() : s.split(/\s+/).pop().trim();
-            let clean = last.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-            return clean ? clean + '123' : 'password123';
+            const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+            let p1 = '', p2 = '';
+            for (let i = 0; i < 4; i++) p1 += chars.charAt(Math.floor(Math.random() * chars.length));
+            for (let i = 0; i < 4; i++) p2 += chars.charAt(Math.floor(Math.random() * chars.length));
+            return 'CCA-' + p1 + '-' + p2;
         }
 
         function confirmBulkResetPassword() {
@@ -673,7 +673,7 @@
             openStudentConfirmModal({
                 title: 'Bulk Reset Passwords',
                 message: 'Reset passwords for <strong>' + ids.length + '</strong> selected student(s)?',
-                sub: 'Each student\'s password will be set to their respective default <strong>[lastname123]</strong> (e.g. <em>malagu123</em>, <em>delacruz123</em>).',
+                sub: 'Each student\'s password will be regenerated with a cryptographically unique temporary credential (format: <strong>CCA-XXXX-XXXX</strong>).',
                 headerClass: 'bg-blue-600',
                 btnClass: 'bg-blue-600 hover:bg-blue-700',
                 iconClass: 'fa-solid fa-rotate-left',

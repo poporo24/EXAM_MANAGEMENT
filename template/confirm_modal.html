@@ -37,6 +37,14 @@
 (function() {
     let _sysConfirmCallback = null;
 
+    window.submitPostAction = function(url) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = url;
+        document.body.appendChild(form);
+        form.submit();
+    };
+
     window.closeSysConfirmModal = function() {
         const modal = document.getElementById('sysConfirmModal');
         if (modal) {

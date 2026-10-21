@@ -302,7 +302,7 @@
                 type: 'danger',
                 confirmText: '<i class="fa-solid fa-trash mr-1"></i> Delete Institute',
                 onConfirm: function() {
-                    window.location.href = '/institutes/' + id + '/delete';
+                    submitPostAction('/institutes/' + id + '/delete');
                 }
             });
         }

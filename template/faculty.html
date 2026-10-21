@@ -1024,7 +1024,7 @@ function confirmDeleteInstructor(id, name) {
         type: 'danger',
         confirmText: '<i class="fa-solid fa-trash mr-1"></i> Delete Instructor',
         onConfirm: function() {
-            window.location.href = '/delete_instructor/' + id;
+            submitPostAction('/delete_instructor/' + id);
         }
     });
 }
@@ -1037,7 +1037,7 @@ function confirmRemoveReliever(id, name) {
         type: 'danger',
         confirmText: '<i class="fa-solid fa-trash mr-1"></i> Remove Reliever',
         onConfirm: function() {
-            window.location.href = '/relievers/remove/' + id;
+            submitPostAction('/relievers/remove/' + id);
         }
     });
 }

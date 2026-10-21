@@ -1,40 +1,76 @@
 import mysql.connector
+from mysql.connector import pooling
 from datetime import datetime, timedelta
+import os, urllib.parse
+
+_db_pool = None
+
+def get_connection_pool():
+    global _db_pool
+    if _db_pool is None:
+        db_url = os.environ.get('DATABASE_URL')
+        pool_size = int(os.environ.get('DB_POOL_SIZE', 10))
+        try:
+            if db_url:
+                url = urllib.parse.urlparse(db_url)
+                _db_pool = pooling.MySQLConnectionPool(
+                    pool_name="cca_exam_pool",
+                    pool_size=pool_size,
+                    pool_reset_session=True,
+                    host=url.hostname,
+                    user=url.username,
+                    password=url.password,
+                    database=url.path[1:],
+                    port=url.port or 3306
+                )
+            else:
+                _db_pool = pooling.MySQLConnectionPool(
+                    pool_name="cca_exam_pool",
+                    pool_size=pool_size,
+                    pool_reset_session=True,
+                    host="127.0.0.1",
+                    user="root",
+                    password="",
+                    database="cca_exam_management_db"
+                )
+        except Exception as pool_err:
+            print(f"[DB Pool Init Notice] {pool_err}")
+            _db_pool = None
+    return _db_pool
 
 def open_db():
-    import os
-    import mysql.connector
-    
-    # Check if we are on Render (using Aiven remote DB)
-    db_url = os.environ.get('DATABASE_URL')
-    
-    if db_url:
-        # Connect using the remote URL (mysql://user:pass@host:port/dbname)
-        import urllib.parse
-        url = urllib.parse.urlparse(db_url)
+    """
+    Returns an active database connection from the connection pool with graceful fallback.
+    Pooled connections automatically return to the pool when db.close() is called.
+    """
+    pool = get_connection_pool()
+    if pool:
         try:
+            return pool.get_connection()
+        except Exception:
+            pass  # Fallback to direct connection if pool is exhausted under extreme bursts
+
+    db_url = os.environ.get('DATABASE_URL')
+    try:
+        if db_url:
+            url = urllib.parse.urlparse(db_url)
             return mysql.connector.connect(
                 host=url.hostname,
                 user=url.username,
                 password=url.password,
-                database=url.path[1:], # remove leading slash
+                database=url.path[1:],
                 port=url.port or 3306
             )
-        except mysql.connector.Error as err:
-            print(f"Remote DB Error: {err}")
-            return None
-    else:
-        # Local XAMPP connection
-        try:
+        else:
             return mysql.connector.connect(
                 host="127.0.0.1",
                 user="root",
                 password="",
                 database="cca_exam_management_db"
             )
-        except mysql.connector.Error as err:
-            print(f"Local DB Error: {err}")
-            return None
+    except mysql.connector.Error as err:
+        print(f"Database Connection Error: {err}")
+        return None
 
 def ensure_database_schema():
     """
@@ -80,11 +116,44 @@ def ensure_database_schema():
         if 'schedule_published_at' not in cols:
             cursor.execute("ALTER TABLE system_settings ADD COLUMN schedule_published_at DATETIME NULL")
 
+        # 3. Create audit_logs table for security compliance and non-repudiation
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                user_id INT NULL,
+                user_name VARCHAR(150) NULL,
+                user_role VARCHAR(50) NULL,
+                ip_address VARCHAR(45) NULL,
+                action VARCHAR(100) NOT NULL,
+                details TEXT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
+
         db.commit()
         return True, "Database schema is up to date."
     except Exception as e:
         print(f"ensure_database_schema notice: {e}")
         return False, str(e)
+    finally:
+        db.close()
+
+def log_audit_event(action, details=None, user_id=None, user_name=None, user_role=None, ip_address=None):
+    """
+    Logs security, administrative, and data modification events for compliance and non-repudiation.
+    Aligned with ISO/IEC 27001 A.8.15 and NIST SP 800-53 AU-2.
+    """
+    db = open_db()
+    if not db: return
+    try:
+        cursor = db.cursor()
+        cursor.execute("""
+            INSERT INTO audit_logs (user_id, user_name, user_role, ip_address, action, details)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (user_id, user_name, user_role, ip_address, action, details))
+        db.commit()
+    except Exception as e:
+        print(f"[Audit Log Notice] {e}")
     finally:
         db.close()
 
@@ -100,7 +169,7 @@ def get_system_settings():
     finally:
         db.close()
 
-def save_system_settings(day_start, day_end, slot_interval_min, max_proctor_hrs, travel_buffer_min, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from, smtp_use_tls, major_duration_hrs=2.0, minor_duration_hrs=1.0, max_daily_proctor_hrs=4.0):
+def save_system_settings(day_start, day_end, slot_interval_min, max_proctor_hrs, travel_buffer_min, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from, smtp_use_tls, major_duration_hrs=3.0, minor_duration_hrs=1.0, max_daily_proctor_hrs=4.0):
     db = open_db()
     if not db:
         return
@@ -362,7 +431,7 @@ def register_user(full_name, email, password, role, section=None, institute_id=N
         
         instructor_id = None
         if role == 'proctor':
-            cursor.execute("INSERT INTO instructors (name, status, institute_id, is_pwd, subjects_taught) VALUES (%s, 'Active', %s, 0, '')", (full_name, institute_id))
+            cursor.execute("INSERT INTO instructors (name, status, institute_id, is_pwd, subjects_taught) VALUES (%s, 'Inactive', %s, 0, '')", (full_name, institute_id))
             instructor_id = cursor.lastrowid
             
         cursor.execute(
@@ -452,14 +521,15 @@ def delete_user(id):
     if not db: return "DB connection error"
     try:
         cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT email FROM users WHERE id=%s", (id,))
+        cursor.execute("SELECT email, instructor_id, role FROM users WHERE id=%s", (id,))
         user = cursor.fetchone()
         if not user:
             return "User not found"
-        email = user['email']
         
-        cursor = db.cursor()
-        cursor.execute("DELETE FROM users WHERE id=%s", (id,))
+        cursor_w = db.cursor()
+        if user.get('instructor_id') and user.get('role') == 'proctor':
+            cursor_w.execute("DELETE FROM instructors WHERE id=%s", (user['instructor_id'],))
+        cursor_w.execute("DELETE FROM users WHERE id=%s", (id,))
         db.commit()
         return None
     except Exception as e:
@@ -504,6 +574,13 @@ def approve_student(user_id):
         cursor_r = db.cursor(dictionary=True)
         # Update for both students and proctors
         cursor.execute("UPDATE users SET is_active=1 WHERE id=%s AND role IN ('student', 'proctor')", (user_id,))
+        # Also activate instructor record if this user is a proctor
+        cursor.execute("""
+            UPDATE instructors i
+            JOIN users u ON u.instructor_id = i.id
+            SET i.status = 'Active'
+            WHERE u.id = %s AND u.role = 'proctor'
+        """, (user_id,))
         db.commit()
         
         # Notify via in-app and Email
@@ -548,13 +625,19 @@ def approve_student(user_id):
         db.close()
 
 def deactivate_student(user_id):
-    """Deactivate a student account (is_active=0) and notify them."""
+    """Deactivate a student or proctor account (is_active=0) and notify them."""
     db = open_db()
     if not db: return False
     try:
         cursor   = db.cursor()
         cursor_r = db.cursor(dictionary=True)
-        cursor.execute("UPDATE users SET is_active=0 WHERE id=%s AND role='student'", (user_id,))
+        cursor.execute("UPDATE users SET is_active=0 WHERE id=%s AND role IN ('student', 'proctor')", (user_id,))
+        cursor.execute("""
+            UPDATE instructors i
+            JOIN users u ON u.instructor_id = i.id
+            SET i.status = 'Inactive'
+            WHERE u.id = %s AND u.role = 'proctor'
+        """, (user_id,))
         db.commit()
         cursor_r.execute("SELECT full_name FROM users WHERE id=%s", (user_id,))
         row = cursor_r.fetchone()
@@ -947,7 +1030,7 @@ def bulk_import_exams(rows):
     if not db: return (0, ["DB Error"])
     # Load duration defaults from settings
     settings = get_system_settings()
-    major_min = int(float(settings.get('major_duration_hrs', 2)) * 60)
+    major_min = int(float(settings.get('major_duration_hrs', 3.0) or 3.0) * 60)
     minor_min = int(float(settings.get('minor_duration_hrs', 1)) * 60)
     success_count = 0
     error_list = []
@@ -2119,7 +2202,7 @@ def bulk_import_subjects(rows):
                     res = cursor.fetchone()
                     if res: institute_id = res[0]
                 cursor.execute("INSERT INTO subjects (name, code, institute_id, is_common, content_group_id) VALUES (%s, %s, %s, %s, %s)",
-                               (row.get('name'), row.get('code'), institute_id, row.get('is_common', 0), row.get('content_group')))
+                               (row.get('name'), row.get('code'), institute_id, row.get('is_common', 0), int(row.get('content_group')) if (row.get('content_group') is not None and str(row.get('content_group')).strip().isdigit()) else None))
                 success_count += 1
             except Exception as e:
                 error_list.append(f"Row {i+1}: {str(e)}")

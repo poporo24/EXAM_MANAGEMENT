@@ -530,7 +530,7 @@
                     </div>
 
                     <!-- Bulk delete form wraps table -->
-                    <form id="instructorBulkForm" action="/instructors/bulk_delete" method="POST">
+                    <form id="instructorBulkForm" action="/faculty/bulk_delete" method="POST">
 
                     <!-- Bulk action toolbar -->
                     <div id="instructorBulkToolbar" class="hidden px-6 py-3 bg-red-50 border-b border-red-200 flex items-center justify-between">
@@ -586,11 +586,11 @@
                                             <button onclick="openEditInstructorModal('{{ ins.id }}', '{{ ins.name }}', '{{ ins.institute_id }}', '{{ ins.building }}', '{{ ins.is_pwd }}')" class="text-blue-600 hover:text-blue-900 mr-3"><i class="fa-solid fa-edit"></i></button>
                                             
                                             {% if ins.status == 'Active' %}
-                                            <form action="/deactivate_instructor/{{ ins.id }}" method="POST" class="inline-block">
+                                            <form action="/faculty/{{ ins.id }}/deactivate" method="POST" class="inline-block">
                                                 <button type="submit" class="text-yellow-600 hover:text-yellow-900 mr-3" title="Deactivate"><i class="fa-solid fa-ban"></i></button>
                                             </form>
                                             {% else %}
-                                            <form action="/activate_instructor/{{ ins.id }}" method="POST" class="inline-block">
+                                            <form action="/faculty/{{ ins.id }}/activate" method="POST" class="inline-block">
                                                 <button type="submit" class="text-green-600 hover:text-green-900 mr-3" title="Activate"><i class="fa-solid fa-check-circle"></i></button>
                                             </form>
                                             {% endif %}
@@ -925,7 +925,7 @@
         }
 
         function openEditInstructorModal(id, name, inst_id, building, is_pwd) {
-            document.getElementById('editInstructorForm').action = '/edit_instructor/' + id;
+            document.getElementById('editInstructorForm').action = '/faculty/' + id + '/edit';
             document.getElementById('edit_inst_name').value = name;
             document.getElementById('edit_inst_building').value = building !== 'None' ? building : '';
             document.getElementById('edit_inst_institute').value = inst_id;
@@ -986,8 +986,8 @@
 
         // ── Auto-fill duration based on subject type ─────────────────────────
         const durationDefaults = {
-            'Major': {{ settings.major_duration_hrs|default('2.0') }},
-            'Lecture': {{ settings.major_duration_hrs|default('2.0') }},
+            'Major': {{ settings.major_duration_hrs|default('3.0') }},
+            'Lecture': {{ settings.major_duration_hrs|default('3.0') }},
             'Minor': {{ settings.minor_duration_hrs|default('1.0') }},
             'Laboratory': {{ settings.minor_duration_hrs|default('1.0') }}
         };
@@ -1218,20 +1218,28 @@
         if (cb) cb();
     });
 
+    function submitPostAction(url) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = url;
+        document.body.appendChild(form);
+        form.submit();
+    }
+
     function confirmDeleteExam(url) {
         warnConfirm({ title: 'Delete Exam', message: 'Are you sure you want to delete this exam?',
             sub: 'This will also remove any associated schedule and records. This cannot be undone.',
-            type: 'danger', confirmText: 'Yes, Delete Exam', onConfirm: () => window.location.href = url });
+            type: 'danger', confirmText: 'Yes, Delete Exam', onConfirm: () => submitPostAction(url) });
     }
     function confirmDeleteRoom(url) {
         warnConfirm({ title: 'Delete Room', message: 'Are you sure you want to delete this room?',
             sub: 'Any exams scheduled in this room will lose their room assignment. This cannot be undone.',
-            type: 'danger', confirmText: 'Yes, Delete Room', onConfirm: () => window.location.href = url });
+            type: 'danger', confirmText: 'Yes, Delete Room', onConfirm: () => submitPostAction(url) });
     }
     function confirmDeleteInstructor(url) {
         warnConfirm({ title: 'Delete Instructor / Proctor', message: 'Are you sure you want to delete this instructor?',
             sub: 'Their proctor account and all exam assignments will be affected. This cannot be undone.',
-            type: 'danger', confirmText: 'Yes, Delete Instructor', onConfirm: () => window.location.href = url });
+            type: 'danger', confirmText: 'Yes, Delete Instructor', onConfirm: () => submitPostAction(url) });
     }
     function confirmBulkDeleteExams() {
         const count = document.querySelectorAll('.exam-row-checkbox:checked').length;

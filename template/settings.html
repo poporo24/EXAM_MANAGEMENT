@@ -152,7 +152,7 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">Major Subject Duration (Hours)</label>
-                                <input type="number" name="major_duration_hrs" value="{{ settings.major_duration_hrs|default('2.0') }}" min="0.5" step="0.5" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                                <input type="number" name="major_duration_hrs" value="{{ settings.major_duration_hrs|default('3.0') }}" min="0.5" step="0.5" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
                                 <p class="text-xs text-gray-500 mt-1">Default duration for Major / Lecture subjects.</p>
                             </div>
                             <div>
@@ -269,60 +269,6 @@
         </div>
         </div>
     </main>
-
-    <!-- Save Settings Confirmation Modal -->
-    <div id="saveConfirmModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
-        <div class="flex items-center justify-center min-h-screen px-4">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="closeSaveModal()"></div>
-            <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden z-10">
-                <div class="bg-amber-600 px-6 py-4 flex items-center justify-between">
-                    <h3 class="text-lg font-semibold text-white">System Changes Warning</h3>
-                    <button onclick="closeSaveModal()" class="text-white hover:text-amber-200 focus:outline-none">&times;</button>
-                </div>
-                
-                <div class="p-6">
-                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 flex items-start gap-3">
-                        <i class="fa-solid fa-triangle-exclamation text-red-600 mt-1"></i>
-                        <div>
-                            <h4 class="text-sm font-bold text-red-800">Global Impact Warning</h4>
-                            <p class="text-xs text-red-700 mt-1">
-                                Saving these settings will alter core system parameters. 
-                                Changes to Exam Duration Defaults will automatically update the duration of <b>ALL existing exams</b> in the database.
-                            </p>
-                        </div>
-                    </div>
-
-                    <p class="text-sm text-gray-600">
-                        Are you sure you want to apply these changes? This action may affect current exam schedules and instructor assignments.
-                    </p>
-                </div>
-
-                <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
-                    <button onclick="closeSaveModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-                    <button onclick="submitSettings()" class="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700">Yes, Apply Changes</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        function openSaveModal() {
-            // Check form validity before showing modal
-            if (!document.getElementById('settingsForm').checkValidity()) {
-                document.getElementById('settingsForm').reportValidity();
-                return;
-            }
-            document.getElementById('saveConfirmModal').classList.remove('hidden');
-        }
-
-        function closeSaveModal() {
-            document.getElementById('saveConfirmModal').classList.add('hidden');
-        }
-
-        function submitSettings() {
-            document.getElementById('settingsForm').submit();
-        }
-    </script>
 
 <script>
     function togglePassword(btn) {

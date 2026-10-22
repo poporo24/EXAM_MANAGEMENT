@@ -8,7 +8,13 @@ from flask import (Flask, render_template, session, redirect, url_for,
 from flask_mail import Mail, Message as MailMessage
 from datetime import date, datetime, timedelta
 from collections import defaultdict
-import io, os
+import io, os, time
+os.environ['TZ'] = 'Asia/Manila'
+if hasattr(time, 'tzset'):
+    try:
+        time.tzset()
+    except Exception:
+        pass
 
 import secrets
 from datetime import datetime, timedelta
@@ -1395,64 +1401,11 @@ def schedule_view():
         else:
             unscheduled.append(exam)
 
-    # Detect conflicts
-    conflict_ids = set()
-    conflict_reasons = {}   # exam_id -> set of reason strings
-    def _add_conflict(eid, reason):
-        conflict_ids.add(eid)
-        conflict_reasons.setdefault(eid, set()).add(reason)
-
-    for i, a in enumerate(scheduled_exams):
-        end_a = a['_dt'] + timedelta(minutes=a['duration_minutes'] or 60)
-        for b in scheduled_exams[i+1:]:
-            end_b = b['_dt'] + timedelta(minutes=b['duration_minutes'] or 60)
-            overlaps = a['_dt'] < end_b and b['_dt'] < end_a
-            # Room conflict: same room, overlapping time
-            if overlaps and a.get('room_id') and a['room_id'] == b.get('room_id'):
-                _add_conflict(a['id'], 'room'); _add_conflict(b['id'], 'room')
-            # Proctor conflict: same instructor/proctor, overlapping time
-            if overlaps and a.get('instructor_id') and a['instructor_id'] == b.get('instructor_id'):
-                _add_conflict(a['id'], 'proctor'); _add_conflict(b['id'], 'proctor')
-            # Section conflict: same section sitting two different exams at the same time OR less than 1 hour break
-            sec_a = (a.get('section') or '').strip()
-            sec_b = (b.get('section') or '').strip()
-            if sec_a and sec_a == sec_b:
-                a_buf_start = a['_dt'] - timedelta(hours=1)
-                a_buf_end = end_a + timedelta(hours=1)
-                if a_buf_start < end_b and b['_dt'] < a_buf_end:
-                    _add_conflict(a['id'], 'section'); _add_conflict(b['id'], 'section')
-            # Subject conflict: same subject scheduled at different times
-            subj_a = (a.get('subject_name') or '').strip().lower()
-            subj_b = (b.get('subject_name') or '').strip().lower()
-            if subj_a and subj_a == subj_b and a['_dt'] != b['_dt']:
-                _add_conflict(a['id'], 'subject'); _add_conflict(b['id'], 'subject')
-
-    # â”€â”€ Per-section daily limit violations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    # Group scheduled exams by (section, date)
-    from collections import defaultdict as _dd
-    sec_day_exams = _dd(list)   # (section, date_str) -> [exam, ...]
-    for exam in scheduled_exams:
-        sec = (exam.get('section') or '').strip()
-        if sec:
-            sec_day_exams[(sec, exam['_date_str'])].append(exam)
-
-    for (sec, day), exams in sec_day_exams.items():
-        major_exams = [e for e in exams if (e.get('subject_type') or 'Major') == 'Major']
-        minor_exams = [e for e in exams if (e.get('subject_type') or 'Major') != 'Major']
-        n_maj = len(major_exams)
-        n_min = len(minor_exams)
-        # Minor slots allowed = 4 - major count
-        minor_limit = 4 - n_maj
-        if n_maj > 3:
-            for e in exams: _add_conflict(e['id'], 'daily_major')
-        if n_min > minor_limit:
-            for e in exams: _add_conflict(e['id'], 'daily_minor')
-        if len(exams) > 4:
-            for e in exams: _add_conflict(e['id'], 'daily_total')
-
-    # Convert sets to sorted lists for template consumption
-    conflict_reasons = {k: sorted(v) for k, v in conflict_reasons.items()}
-    conflict_ids = sorted(list(conflict_ids))
+    # Unified conflict audit synchronized with validator
+    from system.database import audit_schedule_conflicts
+    conflict_audit = audit_schedule_conflicts()
+    conflict_ids = conflict_audit.get('conflict_exam_ids', [])
+    conflict_reasons = conflict_audit.get('conflict_reasons', {})
 
     # Unique sections for dropdown filter
     all_sections = sorted(list(set(e.get('section', '').strip() for e in all_exams if e.get('section', '').strip())))
@@ -1482,6 +1435,7 @@ def schedule_view():
     institutes = get_all_institutes()
     unread     = _get_unread(session['user_id'])
     return render_template("schedule.html",
+                           conflict_audit=conflict_audit,
                            timetable=timetable,
                            dates=dates_set,
                            date_labels=date_labels,

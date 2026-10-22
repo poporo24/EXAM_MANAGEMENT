@@ -21,7 +21,8 @@ def get_connection_pool():
                     user=url.username,
                     password=url.password,
                     database=url.path[1:],
-                    port=url.port or 3306
+                    port=url.port or 3306,
+                    time_zone='+08:00'
                 )
             else:
                 _db_pool = pooling.MySQLConnectionPool(
@@ -32,7 +33,8 @@ def get_connection_pool():
                     user=os.environ.get('DB_USER', "root"),
                     password=os.environ.get('DB_PASSWORD', ""),
                     database=os.environ.get('DB_NAME', "cca_exam_management_db"),
-                    port=int(os.environ.get('DB_PORT', 3306))
+                    port=int(os.environ.get('DB_PORT', 3306)),
+                    time_zone='+08:00'
                 )
         except Exception as pool_err:
             print(f"[DB Pool Init Notice] {pool_err}")
@@ -60,7 +62,8 @@ def open_db():
                 user=url.username,
                 password=url.password,
                 database=url.path[1:],
-                port=url.port or 3306
+                port=url.port or 3306,
+                time_zone='+08:00'
             )
         else:
             return mysql.connector.connect(
@@ -68,7 +71,8 @@ def open_db():
                 user=os.environ.get('DB_USER', "root"),
                 password=os.environ.get('DB_PASSWORD', ""),
                 database=os.environ.get('DB_NAME', "cca_exam_management_db"),
-                port=int(os.environ.get('DB_PORT', 3306))
+                port=int(os.environ.get('DB_PORT', 3306)),
+                time_zone='+08:00'
             )
     except mysql.connector.Error as err:
         print(f"Database Connection Error: {err}")
@@ -1761,8 +1765,8 @@ def apply_exam_edit(exam_id, new_room_id, new_instructor_id, new_datetime_str, s
             sister_ids = [r['id'] for r in cursor_r.fetchall()]
 
         cursor.execute(
-            "UPDATE exams SET room_id=%s, instructor_id=%s, exam_date_time=%s, status='Scheduled' WHERE id=%s",
-            (new_room_id, new_instructor_id, new_dt, exam_id)
+            "UPDATE exams SET room_id=%s, instructor_id=%s, instructor_name=(SELECT name FROM instructors WHERE id=%s), exam_date_time=%s, status='Scheduled' WHERE id=%s",
+            (new_room_id, new_instructor_id, new_instructor_id, new_dt, exam_id)
         )
         
         if sync_all and sister_ids:
@@ -3654,3 +3658,305 @@ def sync_archive_durations(archive_id=None):
     finally:
         db.close()
 
+
+
+def audit_schedule_conflicts(db=None):
+    """
+    Scans the live database for any scheduling anomalies:
+    - Room Double-Bookings
+    - Proctor Double-Bookings
+    - Section Collisions (student section taking 2 exams at once)
+    - Subject Desynchronization (sister sections taking same subject at different times)
+    - Section 1-Hour Break Buffer Violations (<1 hour between exams)
+    - Academic Integrity Violations (proctor teaching their own subject)
+    - Section Daily Overloads (>3 exams or >2 majors in a day)
+    - Proctor Daily Overloads (>8 hours in a day)
+    """
+    from datetime import datetime as _dt, timedelta as _td
+    from collections import defaultdict
+    import re
+    
+    close_when_done = False
+    if db is None:
+        db = open_db()
+        close_when_done = True
+        
+    if not db:
+        return {
+            'is_clean': True,
+            'total_exams': 0,
+            'total_conflicts_count': 0,
+            'conflict_exam_ids': [],
+            'conflict_reasons': {},
+            'room_conflicts': [],
+            'proctor_conflicts': [],
+            'section_conflicts': [],
+            'subject_conflicts': [],
+            'break_conflicts': [],
+            'integrity_conflicts': [],
+            'section_overloads': [],
+            'proctor_overloads': []
+        }
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT e.id, e.subject_name, e.section, e.subject_type, e.duration_minutes, e.exam_date_time,
+                   e.room_id, r.room_name,
+                   e.instructor_id, COALESCE(inst.name, e.instructor_name, 'TBA') as instructor_name,
+                   inst.subjects_taught
+            FROM exams e
+            LEFT JOIN rooms r ON e.room_id = r.id
+            LEFT JOIN instructors inst ON e.instructor_id = inst.id
+            WHERE e.status = 'Scheduled' AND e.exam_date_time IS NOT NULL
+            ORDER BY e.exam_date_time ASC
+        """)
+        rows = cursor.fetchall()
+        cursor.close()
+    finally:
+        if close_when_done:
+            db.close()
+
+    total_exams = len(rows)
+    if total_exams == 0:
+        return {
+            'is_clean': True,
+            'total_exams': 0,
+            'total_conflicts_count': 0,
+            'conflict_exam_ids': [],
+            'conflict_reasons': {},
+            'room_conflicts': [],
+            'proctor_conflicts': [],
+            'section_conflicts': [],
+            'subject_conflicts': [],
+            'break_conflicts': [],
+            'integrity_conflicts': [],
+            'section_overloads': [],
+            'proctor_overloads': []
+        }
+
+    records = []
+    for r in rows:
+        st = r['exam_date_time']
+        dur_mins = int(r.get('duration_minutes') or (120 if r.get('subject_type') == 'Major' else 60))
+        end = st + _td(minutes=dur_mins)
+        records.append({
+            'id': r['id'],
+            'subject': (r.get('subject_name') or 'Unknown').strip(),
+            'section': (r.get('section') or '').strip(),
+            'type': r.get('subject_type') or 'Major',
+            'room_id': r.get('room_id'),
+            'room_name': r.get('room_name') or f"Room {r.get('room_id')}",
+            'instructor_id': r.get('instructor_id'),
+            'instructor_name': r.get('instructor_name') or 'TBA',
+            'subjects_taught': r.get('subjects_taught') or '',
+            'start': st,
+            'end': end,
+            'dur_hours': dur_mins / 60.0,
+            'date': st.date()
+        })
+
+    room_conflicts = []
+    proctor_conflicts = []
+    section_conflicts = []
+    subject_conflicts = []
+    break_conflicts = []
+    integrity_conflicts = []
+    conflict_exam_ids = set()
+    conflict_reasons = defaultdict(list)
+
+    # 1. Subject Desynchronization Check (sister sections taking same course at different times)
+    subj_groups = defaultdict(list)
+    for r in records:
+        norm_subj = re.sub(r'\s+', '', r['subject'].upper())
+        if norm_subj:
+            subj_groups[norm_subj].append(r)
+
+    for norm_subj, s_records in subj_groups.items():
+        if len(s_records) > 1:
+            times_map = defaultdict(list)
+            for r in s_records:
+                times_map[r['start']].append(r)
+            if len(times_map) > 1:
+                for r in s_records:
+                    conflict_exam_ids.add(r['id'])
+                    if 'subject' not in conflict_reasons[r['id']]:
+                        conflict_reasons[r['id']].append('subject')
+                s_name = s_records[0]['subject']
+                details_list = [f"{r['section']} at {r['start'].strftime('%b %d %I:%M %p')}" for r in s_records]
+                subject_conflicts.append({
+                    'subject': s_name,
+                    'count': len(s_records),
+                    'details': ", ".join(details_list),
+                    'reason': f"Subject '{s_name}' is split across {len(times_map)} different exam times ({', '.join(details_list)}). All sections of the same course must be held at the same time."
+                })
+
+    # 2. Academic Integrity Check: Proctor teaching their own course
+    for r in records:
+        if r['instructor_id'] and r['subjects_taught'] and r['subject']:
+            subs = {s.strip().lower() for s in re.split(r'[,|;]', r['subjects_taught']) if s.strip()}
+            s_low = r['subject'].lower()
+            if s_low in subs or any(s_low == sub or sub in s_low for sub in subs):
+                conflict_exam_ids.add(r['id'])
+                if 'proctor' not in conflict_reasons[r['id']]:
+                    conflict_reasons[r['id']].append('proctor')
+                integrity_conflicts.append({
+                    'exam_id': r['id'],
+                    'proctor': r['instructor_name'],
+                    'subject': r['subject'],
+                    'section': r['section'],
+                    'date': r['date'].strftime('%b %d, %Y'),
+                    'time': f"{r['start'].strftime('%I:%M %p')} - {r['end'].strftime('%I:%M %p')}",
+                    'reason': f"Instructor '{r['instructor_name']}' teaches '{r['subject']}' and is prohibited from proctoring this course."
+                })
+
+    # 3. Pairwise collisions: Room & Proctor double-bookings, Section clashes & break buffer
+    for i in range(len(records)):
+        r1 = records[i]
+        for j in range(i + 1, len(records)):
+            r2 = records[j]
+
+            # Time interval overlap
+            has_overlap = (r1['start'] < r2['end'] and r1['end'] > r2['start'])
+
+            # Room collision (strictly concurrent)
+            if has_overlap and r1['room_id'] and r2['room_id'] and r1['room_id'] == r2['room_id']:
+                conflict_exam_ids.add(r1['id'])
+                conflict_exam_ids.add(r2['id'])
+                if 'room' not in conflict_reasons[r1['id']]: conflict_reasons[r1['id']].append('room')
+                if 'room' not in conflict_reasons[r2['id']]: conflict_reasons[r2['id']].append('room')
+                room_conflicts.append({
+                    'room': r1['room_name'],
+                    'date': r1['date'].strftime('%b %d, %Y'),
+                    'time': f"{r1['start'].strftime('%I:%M %p')} - {r1['end'].strftime('%I:%M %p')}",
+                    'exam1': f"{r1['subject']} ({r1['section']})",
+                    'exam2': f"{r2['subject']} ({r2['section']})"
+                })
+
+            # Proctor collision (strictly concurrent)
+            if has_overlap and r1['instructor_id'] and r2['instructor_id'] and r1['instructor_id'] == r2['instructor_id']:
+                conflict_exam_ids.add(r1['id'])
+                conflict_exam_ids.add(r2['id'])
+                if 'proctor' not in conflict_reasons[r1['id']]: conflict_reasons[r1['id']].append('proctor')
+                if 'proctor' not in conflict_reasons[r2['id']]: conflict_reasons[r2['id']].append('proctor')
+                proctor_conflicts.append({
+                    'proctor': r1['instructor_name'],
+                    'date': r1['date'].strftime('%b %d, %Y'),
+                    'time': f"{r1['start'].strftime('%I:%M %p')} - {r1['end'].strftime('%I:%M %p')}",
+                    'room1': r1['room_name'],
+                    'room2': r2['room_name'],
+                    'exam1': f"{r1['subject']} ({r1['section']})",
+                    'exam2': f"{r2['subject']} ({r2['section']})"
+                })
+
+            # Section collision (strictly concurrent or <1hr break)
+            if r1['section'] and r2['section'] and r1['section'].lower() == r2['section'].lower():
+                if has_overlap:
+                    conflict_exam_ids.add(r1['id'])
+                    conflict_exam_ids.add(r2['id'])
+                    if 'section' not in conflict_reasons[r1['id']]: conflict_reasons[r1['id']].append('section')
+                    if 'section' not in conflict_reasons[r2['id']]: conflict_reasons[r2['id']].append('section')
+                    section_conflicts.append({
+                        'section': r1['section'],
+                        'date': r1['date'].strftime('%b %d, %Y'),
+                        'time': f"{r1['start'].strftime('%I:%M %p')} - {r1['end'].strftime('%I:%M %p')}",
+                        'exam1': r1['subject'],
+                        'exam2': r2['subject']
+                    })
+                elif r1['date'] == r2['date']:
+                    # Check break buffer between exams on same day
+                    gap_mins = None
+                    if r2['start'] >= r1['end']:
+                        gap_mins = int((r2['start'] - r1['end']).total_seconds() / 60)
+                    elif r1['start'] >= r2['end']:
+                        gap_mins = int((r1['start'] - r2['end']).total_seconds() / 60)
+                    if gap_mins is not None and gap_mins < 60:
+                        conflict_exam_ids.add(r1['id'])
+                        conflict_exam_ids.add(r2['id'])
+                        if 'section' not in conflict_reasons[r1['id']]: conflict_reasons[r1['id']].append('section')
+                        if 'section' not in conflict_reasons[r2['id']]: conflict_reasons[r2['id']].append('section')
+                        break_conflicts.append({
+                            'section': r1['section'],
+                            'date': r1['date'].strftime('%b %d, %Y'),
+                            'exam1': f"{r1['subject']} ({r1['start'].strftime('%I:%M %p')})",
+                            'exam2': f"{r2['subject']} ({r2['start'].strftime('%I:%M %p')})",
+                            'gap': gap_mins,
+                            'reason': f"Section '{r1['section']}' has only {gap_mins} mins break between '{r1['subject']}' and '{r2['subject']}' (Minimum 1 hour break required)."
+                        })
+
+    # 4. Section daily limits (>3 exams or >2 majors in a day)
+    sec_daily = defaultdict(lambda: defaultdict(list))
+    for r in records:
+        if r['section']:
+            sec_daily[r['section']][r['date']].append(r)
+
+    section_overloads = []
+    for sec, days in sec_daily.items():
+        for d, exs in days.items():
+            tot = len(exs)
+            maj = sum(1 for e in exs if e['type'] == 'Major')
+            if tot > 3:
+                for e in exs:
+                    conflict_exam_ids.add(e['id'])
+                    if 'daily_total' not in conflict_reasons[e['id']]: conflict_reasons[e['id']].append('daily_total')
+                section_overloads.append({
+                    'section': sec,
+                    'date': d.strftime('%b %d, %Y'),
+                    'reason': f"{tot} exams on this day (maximum 3 permitted)"
+                })
+            elif maj > 2:
+                for e in exs:
+                    conflict_exam_ids.add(e['id'])
+                    if 'daily_major' not in conflict_reasons[e['id']]: conflict_reasons[e['id']].append('daily_major')
+                section_overloads.append({
+                    'section': sec,
+                    'date': d.strftime('%b %d, %Y'),
+                    'reason': f"{maj} major exams on this day (maximum 2 permitted)"
+                })
+
+    # 5. Proctor daily limits (>8.0 hours in a day)
+    proctor_daily = defaultdict(lambda: defaultdict(float))
+    for r in records:
+        if r['instructor_id']:
+            proctor_daily[(r['instructor_id'], r['instructor_name'])][r['date']] += r['dur_hours']
+
+    proctor_overloads = []
+    for (i_id, i_name), days in proctor_daily.items():
+        for d, hrs in days.items():
+            if hrs > 8.0:
+                for r in records:
+                    if r['instructor_id'] == i_id and r['date'] == d:
+                        conflict_exam_ids.add(r['id'])
+                        if 'daily_total' not in conflict_reasons[r['id']]: conflict_reasons[r['id']].append('daily_total')
+                proctor_overloads.append({
+                    'proctor': i_name,
+                    'date': d.strftime('%b %d, %Y'),
+                    'hours': round(hrs, 1),
+                    'reason': f"{round(hrs, 1)} hours assigned today (maximum 8.0 hours permitted)"
+                })
+
+    tot_conflicts = (
+        len(room_conflicts) +
+        len(proctor_conflicts) +
+        len(section_conflicts) +
+        len(subject_conflicts) +
+        len(break_conflicts) +
+        len(integrity_conflicts) +
+        len(section_overloads) +
+        len(proctor_overloads)
+    )
+
+    return {
+        'is_clean': tot_conflicts == 0,
+        'total_exams': total_exams,
+        'total_conflicts_count': tot_conflicts,
+        'conflict_exam_ids': sorted(list(conflict_exam_ids)),
+        'conflict_reasons': dict(conflict_reasons),
+        'room_conflicts': room_conflicts,
+        'proctor_conflicts': proctor_conflicts,
+        'section_conflicts': section_conflicts,
+        'subject_conflicts': subject_conflicts,
+        'break_conflicts': break_conflicts,
+        'integrity_conflicts': integrity_conflicts,
+        'section_overloads': section_overloads,
+        'proctor_overloads': proctor_overloads
+    }

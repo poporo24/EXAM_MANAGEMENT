@@ -393,17 +393,26 @@
     </style>
 
     <style>
-        /* Mobile Responsive Overrides */
-        @media screen and (max-width: 768px) {
-            #sidebar { width: 4rem !important; z-index: 50; }
-            #main-content { margin-left: 4rem !important; width: calc(100% - 4rem) !important; }
-            .nav-text { display: none !important; }
-            
-            /* Responsive table scroll handled by wrapper */
-            .overflow-x-auto { width: 100% !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
-            
-            /* Make modals scrollable if they overflow */
-            .fixed.inset-0 > div { padding: 1rem; overflow-y: auto; max-height: 100vh; }
+                /* Mobile & Tablet Responsive Overrides */
+        @media screen and (max-width: 1023px) {
+            #main-content {
+                margin-left: 0 !important;
+                width: 100% !important;
+                min-width: 0 !important;
+            }
+            .overflow-x-auto {
+                width: 100% !important;
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+            }
+            .fixed.inset-0 > div {
+                padding: 1rem !important;
+                overflow-y: auto !important;
+                max-height: 100vh !important;
+            }
+            input, select, textarea {
+                font-size: 16px !important;
+            }
         }
     </style>
 
@@ -449,7 +458,7 @@
 
         <!-- Top header -->
         <header class="no-print bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
-            <h1 class="text-xl font-semibold text-gray-800">Master Schedule — Timetable</h1>
+            <h1 class="text-xl font-semibold text-gray-800">Master Schedule &mdash; Timetable</h1>
             <div class="flex items-center gap-4">
                 <a href="/notifications" class="text-gray-500 hover:text-[#668054] relative">
                     <i class="fa-regular fa-bell text-xl"></i>
@@ -463,6 +472,94 @@
         </header>
 
         <div class="px-4 sm:px-6 lg:px-8 py-6">
+
+            <!-- Live Automated Conflict Verification Card (TOP OF PAGE) -->
+            {% if conflict_audit %}
+                {% if conflict_audit.is_clean and conflict_audit.total_exams > 0 %}
+                <div class="no-print bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-xl flex-shrink-0">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 class="font-bold text-emerald-900 text-sm">Schedule is 100% Conflict-Free</h3>
+                                <span class="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Verified Clean</span>
+                            </div>
+                            <p class="text-xs text-emerald-700 mt-0.5">
+                                Automated Validation Check: <strong>0 Room Collisions</strong> &bull; <strong>0 Proctor Double-Bookings</strong> &bull; <strong>0 Section Clashes</strong> &bull; <strong>0 Subject Desyncs</strong> &bull; <strong>0 Daily Overloads</strong> ({{ conflict_audit.total_exams }} scheduled sessions verified)
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-emerald-700 border border-emerald-200 shadow-2xs">
+                            <i class="fa-solid fa-shield-check text-emerald-500 mr-1.5"></i> Ready for Examination
+                        </span>
+                    </div>
+                </div>
+                {% elif conflict_audit.total_conflicts_count > 0 %}
+                <div class="no-print bg-red-50 border border-red-200 rounded-xl p-4 mb-6 shadow-xs">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold text-xl flex-shrink-0">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-red-900 text-sm">Attention: {{ conflict_audit.total_conflicts_count }} Scheduling Conflict(s) Detected</h3>
+                                <p class="text-xs text-red-700 mt-0.5">
+                                    {{ conflict_audit.room_conflicts|length }} room double-bookings, {{ conflict_audit.proctor_conflicts|length }} proctor overlaps, {{ conflict_audit.section_conflicts|length }} section collisions{% if conflict_audit.subject_conflicts %}, {{ conflict_audit.subject_conflicts|length }} subject timing desyncs{% endif %}{% if conflict_audit.break_conflicts %}, {{ conflict_audit.break_conflicts|length }} break buffer violations{% endif %}{% if conflict_audit.integrity_conflicts %}, {{ conflict_audit.integrity_conflicts|length }} academic integrity violations{% endif %}{% if conflict_audit.section_overloads %}, {{ conflict_audit.section_overloads|length }} daily overloads{% endif %}{% if conflict_audit.proctor_overloads %}, {{ conflict_audit.proctor_overloads|length }} proctor overloads{% endif %}.
+                                </p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="document.getElementById('conflictDetailsBoxTop').classList.toggle('hidden')" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors">
+                            <i class="fa-solid fa-list-check mr-1"></i> Toggle Conflict Details
+                        </button>
+                    </div>
+                    <div id="conflictDetailsBoxTop" class="hidden mt-3 pt-3 border-t border-red-200 space-y-2 max-h-60 overflow-y-auto text-xs">
+                        {% for subc in conflict_audit.subject_conflicts %}
+                        <div class="p-2 bg-white rounded border border-red-200 text-red-800 flex justify-between items-center">
+                            <span><i class="fa-solid fa-book-bookmark mr-1 text-red-500"></i> <strong>Subject Desynchronization</strong>: {{ subc.reason }}</span>
+                        </div>
+                        {% endfor %}
+                        {% for bc in conflict_audit.break_conflicts %}
+                        <div class="p-2 bg-white rounded border border-red-200 text-red-800 flex justify-between items-center">
+                            <span><i class="fa-solid fa-hourglass-half mr-1 text-red-500"></i> <strong>Insufficient Break</strong> on {{ bc.date }}: {{ bc.reason }}</span>
+                        </div>
+                        {% endfor %}
+                        {% for rc in conflict_audit.room_conflicts %}
+                        <div class="p-2 bg-white rounded border border-red-200 text-red-800 flex justify-between items-center">
+                            <span><i class="fa-solid fa-door-open mr-1 text-red-500"></i> <strong>Room {{ rc.room }}</strong> double-booked on {{ rc.date }} at {{ rc.time }}: {{ rc.exam1 }} vs {{ rc.exam2 }}</span>
+                        </div>
+                        {% endfor %}
+                        {% for sc in conflict_audit.section_conflicts %}
+                        <div class="p-2 bg-white rounded border border-red-200 text-red-800 flex justify-between items-center">
+                            <span><i class="fa-solid fa-users mr-1 text-red-500"></i> <strong>Section {{ sc.section }}</strong> double-booked on {{ sc.date }} at {{ sc.time }}: {{ sc.exam1 }} vs {{ sc.exam2 }}</span>
+                        </div>
+                        {% endfor %}
+                        {% for pc in conflict_audit.proctor_conflicts %}
+                        <div class="p-2 bg-white rounded border border-red-200 text-red-800 flex justify-between items-center">
+                            <span><i class="fa-solid fa-user-tie mr-1 text-red-500"></i> <strong>Proctor {{ pc.proctor }}</strong> assigned to 2 rooms on {{ pc.date }} at {{ pc.time }}: {{ pc.room1 }} vs {{ pc.room2 }}</span>
+                        </div>
+                        {% endfor %}
+                        {% for ic in conflict_audit.integrity_conflicts %}
+                        <div class="p-2 bg-white rounded border border-red-200 text-red-800 flex justify-between items-center">
+                            <span><i class="fa-solid fa-graduation-cap mr-1 text-red-500"></i> <strong>Academic Integrity</strong> on {{ ic.date }} at {{ ic.time }}: {{ ic.reason }}</span>
+                        </div>
+                        {% endfor %}
+                        {% for so in conflict_audit.section_overloads %}
+                        <div class="p-2 bg-white rounded border border-red-200 text-red-800 flex justify-between items-center">
+                            <span><i class="fa-solid fa-clock mr-1 text-red-500"></i> <strong>Section {{ so.section }}</strong> on {{ so.date }}: {{ so.reason }}</span>
+                        </div>
+                        {% endfor %}
+                        {% for po in conflict_audit.proctor_overloads %}
+                        <div class="p-2 bg-white rounded border border-red-200 text-red-800 flex justify-between items-center">
+                            <span><i class="fa-solid fa-clock mr-1 text-red-500"></i> <strong>Proctor {{ po.proctor }}</strong> on {{ po.date }}: {{ po.reason }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            {% endif %}
 
             <!-- Flash messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -720,12 +817,16 @@
                     <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Unscheduled</p>
                     <p class="text-2xl font-bold {% if unscheduled|length > 0 %}text-red-500{% else %}text-gray-400{% endif %} mt-1">{{ unscheduled|length }}</p>
                 </div>
-                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 {% if conflict_ids|length > 0 %}cursor-pointer hover:border-orange-300 hover:shadow-md transition-all{% endif %}"
-                     {% if conflict_ids|length > 0 %}onclick="document.getElementById('conflictSummary').scrollIntoView({behavior:'smooth'})" title="Click to view all conflicts"{% endif %}>
+                <div class="bg-white rounded-xl border shadow-sm p-4 transition-all {% if conflict_audit.total_conflicts_count > 0 %}border-red-300 bg-red-50/20 cursor-pointer hover:shadow-md{% else %}border-gray-200{% endif %}"
+                     {% if conflict_audit.total_conflicts_count > 0 %}onclick="const b = document.getElementById('conflictDetailsBoxTop'); if(b){b.classList.remove('hidden'); b.scrollIntoView({behavior:'smooth'});}" title="Click to view all conflicts"{% endif %}>
                     <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Conflicts</p>
-                    <p class="text-2xl font-bold {% if conflict_ids|length > 0 %}text-orange-500{% else %}text-gray-400{% endif %} mt-1">
-                        {{ conflict_ids|length }}
-                        {% if conflict_ids|length > 0 %}<span class="text-xs font-normal text-orange-400 ml-1">↓ view</span>{% endif %}
+                    <p class="text-2xl font-bold {% if conflict_audit.total_conflicts_count > 0 %}text-red-500{% else %}text-emerald-600{% endif %} mt-1">
+                        {{ conflict_audit.total_conflicts_count }}
+                        {% if conflict_audit.total_conflicts_count > 0 %}
+                        <span class="text-xs font-normal text-red-500 ml-1"><i class="fa-solid fa-arrow-down mr-0.5"></i>view</span>
+                        {% else %}
+                        <span class="text-xs font-normal text-emerald-600 ml-1"><i class="fa-solid fa-check mr-0.5"></i>clean</span>
+                        {% endif %}
                     </p>
                 </div>
             </div>
@@ -754,6 +855,8 @@
                 </div>
             </div>
             
+                        
+
             <div class="timetable-wrapper mb-8">
 
                 <div class="overflow-x-auto w-full"><table class="timetable">

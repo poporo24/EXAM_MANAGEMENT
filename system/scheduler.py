@@ -248,11 +248,14 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
         dur_hrs = dur / 60.0
         # Multi-tier relaxation: Try strict major limit and daily hour limit first.
         # If no slot is found satisfying the tight constraints, relax slightly so no exam is left unscheduled.
+        target_min_hrs = float(settings.get('target_min_proctor_hrs') or 4.0)
+        # Multi-tier relaxation: Try strict major limit and baseline target (4-5 hrs) first.
+        # If no slot is found, expand daily hours up to the 8.0 hour workday ceiling.
         limit_tiers = [
-            (2, max_daily_hrs),
-            (3, max_daily_hrs),
-            (3, max_daily_hrs + 2.0),
-            (3, max(max_daily_hrs + 4.0, 8.0))
+            (2, target_min_hrs),          # Tier 1: Strict 2 majors, soft target 4.0 hrs
+            (2, target_min_hrs + 1.0),    # Tier 2: Strict 2 majors, soft target 5.0 hrs
+            (3, target_min_hrs + 2.5),    # Tier 3: 3 majors, 6.5 hrs
+            (3, 8.0)                      # Tier 4: 3 majors, maximum 8.0 hrs ceiling
         ]
         for major_limit, allowed_daily_hrs in limit_tiers:
             if placed_group: break

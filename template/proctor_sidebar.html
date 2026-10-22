@@ -16,47 +16,115 @@
         min-width: 0;
         max-width: 100%;
     }
-    /* Immediate collapsed state */
-    html.sidebar-collapsed #sidebar {
-        width: 4rem !important;
+
+    /* Desktop View (>= 1024px) */
+    @media screen and (min-width: 1024px) {
+        #sidebar {
+            transform: translateX(0) !important;
+        }
+        #sidebarBackdrop {
+            display: none !important;
+        }
+        /* Desktop collapsed state */
+        html.sidebar-collapsed #sidebar {
+            width: 4rem !important;
+        }
+        html.sidebar-collapsed #main-content {
+            margin-left: 4rem !important;
+        }
+        html.sidebar-collapsed .nav-text {
+            display: none !important;
+        }
+        html.sidebar-collapsed .sidebar-header-container {
+            justify-content: center !important;
+        }
+        html.sidebar-collapsed .sidebar-header-container > div.nav-text,
+        html.sidebar-collapsed .sidebar-header-container > div:first-child {
+            display: none !important;
+        }
+        html.sidebar-collapsed #sidebar .sidebar-footer {
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+        }
+        html.sidebar-collapsed #sidebar .user-profile-row {
+            justify-content: center !important;
+        }
+        html.sidebar-collapsed #sidebar .sidebar-footer a,
+        html.sidebar-collapsed #sidebar .sidebar-footer button {
+            justify-content: center !important;
+        }
     }
-    html.sidebar-collapsed #main-content {
-        margin-left: 4rem !important;
-    }
-    html.sidebar-collapsed .nav-text {
-        display: none !important;
-    }
-    html.sidebar-collapsed .sidebar-header-container {
-        justify-content: center !important;
-    }
-    html.sidebar-collapsed .sidebar-header-container > div.nav-text,
-    html.sidebar-collapsed .sidebar-header-container > div:first-child {
-        display: none !important;
-    }
-    html.sidebar-collapsed #sidebar .sidebar-footer {
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-    }
-    html.sidebar-collapsed #sidebar .user-profile-row {
-        justify-content: center !important;
-    }
-    html.sidebar-collapsed #sidebar .sidebar-footer a,
-    html.sidebar-collapsed #sidebar .sidebar-footer button {
-        justify-content: center !important;
+
+    /* Mobile & Tablet Mode (< 1024px) */
+    @media screen and (max-width: 1023px) {
+        #sidebar {
+            position: fixed !important;
+            top: 0 !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            width: 280px !important;
+            max-width: 82vw !important;
+            height: 100vh !important;
+            z-index: 9999 !important;
+            transform: translateX(-100%) !important;
+            transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35) !important;
+        }
+        #sidebar.mobile-drawer-open {
+            transform: translateX(0) !important;
+        }
+        #sidebar .nav-text {
+            display: inline-block !important;
+        }
+        #sidebar .sidebar-header-container > div.nav-text,
+        #sidebar .sidebar-header-container > div:first-child {
+            display: flex !important;
+        }
+        #main-content {
+            margin-left: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        header {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+        }
+        header h1 {
+            font-size: 1.15rem !important;
+        }
+        /* Form inputs: prevent iOS auto-zoom */
+        input, select, textarea {
+            font-size: 16px !important;
+        }
+        /* Smooth table scrolling */
+        .overflow-x-auto {
+            width: 100% !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+        }
     }
 </style>
 
 <!-- Sidebar -->
-<aside id="sidebar" class="no-print bg-white border-r border-gray-200 fixed h-full w-64 sidebar-transition z-20 flex flex-col">
+<!-- Mobile Drawer Backdrop Overlay -->
+<div id="sidebarBackdrop" onclick="closeMobileSidebar()" class="fixed inset-0 bg-gray-900/60 z-[9998] hidden transition-opacity lg:hidden" title="Tap to close menu"></div>
+
+<aside id="sidebar" class="no-print bg-white border-r border-gray-200 fixed h-screen w-64 sidebar-transition z-20 flex flex-col overflow-hidden">
     <div class="h-16 w-full flex items-center justify-between px-4 border-b border-gray-200 sidebar-header-container">
         <div class="flex-1 flex items-center gap-3 overflow-hidden whitespace-nowrap nav-text">
             <i class="fa-solid fa-graduation-cap text-2xl text-[#668054]"></i>
             <span class="font-bold text-lg">CCA Exams</span>
         </div>
-        <button onclick="toggleSidebar()" class="text-gray-500 hover:text-[#668054] focus:outline-none" title="Toggle Sidebar">
+        <!-- Desktop Collapse Toggle -->
+        <button type="button" onclick="toggleSidebar()" class="hidden lg:flex text-gray-500 hover:text-[#668054] focus:outline-none p-1.5 rounded-lg hover:bg-gray-100 transition-colors" title="Toggle Sidebar">
             <i class="fa-solid fa-bars text-xl"></i>
         </button>
+        <!-- Mobile Drawer Close Button -->
+        <button type="button" onclick="closeMobileSidebar()" class="lg:hidden text-gray-500 hover:text-red-500 focus:outline-none p-1.5 rounded-lg hover:bg-gray-100 transition-colors" title="Close Menu">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
     </div>
+
 
     <nav class="flex-1 overflow-y-auto py-4 space-y-1">
         <a href="/proctor" class="flex items-center px-4 py-3 group {% if active_page == 'proctor' %}bg-green-50 text-[#668054] border-r-4 border-[#668054]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#668054]{% endif %}" title="My Exams">
@@ -166,6 +234,61 @@
             document.documentElement.classList.remove('sidebar-collapsed');
         }
     });
+
+    // Mobile Drawer Controls
+    function openMobileSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebarBackdrop');
+        if (sidebar) sidebar.classList.add('mobile-drawer-open');
+        if (backdrop) backdrop.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    }
+
+    function closeMobileSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebarBackdrop');
+        if (sidebar) sidebar.classList.remove('mobile-drawer-open');
+        if (backdrop) backdrop.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    }
+
+    // Auto-insert mobile hamburger menu button into page <header>
+    document.addEventListener('DOMContentLoaded', () => {
+        const header = document.querySelector('header');
+        if (header && !header.querySelector('.mobile-hamburger-btn')) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'mobile-hamburger-btn lg:hidden p-2 -ml-2 mr-2 text-gray-600 hover:text-[#668054] hover:bg-gray-100 rounded-lg focus:outline-none transition-colors flex items-center justify-center flex-shrink-0';
+            btn.onclick = openMobileSidebar;
+            btn.title = 'Open Menu';
+            btn.innerHTML = '<i class="fa-solid fa-bars text-xl"></i>';
+
+            const leftContainer = header.firstElementChild;
+            const titleEl = header.querySelector('h1, h2, .page-title');
+            if (titleEl && titleEl.parentElement === header) {
+                const titleWrapper = document.createElement('div');
+                titleWrapper.className = 'flex items-center gap-2 min-w-0';
+                header.insertBefore(titleWrapper, titleEl);
+                titleWrapper.appendChild(btn);
+                titleWrapper.appendChild(titleEl);
+            } else if (leftContainer && leftContainer.classList.contains('flex')) {
+                leftContainer.insertBefore(btn, leftContainer.firstChild);
+            } else {
+                header.insertBefore(btn, header.firstChild);
+            }
+        }
+        // Auto-close mobile drawer when any link is tapped
+        document.querySelectorAll('#sidebar nav a').forEach(a => {
+            a.addEventListener('click', () => {
+                if (window.innerWidth < 1024) closeMobileSidebar();
+            });
+        });
+    });
+
+    window.addEventListener('resize', () => {
+        if (window.innerWidth >= 1024) closeMobileSidebar();
+    });
+
 </script>
 
 {% include 'change_password_modal.html' %}

@@ -343,6 +343,7 @@
                                 <i class="fa-solid fa-file-csv mr-2 text-[#668054]"></i> Import CSV
                             </button>
                             <form id="deleteAllExamsForm" action="/delete_all_exams" method="POST" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 <button type="button" onclick="confirmDeleteAllExams()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700">
                                     <i class="fa-solid fa-trash-can mr-2"></i> Delete All
                                 </button>
@@ -355,6 +356,7 @@
 
                     <!-- Bulk delete form wraps the table -->
                     <form id="examBulkDeleteForm" action="/exams/bulk_delete" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
                     <!-- Bulk action toolbar (hidden until rows selected) -->
                     <div id="examBulkToolbar" class="hidden px-6 py-3 bg-red-50 border-b border-red-200 flex items-center justify-between">
@@ -437,6 +439,7 @@
                     </div>
                     <!-- Bulk delete form wraps the table -->
                     <form id="roomBulkDeleteForm" action="/rooms/bulk_delete" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
                     <!-- Floating bulk-action toolbar (hidden until items checked) -->
                     <div id="roomBulkToolbar" class="hidden px-6 py-3 bg-red-50 border-b border-red-200 flex items-center justify-between transition-all">
@@ -531,6 +534,7 @@
 
                     <!-- Bulk delete form wraps table -->
                     <form id="instructorBulkForm" action="/faculty/bulk_delete" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
                     <!-- Bulk action toolbar -->
                     <div id="instructorBulkToolbar" class="hidden px-6 py-3 bg-red-50 border-b border-red-200 flex items-center justify-between">
@@ -587,10 +591,12 @@
                                             
                                             {% if ins.status == 'Active' %}
                                             <form action="/faculty/{{ ins.id }}/deactivate" method="POST" class="inline-block">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                                 <button type="submit" class="text-yellow-600 hover:text-yellow-900 mr-3" title="Deactivate"><i class="fa-solid fa-ban"></i></button>
                                             </form>
                                             {% else %}
                                             <form action="/faculty/{{ ins.id }}/activate" method="POST" class="inline-block">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                                 <button type="submit" class="text-green-600 hover:text-green-900 mr-3" title="Activate"><i class="fa-solid fa-check-circle"></i></button>
                                             </form>
                                             {% endif %}
@@ -626,6 +632,7 @@
                             <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Add New Exam</h3>
                             <div class="mt-4">
                                 <form action="/add_exam" method="POST" id="addExamForm" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
                                     <div>
                                         <label for="section" class="block text-sm font-medium text-gray-700">Section</label>
@@ -680,6 +687,7 @@
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Add New Room</h3>
                     <form action="/add_room" method="POST" id="addRoomForm" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Room Name</label>
                             <input type="text" name="room_name" required class="mt-1 focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
@@ -729,6 +737,7 @@
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Edit Room</h3>
                     <form id="editRoomForm" method="POST" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Room Name</label>
                             <input type="text" name="room_name" id="edit_room_name" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
@@ -778,6 +787,7 @@
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Add New Instructor</h3>
                     <form action="/add_instructor" method="POST" id="addInstructorForm" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Full Name</label>
                             <input type="text" name="name" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
@@ -817,6 +827,7 @@
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Edit Instructor</h3>
                     <form id="editInstructorForm" method="POST" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Full Name</label>
                             <input type="text" name="name" id="edit_inst_name" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
@@ -1051,6 +1062,7 @@
 
                 <!-- Upload form -->
                 <form action="/import/rooms" method="POST" enctype="multipart/form-data" class="space-y-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <input type="file" name="csv_file" accept=".csv" required
                         class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-[#668054] hover:file:bg-green-100 border border-gray-200 rounded-lg p-2">
                     <button type="submit" class="w-full py-2.5 text-sm font-semibold text-white bg-[#668054] hover:bg-[#4e7038] rounded-lg transition-colors">
@@ -1102,6 +1114,7 @@
 
                 <!-- Upload form -->
                 <form action="/import/instructors" method="POST" enctype="multipart/form-data" class="space-y-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <input type="file" name="csv_file" accept=".csv" required
                         class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-[#668054] hover:file:bg-green-100 border border-gray-200 rounded-lg p-2">
                     <button type="submit" class="w-full py-2.5 text-sm font-semibold text-white bg-[#668054] hover:bg-[#4e7038] rounded-lg transition-colors">
@@ -1153,6 +1166,7 @@
 
                 <!-- Upload form -->
                 <form action="/import/exams" method="POST" enctype="multipart/form-data" class="space-y-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <input type="file" name="csv_file" accept=".csv" required
                         class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-[#668054] hover:file:bg-green-100 border border-gray-200 rounded-lg p-2">
                     <button type="submit" class="w-full py-2.5 text-sm font-semibold text-white bg-[#668054] hover:bg-[#4e7038] rounded-lg transition-colors">

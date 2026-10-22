@@ -140,6 +140,7 @@
             <div class="flex items-center gap-2.5">
                 {% if session.get('role') in ['admin', 'super_admin'] %}
                 <form id="syncDurationsForm" action="/admin/archives/{{ archive.id }}/sync_durations" method="POST" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <button type="button" onclick="confirmSyncDurations()" class="text-xs font-semibold px-3 py-2 border border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg shadow-xs flex items-center gap-1.5 transition cursor-pointer" title="Sync durations and recalculate end times with current settings">
                         <i class="fa-solid fa-arrows-rotate text-emerald-600"></i> Sync Durations
                     </button>
@@ -165,7 +166,7 @@
             <p class="text-xs text-gray-500">Official Historical Examination Record &bull; Archived on {{ archive.archived_at.strftime('%B %d, %Y') if archive.archived_at else '' }}</p>
         </div>
 
-        <div class="p-8 max-w-7xl mx-auto space-y-6">
+        <div class="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
             <!-- Flash Messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}

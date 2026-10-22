@@ -157,7 +157,9 @@ def ensure_database_schema():
     finally:
         db.close()
 
-def log_audit_event(action, details=None, user_id=None, user_name=None, user_role=None, ip_address=None):
+def log_audit_event(action, details=None, user_id=None, user_name=None, user_role=None, ip_address=None, **kwargs):
+    if not user_role and 'role' in kwargs:
+        user_role = kwargs['role']
     """
     Logs security, administrative, and data modification events for compliance and non-repudiation.
     Aligned with ISO/IEC 27001 A.8.15 and NIST SP 800-53 AU-2.

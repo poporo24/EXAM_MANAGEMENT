@@ -771,6 +771,7 @@
                     </div>
 
                     <form id="absenceForm" action="/proctor/report_absence" method="POST" onsubmit="event.preventDefault(); showAbsenceConfirmation();">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <input type="hidden" name="exam_id" id="absence_exam_id">
                         <div>
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">

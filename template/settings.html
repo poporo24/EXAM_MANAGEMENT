@@ -80,7 +80,7 @@
             </div>
         </header>
 
-        <div class="p-8 max-w-4xl">
+        <div class="px-4 sm:px-6 lg:px-8 py-6">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     <div class="mb-6">
@@ -97,6 +97,7 @@
             <div class="space-y-8">
                 <!-- Scheduling Settings -->
                 <form method="POST" action="/settings/save" class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <input type="hidden" name="section" value="scheduling">
                     <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                         <h2 class="font-semibold text-gray-800">Scheduling Engine Settings</h2>
@@ -143,6 +144,7 @@
 
                 <!-- Exam Duration Defaults -->
                 <form method="POST" action="/settings/save" class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <input type="hidden" name="section" value="duration">
                     <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                         <h2 class="font-semibold text-gray-800">Exam Duration Defaults</h2>
@@ -171,6 +173,7 @@
 
                 <!-- Email / SMTP Settings -->
                 <form method="POST" action="/settings/save" class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <input type="hidden" name="section" value="smtp">
                     <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                         <h2 class="font-semibold text-gray-800">Email & SMTP Settings</h2>
@@ -222,6 +225,7 @@
                       </div>
                       <div class="p-6">
                           <form method="POST" action="/change_my_password" class="space-y-4 max-w-md">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                               <input type="hidden" name="redirect_to" value="settings_page">
                               <div>
                                   <label class="block text-sm font-medium text-gray-700">Current Password</label>
@@ -256,6 +260,7 @@
                 </div>
                 <div class="p-6">
                     <form method="POST" action="/settings/test_email" class="flex flex-col sm:flex-row gap-4 items-end">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="flex-grow">
                             <label class="block text-sm font-medium text-gray-700">Test Recipient Email</label>
                             <input type="email" name="test_to" required placeholder="test@example.com" class="mt-1 focus:ring-blue-500 block w-full sm:text-sm border-gray-300 rounded-md border p-2">

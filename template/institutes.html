@@ -145,7 +145,7 @@
             <h1 class="text-xl font-semibold text-gray-800">Institute Management</h1>
         </header>
 
-        <div class="p-8">
+        <div class="px-4 sm:px-6 lg:px-8 py-6">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     <div class="mb-6">
@@ -224,6 +224,7 @@
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Add New Institute</h3>
                     <form action="/institutes/add" method="POST" id="addInstForm" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Name</label>
                             <input type="text" name="name" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
@@ -255,6 +256,7 @@
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Edit Institute</h3>
                     <form id="editInstForm" method="POST" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Name</label>
                             <input type="text" name="name" id="edit_inst_name" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">

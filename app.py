@@ -2412,7 +2412,8 @@ def admin_archive_delete(archive_id):
             f"Super Admin {session.get('full_name')} permanently deleted historical snapshot archive '{archive_title}' (ID #{archive_id}).",
             ip_address=request.remote_addr,
             user_id=session.get('user_id'),
-            role=session.get('role')
+            user_role=session.get('role'),
+            user_name=session.get('full_name')
         )
         flash(msg, "success")
     else:

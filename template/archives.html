@@ -76,7 +76,7 @@
             </div>
         </header>
 
-        <div class="p-8 max-w-7xl mx-auto space-y-6">
+        <div class="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
             <!-- Flash Messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -318,6 +318,7 @@
             </div>
             
             <form action="/admin/archives/create" method="POST" class="p-6 space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-900 flex items-start gap-2.5">
                     <i class="fa-solid fa-circle-info text-amber-600 mt-0.5 flex-shrink-0"></i>
                     <p>
@@ -387,6 +388,7 @@
                 Are you sure you want to delete <strong id="deleteArchiveTitle" class="text-gray-800"></strong>? This will permanently remove the historical record.
             </p>
             <form id="deleteArchiveForm" method="POST" class="mt-5 flex items-center justify-center gap-2.5">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <button type="button" onclick="closeDeleteArchiveModal()" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-50 transition">
                     Cancel
                 </button>

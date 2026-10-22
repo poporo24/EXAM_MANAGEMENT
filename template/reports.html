@@ -150,7 +150,7 @@
             </div>
         </header>
 
-        <div class="p-8">
+        <div class="px-4 sm:px-6 lg:px-8 py-6">
             <!-- Tabs -->
             <div class="border-b border-gray-200 mb-6">
                 <nav class="-mb-px flex space-x-8" aria-label="Tabs">
@@ -179,6 +179,7 @@
                         <div class="flex gap-2">
                             {% if session.role == 'admin' %}
                             <form id="clearAbsenceForm" action="/reports/clear_absence" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 <button type="button" onclick="confirmClearAbsenceReports()" class="inline-flex items-center px-4 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 cursor-pointer">
                                     <i class="fa-solid fa-trash mr-2"></i> Delete All
                                 </button>

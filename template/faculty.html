@@ -276,6 +276,7 @@
 
                 <!-- Bulk delete form wraps table -->
                 <form id="facultyBulkForm" action="/faculty/bulk_delete" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
                 <!-- Bulk action toolbar -->
                 <div id="facultyBulkToolbar" class="hidden px-6 py-3 bg-gray-50 border-b border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -356,10 +357,12 @@
                                             <button type="button" onclick="openEditInstructorModal('{{ ins.id }}', '{{ ins.name|escape }}', '{{ ins.institute_id }}', '{{ ins.building|escape }}', '{{ ins.is_pwd }}', '{{ ins.subjects_taught|escape|default('') }}')" class="text-blue-600 hover:text-blue-800 transition-colors cursor-pointer" title="Edit Instructor"><i class="fa-solid fa-edit text-sm"></i></button>
                                             {% if ins.status == 'Active' %}
                                             <form action="/faculty/{{ ins.id }}/deactivate" method="POST" class="inline-block m-0 p-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                                 <button type="submit" class="text-amber-600 hover:text-amber-800 transition-colors cursor-pointer" title="Deactivate"><i class="fa-solid fa-ban text-sm"></i></button>
                                             </form>
                                             {% else %}
                                             <form action="/faculty/{{ ins.id }}/activate" method="POST" class="inline-block m-0 p-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                                 <button type="submit" class="text-green-600 hover:text-green-800 transition-colors cursor-pointer" title="Activate"><i class="fa-solid fa-check-circle text-sm"></i></button>
                                             </form>
                                             {% endif %}
@@ -434,6 +437,7 @@
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Add New Instructor</h3>
                     <form action="/add_instructor" method="POST" id="addInstructorForm" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">Last Name</label>
@@ -487,6 +491,7 @@
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Edit Instructor</h3>
                     <form id="editInstructorForm" method="POST" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">Last Name</label>
@@ -545,6 +550,7 @@
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Assign Reliever</h3>
                     <form action="/relievers/add" method="POST" id="addRelieverForm" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Select Exam</label>
                             <select name="exam_id" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
@@ -686,6 +692,7 @@
 
                 <!-- Upload form -->
                 <form action="/import/instructors" method="POST" enctype="multipart/form-data" class="space-y-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <input type="file" name="csv_file" accept=".csv" required
                         class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-[#668054] hover:file:bg-green-100 border border-gray-200 rounded-lg p-2">
                     <button type="submit" class="w-full py-2.5 text-sm font-semibold text-white bg-[#668054] hover:bg-[#4e7038] rounded-lg transition-colors">
@@ -733,6 +740,7 @@
                 </div>
 
                 <form id="bulkAvailabilityForm" action="/admin/bulk_proctor_availability" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <!-- Hidden Container for Selected Instructor IDs -->
                     <div id="bulkFacultyIdsContainer"></div>
 

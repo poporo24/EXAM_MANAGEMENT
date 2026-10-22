@@ -128,7 +128,7 @@
             {% endif %}
         </header>
 
-        <div class="p-8 max-w-4xl mx-auto">
+        <div class="px-4 sm:px-6 lg:px-8 py-6">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     <div class="mb-6">
@@ -146,11 +146,13 @@
                 {% if notifications and notifications|length > 0 %}
                 <div class="flex items-center gap-4">
                     <form action="/notifications/mark_all_read" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" class="text-sm font-medium text-[#668054] hover:text-[#829c74]">
                             <i class="fa-solid fa-check-double mr-1"></i> Mark All as Read
                         </button>
                     </form>
                     <form id="clearNotifsForm" action="/notifications/clear_all" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="button" class="text-sm font-medium text-red-600 hover:text-red-800 cursor-pointer" onclick="confirmClearAllNotifs()">
                             <i class="fa-solid fa-trash mr-1"></i> Clear All
                         </button>

@@ -410,6 +410,28 @@ def unlink_subject_content_group(subject_id):
     finally:
         db.close()
 
+def check_subjects_section_overlap(subject_ids):
+    """Returns the name of a section if multiple subjects in subject_ids share that section."""
+    if not subject_ids or len(subject_ids) < 2:
+        return None
+    db = open_db()
+    if not db: return None
+    try:
+        cursor = db.cursor(dictionary=True)
+        placeholders = ','.join(['%s'] * len(subject_ids))
+        cursor.execute(f'''
+            SELECT section, COUNT(DISTINCT subject_id) as sub_cnt
+            FROM exams
+            WHERE subject_id IN ({placeholders}) AND section IS NOT NULL AND TRIM(section) != ''
+            GROUP BY section
+            HAVING sub_cnt > 1
+            LIMIT 1
+        ''', tuple(subject_ids))
+        row = cursor.fetchone()
+        return row['section'] if row else None
+    finally:
+        db.close()
+
 def get_common_subjects():
     db = open_db()
     if not db: return []

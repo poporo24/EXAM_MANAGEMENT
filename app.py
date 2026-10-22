@@ -21,7 +21,7 @@ from system.database import (
     get_all_institutes, add_institute, edit_institute, delete_institute,
     # subjects
     get_all_subjects, get_subjects_by_institute, add_subject, edit_subject,
-    delete_subject, link_subjects_content_group, unlink_subject_content_group,
+    delete_subject, link_subjects_content_group, unlink_subject_content_group, check_subjects_section_overlap,
     get_common_subjects,
     get_subject_content_groups, bulk_import_subjects,
     # users
@@ -827,10 +827,16 @@ def generate_schedule():
         )
         settings = get_system_settings() # reload
 
-    pending     = get_pending_exams()
+    if request.form.get("regenerate_all"):
+        reset_schedule()
+        booked = []
+        pending = get_pending_exams()
+    else:
+        pending     = get_pending_exams()
+        booked      = get_already_scheduled_slots()
+
     rooms       = get_all_rooms()
     instructors = get_active_instructors()
-    booked      = get_already_scheduled_slots()
     proctor_av  = get_proctor_availability()
     settings    = get_system_settings()
 
@@ -841,7 +847,7 @@ def generate_schedule():
         flash(" No active instructors found.", "warning")
         return redirect(url_for('schedule_view'))
     if not pending:
-        flash(" No pending exams to schedule.", "info")
+        flash("All exams are already scheduled. Check 'Fresh Regeneration' to wipe and recreate a fresh schedule from scratch.", "info")
         return redirect(url_for('schedule_view'))
 
     result = run_scheduler(
@@ -1741,7 +1747,11 @@ def link_content_route():
     # Link all selected subjects into one group by chaining pairwise links
     for i in range(1, len(unique_ids)):
         link_subjects_content_group(unique_ids[0], unique_ids[i])
-    flash(f"{len(unique_ids)} subjects linked as identical content.", "success")
+    clash_sec = check_subjects_section_overlap(unique_ids)
+    if clash_sec:
+        flash(f"{len(unique_ids)} subjects linked. Note: Section '{clash_sec}' is enrolled in multiple of these subjects. To prevent student exam collisions, overlapping subjects will be placed into separate time slots.", "info")
+    else:
+        flash(f"{len(unique_ids)} subjects linked as identical content (will be scheduled simultaneously in the same slot).", "success")
     return redirect(url_for('subjects_page'))
 
 @app.route("/subjects/<int:id>/unlink")
@@ -2099,26 +2109,66 @@ def import_exams():
         return redirect(url_for('dashboard') + '#exams')
     from system.importer import parse_exams_csv
     rows, parse_errors = parse_exams_csv(f.read())
-    institutes = {i['code'].upper(): i['id'] for i in get_all_institutes() if i and i.get('code')}
-    subjects_by_code = {s['code'].upper(): s for s in get_all_subjects() if s and s.get('code')}
+    institutes = {i['code'].upper().strip(): i['id'] for i in get_all_institutes() if i and i.get('code')}
+    all_subs = get_all_subjects()
+    subjects_by_code = {s['code'].upper().strip(): s for s in all_subs if s and s.get('code')}
+    subjects_by_name = {s['name'].upper().strip(): s for s in all_subs if s and s.get('name')}
     
+    new_subjects_created = 0
     for r in rows:
-        code = r.pop('institute_code', '').upper()
-        r['institute_id'] = institutes.get(code)
+        inst_code = (r.pop('institute_code', '') or '').upper().strip()
+        r['institute_id'] = institutes.get(inst_code)
         
-        subj_code = (r.pop('subject_code', '') or '').upper()
-        subj = subjects_by_code.get(subj_code)
+        subj_code = (r.pop('subject_code', '') or '').strip()
+        subj_name = (r.get('subject_name', '') or subj_code).strip()
+        
+        # 1. Match by code or by name (case-insensitive)
+        subj = None
+        if subj_code:
+            subj = subjects_by_code.get(subj_code.upper())
+        if not subj and subj_name:
+            subj = subjects_by_name.get(subj_name.upper())
+        if not subj and subj_code:
+            subj = subjects_by_name.get(subj_code.upper())
+            
+        # 2. If subject doesn't exist yet, auto-create it so it immediately reflects in Subject Management!
+        if not subj and (subj_name or subj_code):
+            c_name = subj_name or subj_code
+            c_code = subj_code or c_name
+            db_conn = open_db()
+            if db_conn:
+                try:
+                    c_cur = db_conn.cursor(dictionary=True)
+                    c_cur.execute(
+                        "INSERT INTO subjects (name, code, institute_id, is_common, content_group_id) VALUES (%s, %s, %s, 0, NULL)",
+                        (c_name, c_code, r.get('institute_id'))
+                    )
+                    db_conn.commit()
+                    new_id = c_cur.lastrowid
+                    subj = {'id': new_id, 'name': c_name, 'code': c_code}
+                    new_subjects_created += 1
+                finally:
+                    db_conn.close()
+            if subj:
+                if c_code: subjects_by_code[c_code.upper()] = subj
+                if c_name: subjects_by_name[c_name.upper()] = subj
+        
         if subj:
             r['subject_id'] = subj['id']
             r['subject_name'] = subj['name']
         else:
             r['subject_id'] = None
-            r['subject_name'] = r.get('subject_name') or subj_code # Fallback to CSV name, or code
+            r['subject_name'] = subj_name or subj_code
 
     ok, errors = bulk_import_exams(rows)
+    msg = f"Imported {ok} exam(s)."
+    if new_subjects_created > 0:
+        msg += f" {new_subjects_created} new subject(s) automatically added to Subject Management."
+    if errors:
+        msg += f" {len(errors)} exam(s) skipped."
+    flash(msg, "success" if not errors else "warning")
     if parse_errors:
         flash(f"Parse warnings: {'; '.join(parse_errors)}", "warning")
-    flash(f"Imported {ok} exam(s). {len(errors)} skipped.", "success" if not errors else "warning")
     return redirect(url_for('dashboard') + '#exams')
 
 @app.route("/exams/bulk_delete", methods=["POST"])

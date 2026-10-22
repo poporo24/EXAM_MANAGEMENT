@@ -97,6 +97,10 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
             lock_key = subj
         if dt and lock_key and lock_key not in subject_locked_slot:
             subject_locked_slot[lock_key] = dt
+        if dt and cg_id and s_id:
+            sub_lock_key = f"cg_{cg_id}_s_{s_id}"
+            if sub_lock_key not in subject_locked_slot:
+                subject_locked_slot[sub_lock_key] = dt
 
     exam_dates = []
     cur = period_start
@@ -105,18 +109,39 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
         cur += timedelta(days=1)
 
     # Group by: content_group_id (highest priority) → subject_id → subject_name
-    # This ensures all sections of the same subject are scheduled at the same time.
+    # When subjects are linked into a content group:
+    # - If all sections across linked subjects are disjoint (e.g. ENVISCI and GENDSOC),
+    #   all sections are scheduled simultaneously in the exact same slot.
+    # - If linked subjects share common sections (e.g. 6ADPROG and 6DATAS both taken by C101),
+    #   students cannot take two exams at the same time. Partition by subject so every subject
+    #   gets scheduled safely without dropping any exams!
+    raw_cg_groups = OrderedDict()
     subject_groups = OrderedDict()
     for exam in pending_exams:
         cg_id = exam.get('content_group_id')
         subj_id = exam.get('subject_id')
         if cg_id:
-            key = f"cg_{cg_id}"
+            raw_cg_groups.setdefault(cg_id, []).append(exam)
         elif subj_id:
             key = f"sid_{subj_id}"
+            subject_groups.setdefault(key, []).append(exam)
         else:
             key = (exam.get('subject_name') or '').strip().lower()
-        subject_groups.setdefault(key, []).append(exam)
+            subject_groups.setdefault(key, []).append(exam)
+
+    for cg_id, exams_in_cg in raw_cg_groups.items():
+        sec_list = [e.get('section').strip() for e in exams_in_cg if e.get('section') and e.get('section').strip()]
+        if len(sec_list) == len(set(sec_list)):
+            subject_groups[f"cg_{cg_id}"] = exams_in_cg
+        else:
+            # Overlapping sections inside this alias group:
+            # Partition by subject_id so each individual subject is scheduled in its own slot
+            by_subj = OrderedDict()
+            for ex in exams_in_cg:
+                sid = ex.get('subject_id') or (ex.get('subject_name') or '').strip().lower()
+                by_subj.setdefault(sid, []).append(ex)
+            for sid, sub_exams in by_subj.items():
+                subject_groups[f"cg_{cg_id}_s_{sid}"] = sub_exams
 
     def group_sort_key(group):
         exams = group[1]
@@ -415,6 +440,8 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                 section = exam.get('section') or ''
                 failed.append({
                     'exam_id': exam['id'],
+                    'subject_name': exam.get('subject_name'),
+                    'section': exam.get('section'),
                     'reason': f'No slot found satisfying all constraints for {n_needed} sections simultaneously.'
                 })
 

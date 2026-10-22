@@ -79,6 +79,8 @@ from flask_limiter.errors import RateLimitExceeded
 
 
 app = Flask(__name__, template_folder='template')
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 from flask_wtf.csrf import CSRFProtect, generate_csrf, CSRFError
 csrf = CSRFProtect(app)
 
@@ -137,7 +139,7 @@ def _configure_mail():
     app.config['MAIL_SERVER']         = os.environ.get('SMTP_HOST') or s.get('smtp_host', '') or ''
     app.config['MAIL_PORT']           = int(os.environ.get('SMTP_PORT') or s.get('smtp_port') or 587)
     app.config['MAIL_USERNAME']       = os.environ.get('SMTP_USER') or s.get('smtp_user', '') or ''
-    app.config['MAIL_PASSWORD']       = os.environ.get('SMTP_PASSWORD') or s.get('smtp_password', '') or ''
+    app.config['MAIL_PASSWORD']       = (os.environ.get('SMTP_PASSWORD') or s.get('smtp_password', '') or '').replace(' ', '').strip()
     app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('SMTP_FROM') or s.get('smtp_from', '') or ''
     app.config['MAIL_USE_TLS']        = bool(int(os.environ.get('SMTP_USE_TLS', s.get('smtp_use_tls', 1))))
     app.config['MAIL_USE_SSL']        = False
@@ -150,12 +152,30 @@ def _configure_mail():
 
 _configure_mail()
 mail = Mail(app)
+from concurrent.futures import ThreadPoolExecutor
+_MAIL_POOL = ThreadPoolExecutor(max_workers=2)
 
 def send_email_notification(to_email, subject, body):
-    """Send an email in a background thread. Silently skips if SMTP not configured."""
+    """Send an email in a background thread via Brevo API or Flask-Mail."""
+    try:
+        s = get_system_settings()
+        brevo_key = os.environ.get('BREVO_API_KEY') or s.get('brevo_api_key')
+        smtp_pw = (s.get('smtp_password') or '').replace(' ', '').strip()
+        if not brevo_key and smtp_pw.startswith('xkeysib-'):
+            brevo_key = smtp_pw
+
+        if brevo_key:
+            sender_email = s.get('smtp_from') or s.get('smtp_user') or 'jpbaltazar23-0368@cca.edu.ph'
+            from system.mailer import send_via_brevo
+            def _send_brevo():
+                send_via_brevo(brevo_key, to_email, subject, body, sender_email=sender_email)
+            _MAIL_POOL.submit(_send_brevo)
+            return
+    except Exception as e:
+        print(f"[Mail Setting Check Error] {e}")
+
     if not app.config.get('MAIL_SERVER'):
         return
-    import threading
     def _send():
         try:
             with app.app_context():
@@ -163,7 +183,7 @@ def send_email_notification(to_email, subject, body):
                 mail.send(msg)
         except Exception as e:
             print(f"[Mail Error] {e}")
-    threading.Thread(target=_send, daemon=True).start()
+    _MAIL_POOL.submit(_send)
 
 # â”€â”€ HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -974,6 +994,252 @@ def super_reject_schedule_reset(request_id):
         return redirect(ref)
     return redirect(url_for('super_admin_page'))
 
+def log_email_event(msg):
+    try:
+        with open('email_log.txt', 'a', encoding='utf-8') as f:
+            from datetime import datetime
+            f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}\n")
+    except Exception:
+        pass
+
+def send_single_email_sync(to_email, subject, body):
+    """Synchronously send one email via Brevo API or Flask-Mail."""
+    try:
+        s = get_system_settings()
+        brevo_key = os.environ.get('BREVO_API_KEY') or s.get('brevo_api_key')
+        smtp_pw = (s.get('smtp_password') or '').replace(' ', '').strip()
+        if not brevo_key and smtp_pw.startswith('xkeysib-'):
+            brevo_key = smtp_pw
+
+        if brevo_key:
+            sender_email = s.get('smtp_from') or s.get('smtp_user') or "jpbaltazar23-0368@cca.edu.ph"
+            from system.mailer import send_via_brevo
+            ok, msg = send_via_brevo(brevo_key, to_email, subject, body, sender_email=sender_email)
+            log_email_event(f"BREVO -> {to_email} | ok={ok} | {msg}")
+            return ok, msg
+    except Exception as e:
+        log_email_event(f"BREVO EXCEPTION -> {to_email} | {e}")
+        print(f"[Mail Single Brevo Error] {e}")
+
+    if app.config.get('MAIL_SERVER'):
+        try:
+            with app.app_context():
+                msg = MailMessage(subject=subject, recipients=[to_email], body=body)
+                mail.send(msg)
+                return True, "Sent via SMTP"
+        except Exception as e:
+            return False, str(e)
+    return False, "No mail service configured"
+
+def _dispatch_publish_emails_async(admin_email=None, admin_name=None):
+    """
+    Asynchronously queries all active proctors and students, compiles their assigned schedules,
+    and dispatches broadcast notification emails via Brevo/SMTP in the background.
+    """
+    import threading
+    import time
+    from collections import defaultdict
+
+    def _run():
+        log_email_event(f"DISPATCH_START: admin_email={admin_email}")
+        try:
+            db = open_db()
+            if not db:
+                return
+            cursor = db.cursor(dictionary=True)
+
+            # 0. Send confirmation to Admin who clicked Publish
+            if admin_email:
+                adm_name = admin_name or "Administrator"
+                admin_body = f"""Dear {adm_name},
+
+The official Examination Timetable for City College of Angeles has been successfully published and is now LIVE!
+
+Timetable Status: Live on Student and Proctor Portals
+Portal Link: http://cca-exam.duckdns.org/schedule
+
+Best regards,
+CCA Exam Management System"""
+                send_single_email_sync(admin_email, "CCA Examination Timetable Published - Admin Confirmation", admin_body)
+
+            # 1. Fetch and notify ALL active STUDENTS first!
+            cursor.execute("""
+                SELECT u.email, u.full_name, u.section
+                FROM users u
+                WHERE u.role = 'student' AND u.is_active = 1 AND u.email IS NOT NULL AND u.email != ''
+            """)
+            students = cursor.fetchall()
+            log_email_event(f"Sending to {len(students)} active student(s)...")
+            for s in students:
+                try:
+                    email = s.get('email')
+                    if not email:
+                        continue
+                    body = f"""Dear {s['full_name']},
+
+The official Examination Timetable has been officially approved and published!
+
+You can now log in to the Student Portal to view your complete exam schedule, room assignments, and download your Examination Permit:
+http://cca-exam.duckdns.org/student/timetable
+
+Best regards,
+CCA Exam Management System"""
+                    send_single_email_sync(
+                        email,
+                        "Official CCA Examination Timetable Published",
+                        body
+                    )
+                    time.sleep(0.1)
+                except Exception as ex_st:
+                    log_email_event(f"Student mail error for {s.get('email')}: {ex_st}")
+
+            # 2. Fetch and notify active SECRETARIES
+            cursor.execute("""
+                SELECT u.email, u.full_name
+                FROM users u
+                WHERE u.role = 'secretary' AND u.is_active = 1 AND u.email IS NOT NULL AND u.email != ''
+            """)
+            secretaries = cursor.fetchall()
+            for sec in secretaries:
+                try:
+                    email = sec.get('email')
+                    if not email:
+                        continue
+                    body = f"""Dear {sec['full_name']},
+
+The official Examination Timetable has been finalized and published by the administration.
+
+You may access your Departmental Secretary Dashboard to manage exam collection and monitor attendance:
+http://cca-exam.duckdns.org/secretary/dashboard
+
+Best regards,
+CCA Exam Management System"""
+                    send_single_email_sync(
+                        email,
+                        "CCA Examination Timetable Published - Departmental Notice",
+                        body
+                    )
+                    time.sleep(0.1)
+                except Exception as ex_sec:
+                    log_email_event(f"Secretary mail error for {sec.get('email')}: {ex_sec}")
+
+            # 3. Fetch scheduled exams with rooms
+            cursor.execute("""
+                SELECT e.instructor_id, e.subject_name, e.section, e.exam_date_time, r.room_name
+                FROM exams e
+                LEFT JOIN rooms r ON e.room_id = r.id
+                WHERE e.status = 'Scheduled' AND e.instructor_id IS NOT NULL
+                ORDER BY e.exam_date_time ASC
+            """)
+            exams_by_instructor = defaultdict(list)
+            for exam in cursor.fetchall():
+                exams_by_instructor[exam['instructor_id']].append(exam)
+
+            # 4. Fetch and notify PROCTORS
+            cursor.execute("""
+                SELECT u.id as user_id, u.email, u.full_name, u.instructor_id
+                FROM users u
+                WHERE u.role = 'proctor' AND u.is_active = 1 AND u.email IS NOT NULL AND u.email != ''
+            """)
+            proctors = cursor.fetchall()
+            log_email_event(f"Sending to {len(proctors)} active proctor(s)...")
+            for p in proctors:
+                try:
+                    email = p.get('email')
+                    if not email:
+                        continue
+                    assigned = exams_by_instructor.get(p.get('instructor_id'), [])
+                    if assigned:
+                        lines = []
+                        for ex in assigned:
+                            dt = ex['exam_date_time']
+                            dt_str = dt.strftime('%B %d, %Y (%A) at %I:%M %p') if dt else 'TBD'
+                            room = ex.get('room_name') or 'TBD'
+                            lines.append(f"  * {dt_str}\n    Subject: {ex['subject_name']} ({ex['section'] or '-' })\n    Room: {room}")
+                        schedule_text = "\n\n".join(lines)
+                        body = f"""Dear Prof. {p['full_name']},
+
+The official Examination Timetable for City College of Angeles has been finalized and published!
+
+Here is your assigned proctoring schedule ({len(assigned)} exam session{'s' if len(assigned) > 1 else ''}):
+
+{schedule_text}
+
+You can log in to your Proctor Portal to review full details and download your official Proctor Duty Slip:
+http://cca-exam.duckdns.org/proctor/dashboard
+
+Best regards,
+CCA Exam Management System"""
+                    else:
+                        body = f"""Dear Prof. {p['full_name']},
+
+The official Examination Timetable for City College of Angeles has been finalized and published.
+
+You currently do not have any proctoring assignments for this examination period. You may verify your status in your portal:
+http://cca-exam.duckdns.org/proctor/dashboard
+
+Best regards,
+CCA Exam Management System"""
+
+                    send_single_email_sync(
+                        email,
+                        "CCA Examination Timetable Published - Proctor Duties",
+                        body
+                    )
+                    time.sleep(0.1)
+                except Exception as ex_pr:
+                    log_email_event(f"Proctor mail error for {p.get('email')}: {ex_pr}")
+            cursor.execute("""
+                SELECT u.email, u.full_name
+                FROM users u
+                WHERE u.role = 'secretary' AND u.is_active = 1 AND u.email IS NOT NULL AND u.email != ''
+            """)
+            secretaries = cursor.fetchall()
+            for sec in secretaries:
+                email = sec.get('email')
+                if not email:
+                    continue
+                body = f"""Dear {sec['full_name']},
+
+The official Examination Timetable has been finalized and published by the administration.
+
+You may access your Departmental Secretary Dashboard to manage exam collection and monitor attendance:
+http://cca-exam.duckdns.org/secretary/dashboard
+
+Best regards,
+CCA Exam Management System"""
+
+                send_single_email_sync(
+                    email,
+                    "CCA Examination Timetable Published - Departmental Notice",
+                    body
+                )
+                time.sleep(0.05)
+
+            db.close()
+        except Exception as e:
+            print(f"[Publish Email Dispatch Error] {e}")
+
+    threading.Thread(target=_run, daemon=True).start()
+
+@app.route("/admin/email_log")
+def view_email_log():
+    guard = require_role('admin')
+    if guard: return guard
+    try:
+        with open('email_log.txt', 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            log_text = "".join(lines[-100:])
+    except Exception as e:
+        log_text = f"No email log entries yet: {e}"
+    return f"""
+    <html><head><title>Live Email Logs</title></head>
+    <body style='background:#0f172a;color:#f8fafc;font-family:monospace;padding:24px;'>
+      <h2>📬 Live System Email Dispatch Logs</h2>
+      <p style='color:#94a3b8'>Showing last 100 entries (<a href='/admin/email_log' style='color:#38bdf8'>Refresh</a> | <a href='/schedule' style='color:#38bdf8'>Back to Schedule</a>)</p>
+      <pre style='background:#1e293b;padding:16px;border-radius:8px;border:1px solid #334155;white-space:pre-wrap;font-size:13px;line-height:1.5;'>{log_text}</pre>
+    </body></html>"""
+
 @app.route("/schedule/publish", methods=["POST"])
 def schedule_publish():
     guard = require_role('admin')
@@ -988,7 +1254,22 @@ def schedule_publish():
             user_role=session.get('role'),
             ip_address=request.remote_addr
         )
-        flash("Exam timetable has been finalized and published! It is now live on Student and Proctor portals.", "success")
+        admin_email = None
+        admin_name = session.get('full_name', 'Administrator')
+        try:
+            db_adm = open_db()
+            if db_adm:
+                cur_adm = db_adm.cursor(dictionary=True)
+                cur_adm.execute("SELECT email, full_name FROM users WHERE id=%s", (session.get('user_id'),))
+                u_row = cur_adm.fetchone()
+                if u_row:
+                    admin_email = u_row.get('email')
+                    admin_name = u_row.get('full_name') or admin_name
+                db_adm.close()
+        except Exception:
+            pass
+        _dispatch_publish_emails_async(admin_email=admin_email, admin_name=admin_name)
+        flash("Exam timetable has been finalized and published! Notification emails are being dispatched to your email and all proctors/students.", "success")
     else:
         flash(f"Failed to publish timetable: {msg}", "danger")
     return redirect(url_for('schedule_view'))
@@ -1566,7 +1847,7 @@ def import_subjects_route():
         return redirect(url_for('subjects_page'))
     from system.importer import parse_subjects_csv
     rows, parse_errors = parse_subjects_csv(f.read())
-    institutes = {i['code']: i['id'] for i in get_all_institutes()}
+    institutes = {i['code'].upper(): i['id'] for i in get_all_institutes() if i and i.get('code')}
     for r in rows:
         code = r.get('institute_code', '').upper()
         r['institute_id'] = institutes.get(code)
@@ -1778,7 +2059,7 @@ def import_rooms():
         return redirect(url_for('dashboard') + '#rooms')
     from system.importer import parse_rooms_csv
     rows, parse_errors = parse_rooms_csv(f.read())
-    institutes = {i['code']: i['id'] for i in get_all_institutes()}
+    institutes = {i['code'].upper(): i['id'] for i in get_all_institutes() if i and i.get('code')}
     for r in rows:
         code = r.pop('institute_code', '').upper()
         r['institute_id'] = institutes.get(code)
@@ -1798,7 +2079,7 @@ def import_instructors():
         return redirect(url_for('dashboard') + '#instructors')
     from system.importer import parse_instructors_csv
     rows, parse_errors = parse_instructors_csv(f.read())
-    institutes = {i['code']: i['id'] for i in get_all_institutes()}
+    institutes = {i['code'].upper(): i['id'] for i in get_all_institutes() if i and i.get('code')}
     for r in rows:
         code = r.pop('institute_code', '').upper()
         r['institute_id'] = institutes.get(code)
@@ -1818,14 +2099,14 @@ def import_exams():
         return redirect(url_for('dashboard') + '#exams')
     from system.importer import parse_exams_csv
     rows, parse_errors = parse_exams_csv(f.read())
-    institutes = {i['code']: i['id'] for i in get_all_institutes()}
-    subjects_by_code = {s['code'].upper(): s for s in get_all_subjects()}
+    institutes = {i['code'].upper(): i['id'] for i in get_all_institutes() if i and i.get('code')}
+    subjects_by_code = {s['code'].upper(): s for s in get_all_subjects() if s and s.get('code')}
     
     for r in rows:
         code = r.pop('institute_code', '').upper()
         r['institute_id'] = institutes.get(code)
         
-        subj_code = r.pop('subject_code', '').upper()
+        subj_code = (r.pop('subject_code', '') or '').upper()
         subj = subjects_by_code.get(subj_code)
         if subj:
             r['subject_id'] = subj['id']
@@ -2217,14 +2498,28 @@ def test_email():
         flash("Enter a recipient email address.", "warning")
         return redirect(url_for('settings_page'))
     try:
-        # Instead of hanging the server with Flask-Mail, let's manually test the connection with a 5-second timeout
+        s = get_system_settings()
+        password = (s.get('smtp_password') or '').replace(' ', '').strip()
+        brevo_key = os.environ.get('BREVO_API_KEY') or s.get('brevo_api_key')
+        if not brevo_key and password.startswith('xkeysib-'):
+            brevo_key = password
+
+        if brevo_key:
+            from system.mailer import send_via_brevo
+            sender = s.get('smtp_from') or s.get('smtp_user') or "jpbaltazar23-0368@cca.edu.ph"
+            ok, msg = send_via_brevo(brevo_key, to, "CCA Exam Management - Test Email", "This is a test email sent securely via Brevo HTTPS API (Port 443). Automated email delivery is working perfectly!", sender_email=sender)
+            if ok:
+                flash(f"Test email successfully sent to {to} via Brevo API!", "success")
+            else:
+                flash(f"Brevo API error: {msg}", "danger")
+            return redirect(url_for('settings_page'))
+
+        # Standard SMTP Test
         import smtplib
         import socket
-        s = get_system_settings()
         host = s.get('smtp_host', '')
         port = int(s.get('smtp_port') or 587)
         user = s.get('smtp_user', '')
-        password = s.get('smtp_password', '')
         use_tls = bool(s.get('smtp_use_tls', 1))
         
         # Test TCP connection first

@@ -220,6 +220,7 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ s.created_at.strftime("%b %d, %Y %I:%M %p") if s.created_at else "—" }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap flex gap-2">
                                     <form action="/students/approve/{{ s.id }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                         <button class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700"><i class="fa-solid fa-check mr-1"></i>Approve</button>
                                     </form>
                                     <button type="button" onclick="confirmRejectRegistration({{ s.id }}, '{{ s.full_name|e }}')" class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-times mr-1"></i>Reject</button>
@@ -233,11 +234,13 @@
                 <div class="px-6 py-3 bg-gray-50 border-t border-gray-200 flex items-center gap-3">
                     <span class="text-xs text-gray-500">Bulk:</span>
                     <form action="/students/bulk_action" method="POST" id="pendingBulkForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <input type="hidden" name="bulk_action" value="approve">
                         <div id="pendingBulkIds"></div>
                         <button type="button" onclick="submitBulk('pendingBulkForm','pending-cb','approve')" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700"><i class="fa-solid fa-check mr-1"></i>Approve Selected</button>
                     </form>
                     <form action="/students/bulk_action" method="POST" id="pendingDeleteForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <input type="hidden" name="bulk_action" value="delete">
                         <div id="pendingDeleteIds"></div>
                         <button type="button" onclick="confirmBulkPendingDelete()" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-trash mr-1"></i>Delete Selected</button>
@@ -299,9 +302,11 @@
                                             <button onclick="openEditStudentModal({{ s.id }}, '{{ s.full_name|e }}', '{{ s.email|e }}', '{{ (s.section or '')|e }}')" class="p-1.5 rounded-md text-[#668054] hover:bg-green-50 transition-colors" title="Edit Student & Section"><i class="fa-solid fa-pen-to-square text-sm"></i></button>
                                             <button onclick="openResetPwModal({{ s.id }}, '{{ s.full_name|e }}')" class="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 transition-colors" title="Reset Password"><i class="fa-solid fa-rotate-left text-sm"></i></button>
                                             <form action="/students/deactivate/{{ s.id }}" method="POST" id="deactForm_{{ s.id }}" class="inline m-0 p-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                                 <button type="button" onclick="confirmDeactivateStudent({{ s.id }}, '{{ s.full_name|e }}')" class="p-1.5 rounded-md text-amber-600 hover:bg-amber-50 transition-colors" title="Deactivate"><i class="fa-solid fa-ban text-sm"></i></button>
                                             </form>
                                             <form action="/students/reject/{{ s.id }}" method="POST" id="delForm_{{ s.id }}" class="inline m-0 p-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                                 <button type="button" onclick="confirmDeleteStudent({{ s.id }}, '{{ s.full_name|e }}')" class="p-1.5 rounded-md text-red-600 hover:bg-red-50 transition-colors cursor-pointer" title="Delete"><i class="fa-solid fa-trash text-sm"></i></button>
                                             </form>
                                         </div>
@@ -321,9 +326,12 @@
                     <button type="button" onclick="confirmBulkResetPassword()" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"><i class="fa-solid fa-rotate-left mr-1"></i>Reset Password</button>
                     <button type="button" onclick="confirmBulkDeactivate()" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-amber-500 hover:bg-amber-600"><i class="fa-solid fa-ban mr-1"></i>Deactivate</button>
                     <button type="button" onclick="confirmBulkDelete()" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-trash mr-1"></i>Delete</button>
-                    <form action="/students/bulk_action" method="POST" id="activeBulkResetPw"><input type="hidden" name="bulk_action" value="reset_password"><div id="activeBulkResetPwIds"></div></form>
-                    <form action="/students/bulk_action" method="POST" id="activeBulkDeact"><input type="hidden" name="bulk_action" value="deactivate"><div id="activeBulkDeactIds"></div></form>
-                    <form action="/students/bulk_action" method="POST" id="activeBulkDel"><input type="hidden" name="bulk_action" value="delete"><div id="activeBulkDelIds"></div></form>
+                    <form action="/students/bulk_action" method="POST" id="activeBulkResetPw">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><input type="hidden" name="bulk_action" value="reset_password"><div id="activeBulkResetPwIds"></div></form>
+                    <form action="/students/bulk_action" method="POST" id="activeBulkDeact">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><input type="hidden" name="bulk_action" value="deactivate"><div id="activeBulkDeactIds"></div></form>
+                    <form action="/students/bulk_action" method="POST" id="activeBulkDel">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><input type="hidden" name="bulk_action" value="delete"><div id="activeBulkDelIds"></div></form>
                 </div>
                 {% endif %}
             </div>
@@ -356,9 +364,11 @@
                                 <td class="px-6 py-4 whitespace-nowrap">{% if s.section %}<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ s.section }}</span>{% else %}<span class="text-gray-400">—</span>{% endif %}</td>
                                 <td class="px-6 py-4 whitespace-nowrap flex gap-2">
                                     <form action="/students/reactivate/{{ s.id }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                         <button class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700"><i class="fa-solid fa-rotate-left mr-1"></i>Reactivate</button>
                                     </form>
                                     <form action="/students/reject/{{ s.id }}" method="POST" id="delForm_{{ s.id }}" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                         <button type="button" onclick="confirmDeleteStudent({{ s.id }}, '{{ s.full_name|e }}')" class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-trash mr-1"></i>Delete</button>
                                     </form>
                                 </td>
@@ -392,6 +402,7 @@
                     </button>
                 </div>
                 <form id="resetPwForm" method="POST" action="" class="p-6 space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <input type="hidden" name="redirect_to" value="students_page">
                     <input type="hidden" name="new_password" id="resetPwInputNewPw" value="">
                     <input type="hidden" name="confirm_password" id="resetPwInputConfirmPw" value="">
@@ -443,6 +454,7 @@
                     </button>
                 </div>
                 <form id="editStudentForm" method="POST" action="" class="p-6 space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <input type="hidden" name="redirect_to" value="students_page">
                     <div>
                         <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Full Name</label>
@@ -584,11 +596,20 @@
                 iconClass: 'fa-solid fa-times',
                 confirmText: '<i class="fa-solid fa-times mr-1"></i> Yes, Reject',
                 onConfirm: () => {
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = '/students/reject/' + id;
-                    document.body.appendChild(form);
-                    form.submit();
+                    if (window.submitPostAction) {
+                        window.submitPostAction('/students/reject/' + id);
+                    } else {
+                        const form = document.createElement('form');
+                        form.method = 'POST';
+                        form.action = '/students/reject/' + id;
+                        const csrf = document.createElement('input');
+                        csrf.type = 'hidden';
+                        csrf.name = 'csrf_token';
+                        csrf.value = (document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '{{ csrf_token() }}');
+                        form.appendChild(csrf);
+                        document.body.appendChild(form);
+                        form.submit();
+                    }
                 }
             });
         }

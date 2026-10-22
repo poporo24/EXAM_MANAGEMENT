@@ -41,6 +41,15 @@
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = url;
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        const token = meta ? meta.getAttribute('content') : (window.csrfToken || '{{ csrf_token() }}');
+        if (token) {
+            const csrf = document.createElement('input');
+            csrf.type = 'hidden';
+            csrf.name = 'csrf_token';
+            csrf.value = token;
+            form.appendChild(csrf);
+        }
         document.body.appendChild(form);
         form.submit();
     };

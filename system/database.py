@@ -28,10 +28,11 @@ def get_connection_pool():
                     pool_name="cca_exam_pool",
                     pool_size=pool_size,
                     pool_reset_session=True,
-                    host="127.0.0.1",
-                    user="root",
-                    password="",
-                    database="cca_exam_management_db"
+                    host=os.environ.get('DB_HOST', "127.0.0.1"),
+                    user=os.environ.get('DB_USER', "root"),
+                    password=os.environ.get('DB_PASSWORD', ""),
+                    database=os.environ.get('DB_NAME', "cca_exam_management_db"),
+                    port=int(os.environ.get('DB_PORT', 3306))
                 )
         except Exception as pool_err:
             print(f"[DB Pool Init Notice] {pool_err}")
@@ -63,10 +64,11 @@ def open_db():
             )
         else:
             return mysql.connector.connect(
-                host="127.0.0.1",
-                user="root",
-                password="",
-                database="cca_exam_management_db"
+                host=os.environ.get('DB_HOST', "127.0.0.1"),
+                user=os.environ.get('DB_USER', "root"),
+                password=os.environ.get('DB_PASSWORD', ""),
+                database=os.environ.get('DB_NAME', "cca_exam_management_db"),
+                port=int(os.environ.get('DB_PORT', 3306))
             )
     except mysql.connector.Error as err:
         print(f"Database Connection Error: {err}")
@@ -544,6 +546,7 @@ def delete_user(id):
             return "User not found"
         
         cursor_w = db.cursor()
+        cursor_w.execute("DELETE FROM notifications WHERE user_id=%s", (id,))
         if user.get('instructor_id') and user.get('role') == 'proctor':
             cursor_w.execute("DELETE FROM instructors WHERE id=%s", (user['instructor_id'],))
         cursor_w.execute("DELETE FROM users WHERE id=%s", (id,))
@@ -838,7 +841,10 @@ def add_instructor(name, institute_id=None, building=None, is_pwd=0, subjects_ta
             email_name = clean_email_name(name)
             proctor_email = f"{email_name}.{instructor_id}@cca.edu.ph"
 
-        hashed = hash_password(proctor_password)
+        global _cached_proctor_pw_hash
+        if '_cached_proctor_pw_hash' not in globals() or not _cached_proctor_pw_hash:
+            _cached_proctor_pw_hash = hash_password(proctor_password)
+        hashed = _cached_proctor_pw_hash
         cursor.execute("INSERT INTO users (full_name, email, password, role, instructor_id) VALUES (%s, %s, %s, 'proctor', %s)",
                        (name, proctor_email, hashed, instructor_id))
         db.commit()
@@ -1066,7 +1072,7 @@ def bulk_import_exams(rows):
                        VALUES (%s, %s, %s, %s, \'Pending\', %s, %s)""",
                     (row.get('subject_name'), row.get('section') or None,
                      subject_type, dur_min,
-                     row.get('institute_id')))
+                     row.get('institute_id'), row.get('subject_id')))
                 success_count += 1
             except Exception as e:
                 error_list.append(f"Row {i+1}: {str(e)}")

@@ -198,6 +198,15 @@ def save_system_settings(day_start, day_end, slot_interval_min, max_proctor_hrs,
     db = open_db()
     if not db:
         return
+    # Auto-normalize day_end if passed as 12-hour format (e.g., 08:00 -> 20:00 for 8:00 PM)
+    if day_end:
+        try:
+            day_end_str = str(day_end).strip()
+            parts = day_end_str.split(':')
+            if len(parts) >= 2 and int(parts[0]) <= 11:
+                day_end = f"{int(parts[0]) + 12:02d}:{parts[1]}"
+        except Exception:
+            pass
     try:
         cursor = db.cursor()
         cursor.execute("""
@@ -217,15 +226,24 @@ def is_schedule_published():
 def publish_schedule(user_id=None):
     """
     Publishes the current timetable, making it visible to students, proctors, and secretaries,
-    and dispatches broadcast notifications.
+    and dispatches broadcast and finalized assignment notifications.
     """
     db = open_db()
     if not db: return False, "Database connection failed"
     try:
         cursor = db.cursor()
+        cursor_r = db.cursor(dictionary=True)
         cursor.execute("UPDATE system_settings SET schedule_published = 1, schedule_published_at = NOW() WHERE id = 1")
-        
-        # Notify all active students and proctors
+
+        # Clear any old/stale draft schedule notifications before sending finalized ones
+        cursor.execute("""
+            DELETE FROM notifications
+            WHERE title LIKE '%Proctoring Assignment:%'
+               OR title LIKE '%Exam Scheduled:%'
+               OR title = 'Exam Timetable Published'
+        """)
+
+        # 1. Broadcast official publication notice to all active students and proctors
         cursor.execute("""
             INSERT INTO notifications (user_id, title, message, created_at, is_read)
             SELECT u.id, 'Exam Timetable Published',
@@ -234,6 +252,34 @@ def publish_schedule(user_id=None):
             FROM users u
             WHERE u.role IN ('student', 'proctor') AND u.is_active = 1
         """)
+
+        # 2. Send finalized proctoring assignment notifications for all scheduled exams
+        cursor_r.execute("""
+            SELECT e.subject_name, e.section, e.exam_date_time, u.id AS proctor_user_id
+            FROM exams e
+            JOIN users u ON u.instructor_id = e.instructor_id AND u.role = 'proctor'
+            WHERE e.status = 'Scheduled' AND e.exam_date_time IS NOT NULL
+            ORDER BY e.exam_date_time ASC
+        """)
+        notif_params = []
+        for ex in cursor_r.fetchall():
+            subj = ex.get('subject_name') or 'Exam'
+            sec = ex.get('section') or ''
+            dt_val = ex.get('exam_date_time')
+            dt_str = dt_val.strftime('%b %d, %Y %I:%M %p') if hasattr(dt_val, 'strftime') else str(dt_val)
+            notif_params.append((
+                ex['proctor_user_id'],
+                f"📋 Proctoring Assignment: {subj}",
+                f"You have been assigned to proctor '{subj}'"
+                + (f" — Section {sec}" if sec else "")
+                + f" on {dt_str}."
+            ))
+        if notif_params:
+            cursor.executemany(
+                "INSERT INTO notifications (user_id, title, message, created_at, is_read) VALUES (%s, %s, %s, NOW(), 0)",
+                notif_params
+            )
+
         db.commit()
         return True, "Timetable has been officially published and distributed."
     except Exception as e:
@@ -243,13 +289,20 @@ def publish_schedule(user_id=None):
 
 def unpublish_schedule(user_id=None):
     """
-    Reverts the timetable back to Draft mode, hiding it from non-admin portals.
+    Reverts the timetable back to Draft mode, hiding it from non-admin portals
+    and removing draft/published assignment notifications from proctors and students.
     """
     db = open_db()
     if not db: return False, "Database connection failed"
     try:
         cursor = db.cursor()
         cursor.execute("UPDATE system_settings SET schedule_published = 0 WHERE id = 1")
+        cursor.execute("""
+            DELETE FROM notifications
+            WHERE title LIKE '%Proctoring Assignment:%'
+               OR title LIKE '%Exam Scheduled:%'
+               OR title = 'Exam Timetable Published'
+        """)
         db.commit()
         return True, "Timetable has been reverted to Draft mode."
     except Exception as e:
@@ -514,11 +567,25 @@ def get_all_users():
     if not db: return []
     try:
         cursor = db.cursor(dictionary=True)
+        # Keep users.institute_id synced with linked instructors.institute_id for proctors
+        try:
+            cursor.execute("""
+                UPDATE users u
+                JOIN instructors i ON u.instructor_id = i.id
+                SET u.institute_id = i.institute_id
+                WHERE u.role = 'proctor' AND u.institute_id IS NULL AND i.institute_id IS NOT NULL
+            """)
+            db.commit()
+        except Exception:
+            pass
         cursor.execute("""
-            SELECT u.id, u.full_name, u.full_name as name, u.email, u.role, u.section, u.institute_id, u.is_super_admin,
+            SELECT u.id, u.full_name, u.full_name as name, u.email, u.role, u.section,
+                   COALESCE(u.institute_id, i.institute_id) as institute_id,
+                   u.is_super_admin,
                    inst.name as institute_name
             FROM users u
-            LEFT JOIN institutes inst ON u.institute_id = inst.id
+            LEFT JOIN instructors i ON u.instructor_id = i.id
+            LEFT JOIN institutes inst ON COALESCE(u.institute_id, i.institute_id) = inst.id
             ORDER BY u.full_name
         """)
         return cursor.fetchall()
@@ -531,10 +598,13 @@ def get_user_by_id(id):
     try:
         cursor = db.cursor(dictionary=True)
         cursor.execute("""
-            SELECT u.id, u.full_name, u.full_name as name, u.email, u.role, u.section, u.institute_id, u.is_super_admin,
+            SELECT u.id, u.full_name, u.full_name as name, u.email, u.role, u.section,
+                   COALESCE(u.institute_id, i.institute_id) as institute_id,
+                   u.is_super_admin, u.instructor_id,
                    inst.name as institute_name
             FROM users u
-            LEFT JOIN institutes inst ON u.institute_id = inst.id
+            LEFT JOIN instructors i ON u.instructor_id = i.id
+            LEFT JOIN institutes inst ON COALESCE(u.institute_id, i.institute_id) = inst.id
             WHERE u.id = %s
         """, (id,))
         return cursor.fetchone() or {}
@@ -551,11 +621,22 @@ def update_user(id, full_name, email, role, section, institute_id, is_super_admi
         user = cursor.fetchone()
         
         instructor_id = user.get('instructor_id') if user else None
+        old_role = user.get('role') if user else None
+
+        # Security safeguard: Student accounts cannot be promoted to Admin or Super Admin
+        if old_role == 'student':
+            if role == 'admin':
+                role = 'student'
+            is_super_admin = 0
+        if role == 'student':
+            is_super_admin = 0
         
         # If changing to proctor and doesn't have instructor_id, create one
         if role == 'proctor' and not instructor_id:
             cursor.execute("INSERT INTO instructors (name, status, institute_id, is_pwd, subjects_taught) VALUES (%s, 'Active', %s, 0, '')", (full_name, institute_id))
             instructor_id = cursor.lastrowid
+        elif role == 'proctor' and instructor_id:
+            cursor.execute("UPDATE instructors SET name=%s, institute_id=%s WHERE id=%s", (full_name, institute_id, instructor_id))
             
         cursor.execute("UPDATE users SET full_name=%s, email=%s, role=%s, section=%s, institute_id=%s, is_super_admin=%s, instructor_id=%s WHERE id=%s",
                        (full_name, email, role, section, institute_id, is_super_admin, instructor_id, id))
@@ -563,25 +644,132 @@ def update_user(id, full_name, email, role, section, institute_id, is_super_admi
     finally:
         db.close()
 
+def _cleanup_instructor_dependencies(cursor_w, inst_id):
+    """Safely remove or unlink all references to an instructor_id before deleting the instructor record."""
+    if not inst_id:
+        return
+    cursor_w.execute("UPDATE exams SET instructor_id = NULL WHERE instructor_id = %s", (inst_id,))
+    cursor_w.execute("UPDATE exam_collection SET collected_by_instructor_id = NULL WHERE collected_by_instructor_id = %s", (inst_id,))
+    cursor_w.execute("DELETE FROM proctor_availability WHERE instructor_id = %s", (inst_id,))
+    cursor_w.execute("DELETE FROM proctor_absence WHERE instructor_id = %s", (inst_id,))
+    cursor_w.execute("DELETE FROM relievers WHERE instructor_id = %s", (inst_id,))
+    cursor_w.execute("UPDATE users SET instructor_id = NULL WHERE instructor_id = %s", (inst_id,))
+
 def delete_user(id):
     db = open_db()
     if not db: return "DB connection error"
     try:
         cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT email, instructor_id, role FROM users WHERE id=%s", (id,))
+        cursor.execute("SELECT id, full_name, email, instructor_id, role FROM users WHERE id=%s", (id,))
         user = cursor.fetchone()
         if not user:
             return "User not found"
         
         cursor_w = db.cursor()
         cursor_w.execute("DELETE FROM notifications WHERE user_id=%s", (id,))
-        if user.get('instructor_id') and user.get('role') == 'proctor':
-            cursor_w.execute("DELETE FROM instructors WHERE id=%s", (user['instructor_id'],))
+        if user.get('role') == 'proctor':
+            inst_id = user.get('instructor_id')
+            if not inst_id and user.get('full_name'):
+                cursor.execute("SELECT id FROM instructors WHERE LOWER(TRIM(name)) = LOWER(TRIM(%s)) LIMIT 1", (user['full_name'],))
+                m = cursor.fetchone()
+                if m:
+                    inst_id = m['id']
+            if inst_id:
+                _cleanup_instructor_dependencies(cursor_w, inst_id)
+                cursor_w.execute("DELETE FROM instructors WHERE id=%s", (inst_id,))
         cursor_w.execute("DELETE FROM users WHERE id=%s", (id,))
         db.commit()
         return None
     except Exception as e:
         return str(e)
+    finally:
+        db.close()
+
+def bulk_delete_users_and_proctors(user_ids=None, delete_all_role=None, exclude_user_id=None):
+    """
+    Bulk delete selected user IDs or all users of a specific role (e.g. 'proctor').
+    Never deletes Super Admin accounts or exclude_user_id.
+    When deleting all proctors (or when no proctor users remain), also purges any orphaned rows in `instructors`.
+    Returns (deleted_count, error_list).
+    """
+    db = open_db()
+    if not db:
+        return (0, ["Database connection failed"])
+    deleted_count = 0
+    errors = []
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor_w = db.cursor()
+
+        if delete_all_role == 'proctor':
+            cursor.execute("SELECT id, instructor_id, full_name FROM users WHERE role = 'proctor' AND COALESCE(is_super_admin, 0) = 0")
+            proctor_users = [u for u in cursor.fetchall() if u['id'] != exclude_user_id]
+            for u in proctor_users:
+                cursor_w.execute("DELETE FROM notifications WHERE user_id = %s", (u['id'],))
+                cursor_w.execute("DELETE FROM users WHERE id = %s", (u['id'],))
+                deleted_count += 1
+
+            # Also clean up all instructor records so Faculty Management and User Management are both 100% clean
+            cursor.execute("SELECT id FROM instructors")
+            all_insts = cursor.fetchall()
+            for inst in all_insts:
+                iid = inst['id']
+                _cleanup_instructor_dependencies(cursor_w, iid)
+                cursor_w.execute("DELETE FROM instructors WHERE id = %s", (iid,))
+            db.commit()
+            return (deleted_count or len(all_insts), errors)
+
+        target_ids = []
+        if delete_all_role:
+            cursor.execute("SELECT id FROM users WHERE role = %s AND COALESCE(is_super_admin, 0) = 0", (delete_all_role,))
+            target_ids = [r['id'] for r in cursor.fetchall() if r['id'] != exclude_user_id]
+        elif user_ids:
+            for raw_id in user_ids:
+                try:
+                    uid = int(raw_id)
+                    if uid != exclude_user_id:
+                        target_ids.append(uid)
+                except ValueError:
+                    continue
+
+        for uid in target_ids:
+            cursor.execute("SELECT id, full_name, email, instructor_id, role, is_super_admin FROM users WHERE id = %s", (uid,))
+            user = cursor.fetchone()
+            if not user:
+                continue
+            if user.get('is_super_admin'):
+                errors.append(f"Skipped Super Admin '{user.get('full_name')}'")
+                continue
+            try:
+                cursor_w.execute("DELETE FROM notifications WHERE user_id = %s", (uid,))
+                if user.get('role') == 'proctor':
+                    inst_id = user.get('instructor_id')
+                    if not inst_id and user.get('full_name'):
+                        cursor.execute("SELECT id FROM instructors WHERE LOWER(TRIM(name)) = LOWER(TRIM(%s)) LIMIT 1", (user['full_name'],))
+                        m = cursor.fetchone()
+                        if m:
+                            inst_id = m['id']
+                    if inst_id:
+                        _cleanup_instructor_dependencies(cursor_w, inst_id)
+                        cursor_w.execute("DELETE FROM instructors WHERE id = %s", (inst_id,))
+                cursor_w.execute("DELETE FROM users WHERE id = %s", (uid,))
+                deleted_count += 1
+            except Exception as row_err:
+                errors.append(f"{user.get('full_name')}: {row_err}")
+
+        # If all proctor user accounts have now been deleted, also clean up any orphaned instructor records
+        cursor.execute("SELECT COUNT(*) AS cnt FROM users WHERE role = 'proctor'")
+        rem = cursor.fetchone()
+        if rem and rem['cnt'] == 0:
+            cursor.execute("SELECT id FROM instructors")
+            for inst in cursor.fetchall():
+                _cleanup_instructor_dependencies(cursor_w, inst['id'])
+                cursor_w.execute("DELETE FROM instructors WHERE id = %s", (inst['id'],))
+
+        db.commit()
+        return (deleted_count, errors)
+    except Exception as e:
+        return (deleted_count, [str(e)])
     finally:
         db.close()
 
@@ -778,16 +966,41 @@ def bulk_import_rooms(rows):
     error_list = []
     try:
         cursor = db.cursor()
+        cursor_r = db.cursor(dictionary=True)
+        cursor_r.execute("SELECT id, LOWER(TRIM(room_name)) as rname FROM rooms")
+        existing_rooms = {r['rname']: r['id'] for r in cursor_r.fetchall()}
+        
+        # Pre-cache institute codes to avoid repeated queries
+        cursor_r.execute("SELECT id, UPPER(code) as code FROM institutes WHERE code IS NOT NULL")
+        inst_cache = {i['code']: i['id'] for i in cursor_r.fetchall()}
+        
         for i, row in enumerate(rows):
             try:
-                # Need to look up institute_id if institute_code is provided
-                institute_id = None
-                if 'institute_code' in row and row['institute_code']:
-                    cursor.execute("SELECT id FROM institutes WHERE code=%s", (row['institute_code'],))
-                    res = cursor.fetchone()
-                    if res: institute_id = res[0]
-                cursor.execute("INSERT INTO rooms (room_name, capacity, building, floor, institute_id, is_pwd_accessible) VALUES (%s, %s, %s, %s, %s, %s)",
-                               (row.get('room_name'), row.get('capacity'), row.get('building'), row.get('floor', 1), institute_id, row.get('pwd_accessible', 0)))
+                r_name = (row.get('room_name') or '').strip()
+                if not r_name:
+                    continue
+                institute_id = row.get('institute_id')
+                if not institute_id and row.get('institute_code'):
+                    institute_id = inst_cache.get(row['institute_code'].strip().upper())
+                
+                k = r_name.lower()
+                cap = int(row.get('capacity', 30) or 30)
+                bld = row.get('building', '')
+                flr = int(row.get('floor', 1) or 1)
+                pwd = int(row.get('pwd_accessible', 0) or 0)
+                
+                if k in existing_rooms:
+                    cursor.execute("""
+                        UPDATE rooms
+                        SET capacity=%s, building=%s, floor=%s, institute_id=%s, is_pwd_accessible=%s
+                        WHERE id=%s
+                    """, (cap, bld, flr, institute_id, pwd, existing_rooms[k]))
+                else:
+                    cursor.execute("""
+                        INSERT INTO rooms (room_name, capacity, building, floor, institute_id, is_pwd_accessible)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (r_name, cap, bld, flr, institute_id, pwd))
+                    existing_rooms[k] = cursor.lastrowid
                 success_count += 1
             except Exception as e:
                 error_list.append(f"Row {i+1}: {str(e)}")
@@ -873,8 +1086,8 @@ def add_instructor(name, institute_id=None, building=None, is_pwd=0, subjects_ta
         if '_cached_proctor_pw_hash' not in globals() or not _cached_proctor_pw_hash:
             _cached_proctor_pw_hash = hash_password(proctor_password)
         hashed = _cached_proctor_pw_hash
-        cursor.execute("INSERT INTO users (full_name, email, password, role, instructor_id) VALUES (%s, %s, %s, 'proctor', %s)",
-                       (name, proctor_email, hashed, instructor_id))
+        cursor.execute("INSERT INTO users (full_name, email, password, role, instructor_id, institute_id) VALUES (%s, %s, %s, 'proctor', %s, %s)",
+                       (name, proctor_email, hashed, instructor_id, institute_id))
         db.commit()
         return instructor_id
     finally:
@@ -887,6 +1100,8 @@ def edit_instructor(id, name, institute_id, building, is_pwd, subjects_taught):
         cursor = db.cursor()
         cursor.execute("UPDATE instructors SET name=%s, institute_id=%s, building=%s, is_pwd=%s, subjects_taught=%s WHERE id=%s",
                        (name, institute_id, building, is_pwd, subjects_taught, id))
+        cursor.execute("UPDATE users SET full_name=%s, institute_id=%s WHERE instructor_id=%s AND role='proctor'",
+                       (name, institute_id, id))
         db.commit()
     finally:
         db.close()
@@ -917,11 +1132,16 @@ def delete_instructor(instructor_id):
     if not db: return 'Database connection failed.'
     try:
         cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT COUNT(*) AS cnt FROM exams WHERE instructor_id = %s", (instructor_id,))
-        row = cursor.fetchone()
-        if row and row['cnt'] > 0:
-            return f"Cannot delete this instructor — assigned to {row['cnt']} exams."
-        cursor.execute("DELETE FROM instructors WHERE id = %s", (instructor_id,))
+        cursor_w = db.cursor()
+        # Find any linked proctor user accounts so they are also removed from User Management
+        cursor.execute("SELECT id FROM users WHERE instructor_id = %s AND role = 'proctor' AND COALESCE(is_super_admin, 0) = 0", (instructor_id,))
+        linked_users = cursor.fetchall()
+        for u in linked_users:
+            cursor_w.execute("DELETE FROM notifications WHERE user_id = %s", (u['id'],))
+            cursor_w.execute("DELETE FROM users WHERE id = %s", (u['id'],))
+
+        _cleanup_instructor_dependencies(cursor_w, instructor_id)
+        cursor_w.execute("DELETE FROM instructors WHERE id = %s", (instructor_id,))
         db.commit()
         return None
     except Exception as e:
@@ -930,7 +1150,7 @@ def delete_instructor(instructor_id):
         db.close()
 
 def bulk_import_instructors(rows):
-    from datetime import timedelta as _td
+    from datetime import timedelta as _td, date as _date
     db = open_db()
     if not db: return (0, ["DB Error"])
     success_count = 0
@@ -938,20 +1158,58 @@ def bulk_import_instructors(rows):
     
     # Get exam period for date mapping
     period_start, period_end = get_exam_period()
+    if not period_start or not period_end:
+        period_start = _date(2026, 11, 2)
+        period_end   = _date(2026, 11, 7)
     day_map = {'Mon': 0, 'Tue': 1, 'Wed': 2, 'Thu': 3, 'Fri': 4, 'Sat': 5, 'Sun': 6}
     
     try:
         cursor = db.cursor()
         for i, row in enumerate(rows):
             try:
-                institute_id = None
-                if 'institute_code' in row and row['institute_code']:
-                    cursor.execute("SELECT id FROM institutes WHERE code=%s", (row['institute_code'],))
+                institute_id = row.get('institute_id')
+                if not institute_id and row.get('institute_code'):
+                    cursor.execute("SELECT id FROM institutes WHERE UPPER(code)=UPPER(%s)", (row['institute_code'].strip(),))
                     res = cursor.fetchone()
                     if res: institute_id = res[0]
                 
-                # Add instructor
-                inst_id = add_instructor(row.get('name'), institute_id, row.get('building'), row.get('is_pwd', 0), row.get('subjects_taught', ''), provided_email=row.get('email', ''))
+                name_val = (row.get('name') or '').strip()
+                if not name_val:
+                    continue
+
+                # Smart upsert: if instructor with this name already exists, update their institute, building, subjects, and status
+                cursor.execute("SELECT id FROM instructors WHERE LOWER(TRIM(name)) = LOWER(TRIM(%s)) LIMIT 1", (name_val,))
+                existing = cursor.fetchone()
+                if existing:
+                    inst_id = existing[0]
+                    cursor.execute("""
+                        UPDATE instructors
+                        SET institute_id = COALESCE(%s, institute_id),
+                            building = CASE WHEN %s IS NOT NULL AND %s != '' THEN %s ELSE building END,
+                            is_pwd = %s,
+                            subjects_taught = CASE WHEN %s IS NOT NULL AND %s != '' THEN %s ELSE subjects_taught END,
+                            status = 'Active'
+                        WHERE id = %s
+                    """, (
+                        institute_id,
+                        row.get('building'), row.get('building'), row.get('building'),
+                        int(row.get('is_pwd', 0) or 0),
+                        row.get('subjects_taught'), row.get('subjects_taught'), row.get('subjects_taught'),
+                        inst_id
+                    ))
+                    if institute_id:
+                        cursor.execute("UPDATE users SET institute_id = %s WHERE instructor_id = %s", (institute_id, inst_id))
+                    db.commit()
+                else:
+                    db.commit()
+                    inst_id = add_instructor(
+                        name_val,
+                        institute_id,
+                        row.get('building'),
+                        row.get('is_pwd', 0),
+                        row.get('subjects_taught', ''),
+                        provided_email=row.get('email', '')
+                    )
                 
                 # Save availability if present
                 if inst_id and 'availability' in row and row['availability'] and period_start and period_end:
@@ -959,7 +1217,6 @@ def bulk_import_instructors(rows):
                     for avail in row['availability']:
                         target_wd = day_map.get(avail['day'])
                         if target_wd is not None:
-                            # Find all dates in period matching this weekday
                             curr = period_start
                             while curr <= period_end:
                                 if curr.weekday() == target_wd:
@@ -1073,13 +1330,13 @@ def delete_all_exams():
         db.close()
 
 def bulk_import_exams(rows):
-    """Insert multiple exams from parsed CSV rows.
+    """Insert or update multiple exams from parsed CSV rows.
     Each row dict: subject_name, section, subject_type, institute_id (resolved).
     Duration is auto-set from system settings based on subject_type.
+    Prevents duplicate (subject_name, section) entries on re-import.
     Returns (success_count, error_list)."""
     db = open_db()
     if not db: return (0, ["DB Error"])
-    # Load duration defaults from settings
     settings = get_system_settings()
     major_min = int(float(settings.get('major_duration_hrs', 3.0) or 3.0) * 60)
     minor_min = int(float(settings.get('minor_duration_hrs', 1)) * 60)
@@ -1087,23 +1344,45 @@ def bulk_import_exams(rows):
     error_list = []
     try:
         cursor = db.cursor()
+        cursor_r = db.cursor(dictionary=True)
+        cursor_r.execute("SELECT id, subject_name, section FROM exams")
+        existing_map = {}
+        for ex in cursor_r.fetchall():
+            k = ((ex.get('subject_name') or '').strip().lower(), (ex.get('section') or '').strip().upper())
+            existing_map[k] = ex['id']
+
+        insert_batch = []
         for i, row in enumerate(rows):
             try:
                 subject_type = row.get('subject_type', 'Major')
-                # Auto-set duration based on subject type
-                if subject_type in ('Minor', 'Laboratory'):
-                    dur_min = minor_min
+                dur_min = minor_min if subject_type in ('Minor', 'Laboratory') else major_min
+                s_name = (row.get('subject_name') or '').strip()
+                sec = (row.get('section') or '').strip() or None
+                key = (s_name.lower(), (sec or '').upper())
+                if key in existing_map:
+                    cursor.execute(
+                        """UPDATE exams
+                           SET subject_type=%s, duration_minutes=%s, institute_id=%s, subject_id=%s,
+                               status='Pending', exam_date_time=NULL, room_id=NULL, instructor_id=NULL, instructor_name=NULL
+                           WHERE id=%s""",
+                        (subject_type, dur_min, row.get('institute_id'), row.get('subject_id'), existing_map[key])
+                    )
                 else:
-                    dur_min = major_min
-                cursor.execute(
-                    """INSERT INTO exams (subject_name, section, subject_type, duration_minutes, status, institute_id, subject_id)
-                       VALUES (%s, %s, %s, %s, \'Pending\', %s, %s)""",
-                    (row.get('subject_name'), row.get('section') or None,
-                     subject_type, dur_min,
-                     row.get('institute_id'), row.get('subject_id')))
+                    insert_batch.append((
+                        s_name, sec, subject_type, dur_min,
+                        row.get('institute_id'), row.get('subject_id')
+                    ))
+                    existing_map[key] = -1
                 success_count += 1
             except Exception as e:
                 error_list.append(f"Row {i+1}: {str(e)}")
+
+        if insert_batch:
+            cursor.executemany(
+                """INSERT INTO exams (subject_name, section, subject_type, duration_minutes, status, institute_id, subject_id)
+                   VALUES (%s, %s, %s, %s, 'Pending', %s, %s)""",
+                insert_batch
+            )
         db.commit()
     finally:
         db.close()
@@ -1135,10 +1414,16 @@ def get_pending_exams():
         cursor.execute("""
             SELECT e.*, s.content_group_id, s.code AS subject_code, s.name AS subject_catalog_name,
                    COALESCE(inst.capacity_default, 40) AS institute_capacity_default,
-                   (SELECT COUNT(*) FROM users u WHERE u.role = 'student' AND u.section = e.section) AS section_student_count
+                   COALESCE(u_cnt.stu_cnt, 0) AS section_student_count
             FROM exams e
             LEFT JOIN subjects s ON e.subject_id = s.id
             LEFT JOIN institutes inst ON e.institute_id = inst.id
+            LEFT JOIN (
+                SELECT section, COUNT(*) AS stu_cnt
+                FROM users
+                WHERE role = 'student' AND section IS NOT NULL
+                GROUP BY section
+            ) u_cnt ON u_cnt.section = e.section
             WHERE e.exam_date_time IS NULL OR e.status IN ('Pending', 'Unscheduled')
         """)
         return cursor.fetchall()
@@ -1257,118 +1542,208 @@ def get_already_scheduled_slots():
     finally:
         db.close()
 
+def sync_exam_and_subject_institutes():
+    """
+    1. Automatically removes duplicate (subject_name, section) rows in exams (caused by importing CSV multiple times).
+    2. Ensures all exams and subjects have consistent CCA institute assignments in bulk (fewest SQL queries).
+    """
+    import re as _re
+    from collections import defaultdict as _dd
+    db = open_db()
+    if not db:
+        return
+    try:
+        cursor = db.cursor()
+        cursor_r = db.cursor(dictionary=True)
+        cursor_r.execute("SELECT id, UPPER(TRIM(code)) AS code FROM institutes WHERE code IS NOT NULL")
+        inst_by_code = {r['code']: r['id'] for r in cursor_r.fetchall() if r.get('code')}
+        if not inst_by_code:
+            return
+
+        prefix_to_code = {
+            'C': 'ICSLIS', 'CS': 'ICSLIS', 'I': 'ICSLIS', 'IS': 'ICSLIS', 'ACT': 'ICSLIS', 'L': 'ICSLIS', 'LIS': 'ICSLIS',
+            'A': 'IBM', 'BSA': 'IBM', 'AI': 'IBM', 'AIS': 'IBM', 'BSAIS': 'IBM', 'E': 'IBM', 'BSE': 'IBM', 'T': 'IBM', 'BSTM': 'IBM',
+            'BPE': 'IEAS', 'TE': 'IEAS', 'BTLE': 'IEAS', 'BSNE': 'IEAS', 'PSYCH': 'IEAS', 'BAELS': 'IEAS', 'M': 'IEAS', 'COMM': 'IEAS'
+        }
+
+        cursor_r.execute("SELECT id, section, institute_id, subject_id, subject_name, status FROM exams ORDER BY (status = 'Scheduled') DESC, id ASC")
+        exam_rows = cursor_r.fetchall()
+
+        seen_keys = set()
+        dup_exam_ids = []
+        ids_by_target_inst = _dd(list)
+        subj_inst_sets = _dd(set)
+
+        for ex in exam_rows:
+            s_name = (ex.get('subject_name') or '').strip().lower()
+            sec = (ex.get('section') or '').strip()
+            dedup_key = (s_name, sec.upper())
+            if dedup_key in seen_keys:
+                dup_exam_ids.append(ex['id'])
+                continue
+            seen_keys.add(dedup_key)
+
+            m = _re.match(r'^[A-Za-z]+', sec)
+            pref = m.group(0).upper() if m else ''
+            target_code = prefix_to_code.get(pref)
+            target_inst_id = inst_by_code.get(target_code) if target_code else ex.get('institute_id')
+            if target_inst_id and target_inst_id != ex.get('institute_id'):
+                ids_by_target_inst[target_inst_id].append(ex['id'])
+            eff_inst_id = target_inst_id or ex.get('institute_id')
+            sid = ex.get('subject_id')
+            if sid and eff_inst_id:
+                subj_inst_sets[sid].add(eff_inst_id)
+
+        if dup_exam_ids:
+            placeholders = ",".join(["%s"] * len(dup_exam_ids))
+            dup_tuple = tuple(dup_exam_ids)
+            cursor.execute(f"DELETE FROM exam_collection WHERE exam_id IN ({placeholders})", dup_tuple)
+            cursor.execute(f"DELETE FROM relievers WHERE exam_id IN ({placeholders})", dup_tuple)
+            cursor.execute(f"DELETE FROM proctor_absence WHERE exam_id IN ({placeholders})", dup_tuple)
+            cursor.execute(f"DELETE FROM exams WHERE id IN ({placeholders})", dup_tuple)
+
+        # Bulk update exams by target institute (at most 3 UPDATE queries instead of 1000+)
+        for target_inst_id, eid_list in ids_by_target_inst.items():
+            placeholders = ",".join(["%s"] * len(eid_list))
+            cursor.execute(
+                f"UPDATE exams SET institute_id = %s WHERE id IN ({placeholders})",
+                tuple([target_inst_id] + eid_list)
+            )
+
+        # Bulk update subjects by (institute_id, is_common)
+        sids_by_inst_common = _dd(list)
+        for sid, inst_ids in subj_inst_sets.items():
+            if len(inst_ids) == 1:
+                only_inst = next(iter(inst_ids))
+                sids_by_inst_common[(only_inst, 0)].append(sid)
+            elif len(inst_ids) > 1:
+                ieas_id = inst_by_code.get('IEAS') or next(iter(inst_ids))
+                sids_by_inst_common[(ieas_id, 1)].append(sid)
+
+        for (target_inst_id, is_common_flag), sid_list in sids_by_inst_common.items():
+            placeholders = ",".join(["%s"] * len(sid_list))
+            cursor.execute(
+                f"UPDATE subjects SET institute_id = %s, is_common = %s WHERE id IN ({placeholders})",
+                tuple([target_inst_id, is_common_flag] + sid_list)
+            )
+
+        db.commit()
+    except Exception as e:
+        print("[sync_exam_and_subject_institutes error]", e)
+    finally:
+        db.close()
+
 def apply_schedule_results(scheduled, failed_ids):
+    is_pub = is_schedule_published()
     db = open_db()
     if not db: return
     try:
         cursor  = db.cursor()
         cursor_r = db.cursor(dictionary=True)
-        for item in scheduled:
-            cursor.execute("""
-                UPDATE exams SET room_id=%s, instructor_id=%s, instructor_name=%s, exam_date_time=%s, status='Scheduled' WHERE id=%s
-            """, (item['room_id'], item['instructor_id'], item['instructor_name'], item['exam_date_time'], item['exam_id']))
 
-            # ── Fetch exam details for notification messages ──────────────
-            cursor_r.execute(
-                "SELECT subject_name, section FROM exams WHERE id=%s", (item['exam_id'],)
-            )
-            exam_row = cursor_r.fetchone() or {}
-            subject  = exam_row.get('subject_name') or 'Exam'
-            section  = exam_row.get('section') or ''
-            dt_str   = item['exam_date_time'].strftime('%b %d, %Y %I:%M %p') \
-                       if hasattr(item['exam_date_time'], 'strftime') else str(item['exam_date_time'])
+        if scheduled:
+            # Batch UPDATE in chunks of 200 rows using CASE WHEN so 1,000+ exams update in 5 fast queries
+            chunk_size = 200
+            for start_idx in range(0, len(scheduled), chunk_size):
+                chunk = scheduled[start_idx:start_idx + chunk_size]
+                room_cases, inst_cases, name_cases, dt_cases, ids = [], [], [], [], []
+                params_room, params_inst, params_name, params_dt = [], [], [], []
+                for item in chunk:
+                    eid = int(item['exam_id'])
+                    ids.append(eid)
+                    room_cases.append("WHEN %s THEN %s")
+                    params_room.extend([eid, item['room_id']])
+                    inst_cases.append("WHEN %s THEN %s")
+                    params_inst.extend([eid, item['instructor_id']])
+                    name_cases.append("WHEN %s THEN %s")
+                    params_name.extend([eid, item['instructor_name']])
+                    dt_cases.append("WHEN %s THEN %s")
+                    params_dt.extend([eid, item['exam_date_time']])
+                id_placeholders = ",".join(["%s"] * len(ids))
+                sql = f"""
+                    UPDATE exams
+                    SET room_id = CASE id {' '.join(room_cases)} END,
+                        instructor_id = CASE id {' '.join(inst_cases)} END,
+                        instructor_name = CASE id {' '.join(name_cases)} END,
+                        exam_date_time = CASE id {' '.join(dt_cases)} END,
+                        status = 'Scheduled'
+                    WHERE id IN ({id_placeholders})
+                """
+                all_params = tuple(params_room + params_inst + params_name + params_dt + ids)
+                cursor.execute(sql, all_params)
 
-            # ── Notify assigned proctor (in-app) ─────────────────────────
-            cursor_r.execute(
-                "SELECT id FROM users WHERE instructor_id = %s AND role='proctor' LIMIT 1",
-                (item['instructor_id'],)
-            )
-            proctor_user = cursor_r.fetchone()
-            if proctor_user:
-                create_notification(
-                    proctor_user['id'],
-                    f"📋 Proctoring Assignment: {subject}",
-                    f"You have been assigned to proctor '{subject}'"
-                    + (f" — Section {section}" if section else "")
-                    + f" on {dt_str}."
-                )
-
-            # ── Notify all students in the section (in-app) ───────────────
-            if section:
-                cursor_r.execute(
-                    "SELECT id FROM users WHERE role='student' AND section=%s",
-                    (section,)
-                )
-                for student in cursor_r.fetchall():
-                    create_notification(
-                        student['id'],
-                        f"📅 Exam Scheduled: {subject}",
-                        f"Your exam for '{subject}' (Section {section}) has been scheduled"
-                        f" on {dt_str}. Please check the timetable for room details."
+            if is_pub:
+                cursor_r.execute("SELECT instructor_id, id FROM users WHERE role='proctor' AND instructor_id IS NOT NULL")
+                proctor_user_map = {r['instructor_id']: r['id'] for r in cursor_r.fetchall()}
+                notif_rows = []
+                for item in scheduled:
+                    p_uid = proctor_user_map.get(item.get('instructor_id'))
+                    if p_uid:
+                        subject = item.get('subject_name') or 'Exam'
+                        section = item.get('section') or ''
+                        dt_val = item.get('exam_date_time')
+                        dt_str = dt_val.strftime('%b %d, %Y %I:%M %p') if hasattr(dt_val, 'strftime') else str(dt_val)
+                        notif_rows.append((
+                            p_uid,
+                            f"📋 Proctoring Assignment: {subject}",
+                            f"You have been assigned to proctor '{subject}'"
+                            + (f" — Section {section}" if section else "")
+                            + f" on {dt_str}."
+                        ))
+                if notif_rows:
+                    cursor.executemany(
+                        "INSERT INTO notifications (user_id, title, message, created_at, is_read) VALUES (%s, %s, %s, NOW(), 0)",
+                        notif_rows
                     )
 
-        for eid in failed_ids:
-            cursor.execute("UPDATE exams SET status='Unscheduled' WHERE id=%s", (eid,))
+        if failed_ids:
+            placeholders = ",".join(["%s"] * len(failed_ids))
+            cursor.execute(
+                f"UPDATE exams SET status='Unscheduled' WHERE id IN ({placeholders})",
+                tuple(int(eid) for eid in failed_ids)
+            )
         db.commit()
     finally:
         db.close()
 
 def reset_schedule():
+    was_published = is_schedule_published()
     db = open_db()
     if not db: return
     try:
         cursor   = db.cursor()
         cursor_r = db.cursor(dictionary=True)
 
-        # ── Notify proctors and students BEFORE clearing ──────────────────
-        # Collect all scheduled exams with their proctor and section
-        cursor_r.execute("""
-            SELECT e.id, e.subject_name, e.section, e.exam_date_time, e.instructor_id
-            FROM exams e
-            WHERE e.status = 'Scheduled' AND e.exam_date_time IS NOT NULL
+        # Clean up any draft/published assignment notifications
+        cursor.execute("""
+            DELETE FROM notifications
+            WHERE title LIKE '%Proctoring Assignment:%'
+               OR title LIKE '%Exam Scheduled:%'
+               OR title = 'Exam Timetable Published'
         """)
-        scheduled = cursor_r.fetchall()
 
-        notified_proctors  = set()
-        notified_students  = set()
-
-        for exam in scheduled:
-            subject = exam.get('subject_name') or 'an exam'
-            section = (exam.get('section') or '').strip()
-
-            # Notify each proctor once (they may proctor multiple exams)
-            inst_id = exam.get('instructor_id')
-            if inst_id and inst_id not in notified_proctors:
-                cursor_r.execute(
-                    "SELECT id FROM users WHERE instructor_id=%s AND role='proctor' LIMIT 1",
-                    (inst_id,)
-                )
-                proctor = cursor_r.fetchone()
-                if proctor:
-                    create_notification(
-                        proctor['id'],
-                        "🔄 Schedule Reset by Admin",
-                        "The exam schedule has been reset by the administrator. "
-                        "All your proctoring assignments have been cleared. "
-                        "A new schedule will be generated shortly."
-                    )
-                    notified_proctors.add(inst_id)
-
-            # Notify each student in the section once
-            if section:
-                cursor_r.execute(
-                    "SELECT id FROM users WHERE role='student' AND section=%s",
-                    (section,)
-                )
-                for student in cursor_r.fetchall():
-                    if student['id'] not in notified_students:
-                        create_notification(
-                            student['id'],
-                            "🔄 Exam Schedule Reset",
-                            f"The exam schedule for Section {section} has been reset by the administrator. "
-                            "Your exam timetable will be updated once a new schedule is generated."
-                        )
-                        notified_students.add(student['id'])
+        # ── Notify proctors and students BEFORE clearing (ONLY if schedule was live/published) ──
+        if was_published:
+            cursor.execute("""
+                INSERT INTO notifications (user_id, title, message, created_at, is_read)
+                SELECT DISTINCT u.id,
+                       '🔄 Schedule Reset by Admin',
+                       'The exam schedule has been reset by the administrator. All your proctoring assignments have been cleared. A new schedule will be generated shortly.',
+                       NOW(), 0
+                FROM exams e
+                JOIN users u ON u.instructor_id = e.instructor_id AND u.role = 'proctor'
+                WHERE e.status = 'Scheduled' AND e.exam_date_time IS NOT NULL
+            """)
+            cursor.execute("""
+                INSERT INTO notifications (user_id, title, message, created_at, is_read)
+                SELECT DISTINCT u.id,
+                       '🔄 Exam Schedule Reset',
+                       CONCAT('The exam schedule for Section ', u.section, ' has been reset by the administrator. Your exam timetable will be updated once a new schedule is generated.'),
+                       NOW(), 0
+                FROM exams e
+                JOIN users u ON u.section = e.section AND u.role = 'student'
+                WHERE e.status = 'Scheduled' AND e.exam_date_time IS NOT NULL AND e.section IS NOT NULL AND e.section != ''
+            """)
 
         # ── Clear the schedule & associated schedule records ──────────────
         cursor.execute("DELETE FROM exam_collection")
@@ -1785,60 +2160,62 @@ def apply_exam_edit(exam_id, new_room_id, new_instructor_id, new_datetime_str, s
                     )
         db.commit()
 
-        # ── Notify OLD proctor if they were replaced ───────────────────────
-        if old_instructor_id and old_instructor_id != new_instructor_id:
+        # Only notify proctors and students about manual schedule edits if the schedule is already published!
+        if is_schedule_published():
+            # ── Notify OLD proctor if they were replaced ───────────────────────
+            if old_instructor_id and old_instructor_id != new_instructor_id:
+                cursor_r.execute(
+                    "SELECT id, full_name FROM users WHERE instructor_id=%s AND role='proctor' LIMIT 1",
+                    (old_instructor_id,)
+                )
+                old_proctor = cursor_r.fetchone()
+                if old_proctor:
+                    create_notification(
+                        old_proctor['id'],
+                        f"🔄 Proctoring Reassigned: {subject}",
+                        f"You have been removed from proctoring '{subject}'"
+                        + (f" — Section {section}" if section else "")
+                        + f". The exam has been reassigned to another proctor."
+                    )
+
+            # ── Notify NEW / CURRENT proctor ──────────────────────────────────
             cursor_r.execute(
                 "SELECT id, full_name FROM users WHERE instructor_id=%s AND role='proctor' LIMIT 1",
-                (old_instructor_id,)
+                (new_instructor_id,)
             )
-            old_proctor = cursor_r.fetchone()
-            if old_proctor:
-                create_notification(
-                    old_proctor['id'],
-                    f"🔄 Proctoring Reassigned: {subject}",
-                    f"You have been removed from proctoring '{subject}'"
-                    + (f" — Section {section}" if section else "")
-                    + f". The exam has been reassigned to another proctor."
-                )
+            new_proctor = cursor_r.fetchone()
+            if new_proctor:
+                if old_instructor_id and old_instructor_id != new_instructor_id:
+                    # Newly assigned
+                    msg = (
+                        f"You have been assigned to proctor '{subject}'"
+                        + (f" — Section {section}" if section else "")
+                        + f" on {dt_str}."
+                    )
+                    title = f"📋 Proctoring Assignment: {subject}"
+                else:
+                    # Same proctor, details updated
+                    msg = (
+                        f"Your proctoring schedule for '{subject}'"
+                        + (f" — Section {section}" if section else "")
+                        + f" has been updated to {dt_str}."
+                    )
+                    title = f"📅 Schedule Updated: {subject}"
+                create_notification(new_proctor['id'], title, msg)
 
-        # ── Notify NEW / CURRENT proctor ──────────────────────────────────
-        cursor_r.execute(
-            "SELECT id, full_name FROM users WHERE instructor_id=%s AND role='proctor' LIMIT 1",
-            (new_instructor_id,)
-        )
-        new_proctor = cursor_r.fetchone()
-        if new_proctor:
-            if old_instructor_id and old_instructor_id != new_instructor_id:
-                # Newly assigned
-                msg = (
-                    f"You have been assigned to proctor '{subject}'"
-                    + (f" — Section {section}" if section else "")
-                    + f" on {dt_str}."
+            # ── Notify all students in the section ────────────────────────────
+            if section:
+                cursor_r.execute(
+                    "SELECT id FROM users WHERE role='student' AND section=%s",
+                    (section,)
                 )
-                title = f"📋 Proctoring Assignment: {subject}"
-            else:
-                # Same proctor, details updated
-                msg = (
-                    f"Your proctoring schedule for '{subject}'"
-                    + (f" — Section {section}" if section else "")
-                    + f" has been updated to {dt_str}."
-                )
-                title = f"📅 Schedule Updated: {subject}"
-            create_notification(new_proctor['id'], title, msg)
-
-        # ── Notify all students in the section ────────────────────────────
-        if section:
-            cursor_r.execute(
-                "SELECT id FROM users WHERE role='student' AND section=%s",
-                (section,)
-            )
-            for student in cursor_r.fetchall():
-                create_notification(
-                    student['id'],
-                    f"📅 Exam Rescheduled: {subject}",
-                    f"Your exam for '{subject}' (Section {section}) has been updated."
-                    f" New schedule: {dt_str}. Please check the timetable for the latest room details."
-                )
+                for student in cursor_r.fetchall():
+                    create_notification(
+                        student['id'],
+                        f"📅 Exam Rescheduled: {subject}",
+                        f"Your exam for '{subject}' (Section {section}) has been updated."
+                        f" New schedule: {dt_str}. Please check the timetable for the latest room details."
+                    )
 
         return True
     finally:
@@ -1867,7 +2244,7 @@ def get_public_timetable(section=None, institute_id=None, bypass_published_guard
             LEFT JOIN institutes inst ON e.institute_id = inst.id
             LEFT JOIN subjects s ON e.subject_id = s.id
             WHERE e.status = 'Scheduled'
-              AND e.section = %s
+              AND TRIM(e.section) = %s
         """
         params = [section.strip()]
         if institute_id:
@@ -2384,11 +2761,50 @@ def clear_all_notifications(user_id):
     finally:
         db.close()
 
+def delete_selected_notifications(user_id, notif_ids):
+    """Deletes only the specified notification IDs belonging to user_id."""
+    if not notif_ids:
+        return 0
+    clean_ids = []
+    for nid in notif_ids:
+        try:
+            clean_ids.append(int(nid))
+        except (ValueError, TypeError):
+            continue
+    if not clean_ids:
+        return 0
+    db = open_db()
+    if not db:
+        return 0
+    try:
+        cursor = db.cursor()
+        placeholders = ",".join(["%s"] * len(clean_ids))
+        cursor.execute(
+            f"DELETE FROM notifications WHERE user_id = %s AND id IN ({placeholders})",
+            tuple([user_id] + clean_ids)
+        )
+        deleted = cursor.rowcount
+        db.commit()
+        return deleted
+    finally:
+        db.close()
+
 def get_notifications(user_id, unread_only=False):
     db = open_db()
     if not db: return []
     try:
         cursor = db.cursor(dictionary=True)
+        # If schedule is currently in Draft mode (not published), purge any premature assignment notifications
+        cursor.execute("SELECT schedule_published FROM system_settings WHERE id = 1")
+        st = cursor.fetchone()
+        if st and not st.get('schedule_published'):
+            cursor.execute("""
+                DELETE FROM notifications
+                WHERE title LIKE '%Proctoring Assignment:%'
+                   OR title LIKE '%Exam Scheduled:%'
+                   OR title = 'Exam Timetable Published'
+            """)
+            db.commit()
         query = "SELECT * FROM notifications WHERE user_id=%s"
         if unread_only: query += " AND is_read=0"
         query += " ORDER BY created_at DESC"
@@ -2402,8 +2818,48 @@ def get_unread_count(user_id):
     if not db: return 0
     try:
         cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT schedule_published FROM system_settings WHERE id = 1")
+        st = cursor.fetchone()
+        if st and not st.get('schedule_published'):
+            cursor.execute("""
+                DELETE FROM notifications
+                WHERE title LIKE '%Proctoring Assignment:%'
+                   OR title LIKE '%Exam Scheduled:%'
+                   OR title = 'Exam Timetable Published'
+            """)
+            db.commit()
         cursor.execute("SELECT COUNT(*) as c FROM notifications WHERE user_id=%s AND is_read=0", (user_id,))
         return cursor.fetchone()['c']
+    finally:
+        db.close()
+
+def get_live_sync_signature():
+    """
+    Returns a compact state signature for real-time auto-refresh across portals:
+    tracks schedule publication status, proctor absence reports, substitute relievers, and exam collection.
+    """
+    db = open_db()
+    if not db:
+        return ""
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT schedule_published, schedule_published_at FROM system_settings WHERE id = 1")
+        st = cursor.fetchone() or {}
+        pub = int(bool(st.get('schedule_published', 0)))
+        pub_at = str(st.get('schedule_published_at') or '')
+
+        cursor.execute("SELECT COUNT(*) AS cnt, COALESCE(MAX(id), 0) AS max_id FROM proctor_absence")
+        ab = cursor.fetchone() or {}
+
+        cursor.execute("SELECT COUNT(*) AS cnt, COALESCE(MAX(id), 0) AS max_id FROM relievers")
+        rl = cursor.fetchone() or {}
+
+        cursor.execute("SELECT COUNT(*) AS cnt, COALESCE(MAX(collected_at), '') AS max_col, COALESCE(MAX(returned_at), '') AS max_ret FROM exam_collection")
+        ec = cursor.fetchone() or {}
+
+        return f"pub:{pub}:{pub_at}|ab:{ab.get('cnt',0)}:{ab.get('max_id',0)}|rl:{rl.get('cnt',0)}:{rl.get('max_id',0)}|ec:{ec.get('cnt',0)}:{ec.get('max_col','')}:{ec.get('max_ret','')}"
+    except Exception:
+        return ""
     finally:
         db.close()
 
@@ -3903,15 +4359,33 @@ def audit_schedule_conflicts(db=None):
                     'date': d.strftime('%b %d, %Y'),
                     'reason': f"{tot} exams on this day (maximum 3 permitted)"
                 })
-            elif maj > 2:
+            elif maj > 3:
                 for e in exs:
                     conflict_exam_ids.add(e['id'])
                     if 'daily_major' not in conflict_reasons[e['id']]: conflict_reasons[e['id']].append('daily_major')
                 section_overloads.append({
                     'section': sec,
                     'date': d.strftime('%b %d, %Y'),
-                    'reason': f"{maj} major exams on this day (maximum 2 permitted)"
+                    'reason': f"{maj} major exams on this day (maximum 3 permitted with 1-hr break)"
                 })
+            elif maj == 3:
+                # Permitted fallback only if minimum 1 hour break interval is respected between all exams
+                sorted_exs = sorted(exs, key=lambda x: x['start'])
+                has_break_violation = False
+                for idx in range(len(sorted_exs) - 1):
+                    gap_mins = (sorted_exs[idx+1]['start'] - sorted_exs[idx]['end']).total_seconds() / 60.0
+                    if gap_mins < 60:
+                        has_break_violation = True
+                        break
+                if has_break_violation:
+                    for e in exs:
+                        conflict_exam_ids.add(e['id'])
+                        if 'daily_major' not in conflict_reasons[e['id']]: conflict_reasons[e['id']].append('daily_major')
+                    section_overloads.append({
+                        'section': sec,
+                        'date': d.strftime('%b %d, %Y'),
+                        'reason': f"3 major exams on this day require at least 1-hour break between each (insufficient break)"
+                    })
 
     # 5. Proctor daily limits (>8.0 hours in a day)
     proctor_daily = defaultdict(lambda: defaultdict(float))

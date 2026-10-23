@@ -474,6 +474,7 @@
         <div class="px-4 sm:px-6 lg:px-8 py-6">
 
             <!-- Live Automated Conflict Verification Card (TOP OF PAGE) -->
+            <div id="conflictsSection" class="scroll-mt-20">
             {% if conflict_audit %}
                 {% if conflict_audit.is_clean and conflict_audit.total_exams > 0 %}
                 <div class="no-print bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
@@ -483,7 +484,7 @@
                         </div>
                         <div>
                             <div class="flex items-center gap-2">
-                                <h3 class="font-bold text-emerald-900 text-sm">Schedule is 100% Conflict-Free</h3>
+                                <h3 class="font-bold text-emerald-900 text-sm">No Conflicts at the moment &mdash; Schedule is 100% Conflict-Free</h3>
                                 <span class="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Verified Clean</span>
                             </div>
                             <p class="text-xs text-emerald-700 mt-0.5">
@@ -511,9 +512,11 @@
                                 </p>
                             </div>
                         </div>
-                        <button type="button" onclick="document.getElementById('conflictDetailsBoxTop').classList.toggle('hidden')" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors">
-                            <i class="fa-solid fa-list-check mr-1"></i> Toggle Conflict Details
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="openInspectorModal('conflictsInspectorModal')" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors cursor-pointer">
+                                <i class="fa-solid fa-up-right-from-square mr-1"></i> Inspect &amp; Resolve Conflicts
+                            </button>
+                        </div>
                     </div>
                     <div id="conflictDetailsBoxTop" class="hidden mt-3 pt-3 border-t border-red-200 space-y-2 max-h-60 overflow-y-auto text-xs">
                         {% for subc in conflict_audit.subject_conflicts %}
@@ -562,6 +565,8 @@
             {% endif %}
 
             <!-- Flash messages -->
+            </div><!-- /#conflictsSection -->
+
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                 <div class="no-print mb-5">
@@ -602,43 +607,70 @@
 
             <!-- Generate / Controls row -->
             <div class="no-print bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
+                <div class="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 flex items-start gap-2.5">
+                    <i class="fa-solid fa-circle-info text-emerald-600 text-sm mt-0.5 flex-shrink-0"></i>
+                    <div>
+                        <span class="font-bold">Exam Period Notice:</span>
+                        Scheduling ~1,000 exams requires an examination period of at least <strong>5 to 6 days</strong> (e.g., <strong>Oct 26 – Oct 31, 2026</strong> from <strong>07:00 to 20:00</strong>) to satisfy student load regulations (maximum 2 Major exams per day per section). <strong>Fresh Regeneration</strong> is enabled by default to wipe old partial attempts and place 100% of exams cleanly.
+                    </div>
+                </div>
                 <div class="flex flex-wrap gap-4 items-end justify-between">
                     <!-- Generate form -->
                     <form method="POST" action="/generate_schedule" class="gen-row">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Period Start</label>
-                            <input type="date" name="period_start" required
+                            <input type="date" name="period_start" value="{{ period_start.strftime('%Y-%m-%d') if period_start else '2026-10-26' }}" required
                                    class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Period End</label>
-                            <input type="date" name="period_end" required
+                            <input type="date" name="period_end" value="{{ period_end.strftime('%Y-%m-%d') if period_end else '2026-10-31' }}" required
                                    class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Daily Start</label>
-                            <input type="time" name="day_start" value="07:00" required
-                                   class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Daily Start (24h)</label>
+                            <select name="day_start" required
+                                    class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                                <option value="06:00">06:00 (06:00 AM)</option>
+                                <option value="06:30">06:30 (06:30 AM)</option>
+                                <option value="07:00" selected>07:00 (07:00 AM)</option>
+                                <option value="07:30">07:30 (07:30 AM)</option>
+                                <option value="08:00">08:00 (08:00 AM)</option>
+                                <option value="08:30">08:30 (08:30 AM)</option>
+                                <option value="09:00">09:00 (09:00 AM)</option>
+                            </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Daily End</label>
-                            <input type="time" name="day_end" value="20:00" required
-                                   class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Daily End (24h)</label>
+                            <select name="day_end" required
+                                    class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                                <option value="17:00">17:00 (05:00 PM)</option>
+                                <option value="17:30">17:30 (05:30 PM)</option>
+                                <option value="18:00">18:00 (06:00 PM)</option>
+                                <option value="18:30">18:30 (06:30 PM)</option>
+                                <option value="19:00">19:00 (07:00 PM)</option>
+                                <option value="19:30">19:30 (07:30 PM)</option>
+                                <option value="20:00" selected>20:00 (08:00 PM)</option>
+                                <option value="20:30">20:30 (08:30 PM)</option>
+                                <option value="21:00">21:00 (09:00 PM)</option>
+                                <option value="21:30">21:30 (09:30 PM)</option>
+                                <option value="22:00">22:00 (10:00 PM)</option>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Semester</label>
                             <select name="exam_semester" required class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
-                                <option value="1st Semester">1st Semester</option>
-                                <option value="2nd Semester">2nd Semester</option>
-                                <option value="Summer">Summer</option>
+                                <option value="1st Semester" {% if exam_semester == '1st Semester' %}selected{% endif %}>1st Semester</option>
+                                <option value="2nd Semester" {% if exam_semester == '2nd Semester' %}selected{% endif %}>2nd Semester</option>
+                                <option value="Summer" {% if exam_semester == 'Summer' %}selected{% endif %}>Summer</option>
                             </select>
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Exam Term</label>
                             <select name="exam_term" required class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
-                                <option value="Midterm">Midterm</option>
-                                <option value="Finals">Finals</option>
+                                <option value="Midterm" {% if exam_term == 'Midterm' %}selected{% endif %}>Midterm</option>
+                                <option value="Finals" {% if exam_term == 'Finals' %}selected{% endif %}>Finals</option>
                             </select>
                         </div>
                         <div>
@@ -653,7 +685,7 @@
                         </div>
                         <div class="flex items-center self-end pb-2">
                             <label class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer" title="Wipes existing timetable and generates a completely fresh schedule from scratch">
-                                <input type="checkbox" name="regenerate_all" value="1" class="rounded border-gray-300 text-[#668054] focus:ring-[#668054] w-4 h-4">
+                                <input type="checkbox" name="regenerate_all" value="1" checked class="rounded border-gray-300 text-[#668054] focus:ring-[#668054] w-4 h-4">
                                 <span>Fresh Regeneration</span>
                             </label>
                         </div>
@@ -809,29 +841,66 @@
 
             <!-- Stats strip -->
             <div class="no-print grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-                    <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Scheduled</p>
+                <!-- SCHEDULED CARD -->
+                <div onclick="openInspectorModal('scheduledInspectorModal')"
+                     class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-[#668054] transition-all group"
+                     title="Click to inspect scheduled exams summary">
+                    <div class="flex items-center justify-between">
+                        <p class="text-xs text-gray-500 uppercase tracking-wide font-medium group-hover:text-[#668054] transition-colors">Scheduled</p>
+                        <i class="fa-solid fa-calendar-check text-gray-400 group-hover:text-[#668054] text-xs transition-colors"></i>
+                    </div>
                     <p class="text-2xl font-bold text-[#668054] mt-1">{{ sched_count }} <span class="text-lg text-gray-400 font-normal">/ {{ total }}</span></p>
+                    <span class="text-[11px] text-gray-400 group-hover:text-[#668054] transition-colors inline-flex items-center gap-1 mt-1">
+                        <i class="fa-solid fa-eye text-[10px]"></i> Click to inspect summary
+                    </span>
                 </div>
-                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-                    <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Unscheduled</p>
+
+                <!-- UNSCHEDULED CARD -->
+                <div onclick="openInspectorModal('unscheduledInspectorModal')"
+                     class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 cursor-pointer hover:shadow-md {% if unscheduled|length > 0 %}hover:border-red-400{% else %}hover:border-emerald-500{% endif %} transition-all group"
+                     title="Click to inspect unscheduled exams">
+                    <div class="flex items-center justify-between">
+                        <p class="text-xs text-gray-500 uppercase tracking-wide font-medium {% if unscheduled|length > 0 %}group-hover:text-red-500{% else %}group-hover:text-emerald-600{% endif %} transition-colors">Unscheduled</p>
+                        <i class="fa-solid {% if unscheduled|length > 0 %}fa-circle-exclamation text-red-500{% else %}fa-circle-check text-emerald-500{% endif %} text-xs transition-colors"></i>
+                    </div>
                     <p class="text-2xl font-bold {% if unscheduled|length > 0 %}text-red-500{% else %}text-gray-400{% endif %} mt-1">{{ unscheduled|length }}</p>
+                    <span class="text-[11px] text-gray-400 {% if unscheduled|length > 0 %}group-hover:text-red-500{% else %}group-hover:text-emerald-600{% endif %} transition-colors inline-flex items-center gap-1 mt-1">
+                        {% if unscheduled|length > 0 %}
+                        <i class="fa-solid fa-up-right-from-square text-[10px] text-red-500"></i> View {{ unscheduled|length }} unscheduled
+                        {% else %}
+                        <i class="fa-solid fa-circle-check text-[10px] text-emerald-600"></i> 0 unscheduled &bull; click to view
+                        {% endif %}
+                    </span>
                 </div>
-                <div class="bg-white rounded-xl border shadow-sm p-4 transition-all {% if conflict_audit.total_conflicts_count > 0 %}border-red-300 bg-red-50/20 cursor-pointer hover:shadow-md{% else %}border-gray-200{% endif %}"
-                     {% if conflict_audit.total_conflicts_count > 0 %}onclick="const b = document.getElementById('conflictDetailsBoxTop'); if(b){b.classList.remove('hidden'); b.scrollIntoView({behavior:'smooth'});}" title="Click to view all conflicts"{% endif %}>
-                    <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Conflicts</p>
+
+                <!-- CONFLICTS CARD -->
+                <div onclick="openInspectorModal('conflictsInspectorModal')"
+                     class="bg-white rounded-xl border shadow-sm p-4 transition-all cursor-pointer hover:shadow-md group {% if conflict_audit.total_conflicts_count > 0 %}border-red-300 bg-red-50/20 hover:border-red-500{% else %}border-gray-200 hover:border-emerald-500{% endif %}"
+                     title="Click to inspect conflict report">
+                    <div class="flex items-center justify-between">
+                        <p class="text-xs text-gray-500 uppercase tracking-wide font-medium group-hover:text-gray-700 transition-colors">Conflicts</p>
+                        <i class="fa-solid fa-shield-halved {% if conflict_audit.total_conflicts_count > 0 %}text-red-500{% else %}text-emerald-500{% endif %} text-xs transition-colors"></i>
+                    </div>
                     <p class="text-2xl font-bold {% if conflict_audit.total_conflicts_count > 0 %}text-red-500{% else %}text-emerald-600{% endif %} mt-1">
                         {{ conflict_audit.total_conflicts_count }}
                         {% if conflict_audit.total_conflicts_count > 0 %}
-                        <span class="text-xs font-normal text-red-500 ml-1"><i class="fa-solid fa-arrow-down mr-0.5"></i>view</span>
+                        <span class="text-xs font-normal text-red-500 ml-1"><i class="fa-solid fa-up-right-from-square mr-0.5"></i>inspect</span>
                         {% else %}
                         <span class="text-xs font-normal text-emerald-600 ml-1"><i class="fa-solid fa-check mr-0.5"></i>clean</span>
                         {% endif %}
                     </p>
+                    <span class="text-[11px] text-gray-400 group-hover:text-gray-600 transition-colors inline-flex items-center gap-1 mt-1">
+                        {% if conflict_audit.total_conflicts_count > 0 %}
+                        <span class="text-red-600"><i class="fa-solid fa-triangle-exclamation text-[10px] mr-1"></i>{{ conflict_audit.total_conflicts_count }} conflict(s) &bull; click to view</span>
+                        {% else %}
+                        <span class="text-emerald-600"><i class="fa-solid fa-circle-check text-[10px] mr-1"></i>0 conflicts &bull; click to view</span>
+                        {% endif %}
+                    </span>
                 </div>
             </div>
 
             <!-- ══════ TIMETABLE GRID ══════ -->
+            <div id="scheduledSection" class="scroll-mt-20">
             {% if dates and times %}
             
             <div class="print-only">
@@ -1004,188 +1073,7 @@
                 <p class="text-sm mt-1">Set an exam period above and click <strong>Generate Schedule</strong> to auto-assign exams to time slots.</p>
             </div>
             {% endif %}
-
-            <!-- ══════ CONFLICTS SUMMARY ══════ -->
-            {% if conflict_ids|length > 0 %}
-            <div id="conflictSummary" class="mb-8 no-print">
-                <div class="flex justify-between items-center mb-3">
-                    <h2 class="text-base font-bold text-orange-600 flex items-center gap-2">
-                        <i class="fa-solid fa-triangle-exclamation"></i> Conflicts Detected
-                        <span class="ml-1 inline-flex items-center justify-center w-6 h-6 rounded-full bg-orange-100 text-orange-700 text-xs font-bold">{{ conflict_ids|length }}</span>
-                    </h2>
-                    <form action="{{ url_for('resolve_conflicts_route') }}" method="POST" class="inline">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <input type="hidden" name="conflict_ids" value="{{ conflict_ids|join(',') }}">
-                        <button type="submit" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg shadow-sm text-sm font-semibold transition-colors flex items-center gap-2">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-Resolve Conflicts
-                        </button>
-                    </form>
-                </div>
-                <div class="bg-white rounded-xl border border-orange-200 shadow-sm overflow-hidden">
-                    <div class="px-5 py-3 bg-orange-50 border-b border-orange-200 text-xs text-orange-700 font-medium">
-                        The following scheduled exams have conflicts. Click <strong>Edit</strong> to reassign the room, proctor, or time slot, or use <strong>Auto-Resolve</strong> to fix them automatically.
-                    </div>
-                    <div class="overflow-x-auto w-full"><table class="min-w-full divide-y divide-gray-100 text-sm">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Subject & Section</th>
-                                <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date & Time</th>
-                                <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Room</th>
-                                <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Proctor</th>
-                                <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Conflict Type</th>
-                                <th class="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100">
-                            {% for exam in scheduled_exams %}
-                            {% if exam.id in conflict_ids %}
-                            {% set reasons = conflict_reasons.get(exam.id, []) %}
-                            <tr class="hover:bg-orange-50 transition-colors">
-                                <td class="px-5 py-3">
-                                    <span class="font-semibold text-gray-900">{{ exam.subject_name }}</span>
-                                    <span class="text-gray-400 font-normal ml-1">— {{ exam.section }}</span>
-                                    <span class="ml-1 inline-block px-1.5 py-0.5 rounded text-xs font-semibold
-                                        {% if exam.subject_type == 'Major' %}bg-blue-100 text-blue-700{% else %}bg-yellow-100 text-yellow-700{% endif %}">
-                                        {{ exam.subject_type }}
-                                    </span>
-                                </td>
-                                <td class="px-5 py-3 text-gray-600 whitespace-nowrap">{{ exam._date_str }} {{ exam._time_str }}</td>
-                                <td class="px-5 py-3 text-gray-600">
-                                    {% if exam.room_id %}
-                                    <span class="inline-flex items-center gap-1 cursor-pointer hover:text-[#668054] hover:underline"
-                                          onclick="openAvailabilityModal('room', '{{ exam.room_id }}', '{{ exam.room_name | e }}')">
-                                        <i class="fa-solid fa-door-open fa-xs text-[#668054]"></i>{{ exam.room_name }}
-                                    </span>
-                                    {% else %}—{% endif %}
-                                </td>
-                                <td class="px-5 py-3 text-gray-600">
-                                    {% if exam.instructor_id %}
-                                    <span class="inline-flex items-center gap-1 cursor-pointer hover:text-[#668054] hover:underline"
-                                          onclick="openAvailabilityModal('instructor', '{{ exam.instructor_id }}', '{{ exam.instructor_name | e }}')">
-                                        <i class="fa-solid fa-user fa-xs text-[#668054]"></i>{{ exam.instructor_name }}
-                                    </span>
-                                    {% else %}—{% endif %}
-                                </td>
-                                <td class="px-5 py-3">
-                                    <div class="flex flex-wrap gap-1">
-                                        {% if 'room' in reasons %}
-                                            <div class="group relative inline-flex justify-center">
-    <span class="badge badge-conflict-room"><i class="fa-solid fa-door-open mr-0.5"></i> Room</span>
-    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
-        Another exam is already scheduled in this room at this time.
-    </div>
-</div>
-                                        {% endif %}
-                                        {% if 'proctor' in reasons %}
-                                            <div class="group relative inline-flex justify-center">
-    <span class="badge badge-conflict-proctor"><i class="fa-solid fa-user-xmark mr-0.5"></i> Proctor</span>
-    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
-        This proctor is already assigned to another room or is unavailable at this time.
-    </div>
-</div>
-                                        {% endif %}
-                                        {% if 'section' in reasons %}
-                                            <div class="group relative inline-flex justify-center">
-    <span class="badge badge-conflict-section"><i class="fa-solid fa-users mr-0.5"></i> Section</span>
-    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
-        This section has another exam overlapping or less than 1 hour away.
-    </div>
-</div>
-                                        {% endif %}
-                                        {% if 'subject' in reasons %}
-                                            <div class="group relative inline-flex justify-center">
-    <span class="badge badge-conflict-subject"><i class="fa-solid fa-book mr-0.5"></i> Subject</span>
-    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
-        Integrity Risk: Different sections of this subject are taking the exam at different times.
-    </div>
-</div>
-                                        {% endif %}
-                                        {% if 'daily_major' in reasons %}
-                                            <div class="group relative inline-flex justify-center">
-    <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;2 Major/day</span>
-    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
-        This section is exceeding the limit of 2 Major exams per day.
-    </div>
-</div>
-                                        {% endif %}
-                                        {% if 'daily_minor' in reasons %}
-                                            <div class="group relative inline-flex justify-center">
-    <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;3 Minor/day</span>
-    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
-        This section is exceeding the limit of 3 Minor exams per day.
-    </div>
-</div>
-                                        {% endif %}
-                                        {% if 'daily_total' in reasons %}
-                                            <div class="group relative inline-flex justify-center">
-    <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;3 Exams/day</span>
-    <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-[11px] leading-tight rounded shadow-lg z-[100] text-center pointer-events-none before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-4 before:border-transparent before:border-t-gray-800">
-        This section is exceeding the limit of 3 total exams per day.
-    </div>
-</div>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                                <td class="px-5 py-3 text-right">
-                                    <button onclick="openEditScheduleModal('{{ exam.id }}','{{ exam.datetime_raw }}','{{ exam.room_id }}','{{ exam.instructor_id }}','{{ (exam.duration_minutes / 60) | round(1) }}')"
-                                            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-orange-500 text-white text-xs font-semibold hover:bg-orange-600 transition-colors">
-                                        <i class="fa-solid fa-pen-to-square"></i> Edit
-                                    </button>
-                                </td>
-                            </tr>
-                            {% endif %}
-                            {% endfor %}
-                        </tbody>
-                    </table></div>
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- ══════ UNSCHEDULED EXAMS ══════ -->
-            {% if unscheduled %}
-            <div class="mb-8 no-print">
-                <h2 class="text-base font-bold text-red-600 mb-3 flex items-center gap-2">
-                    <i class="fa-solid fa-circle-exclamation"></i> Unscheduled Exams
-                    <span class="ml-1 inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-700 text-xs font-bold">{{ unscheduled|length }}</span>
-                </h2>
-                <div class="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
-                    <div class="overflow-x-auto w-full"><table class="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead class="bg-red-50">
-                            <tr>
-                                <th class="px-5 py-3 text-left text-xs font-semibold text-red-700 uppercase tracking-wider">Subject & Section</th>
-                                <th class="px-5 py-3 text-left text-xs font-semibold text-red-700 uppercase tracking-wider">Institute</th>
-                                <th class="px-5 py-3 text-left text-xs font-semibold text-red-700 uppercase tracking-wider">Type</th>
-                                <th class="px-5 py-3 text-left text-xs font-semibold text-red-700 uppercase tracking-wider">Status</th>
-                                <th class="px-5 py-3 text-right text-xs font-semibold text-red-700 uppercase tracking-wider">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100">
-                            {% for exam in unscheduled %}
-                            <tr class="hover:bg-red-50 transition-colors">
-                                <td class="px-5 py-3 font-medium text-gray-900">{{ exam.subject_name }} <span class="text-gray-400 font-normal">— {{ exam.section }}</span></td>
-                                <td class="px-5 py-3 text-gray-500">{{ exam.institute_name or '—' }}</td>
-                                <td class="px-5 py-3">
-                                    <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold
-                                        {% if exam.subject_type == 'Major' %}bg-blue-100 text-blue-700{% else %}bg-yellow-100 text-yellow-700{% endif %}">
-                                        {{ exam.subject_type }}
-                                    </span>
-                                </td>
-                                <td class="px-5 py-3">
-                                    <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700">{{ exam.status }}</span>
-                                </td>
-                                <td class="px-5 py-3 text-right">
-                                    <button onclick="openEditScheduleModal('{{ exam.id }}','','','','{{ (exam.duration_minutes / 60) | round(1) }}')"
-                                            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors">
-                                        <i class="fa-solid fa-calendar-plus"></i> Assign Slot
-                                    </button>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table></div>
-                </div>
-            </div>
-            {% endif %}
+            </div><!-- /#scheduledSection -->
 
         </div><!-- /p-6 -->
     </main>
@@ -1800,15 +1688,26 @@
                     <i class="fa-solid fa-circle-info text-blue-600 mr-1"></i> Once published, students can immediately view their personalized room and time assignments, and proctors will receive their official assignments.
                 </p>
 
-                <form id="publishScheduleForm" method="POST" action="/schedule/publish">
+                <form id="publishScheduleForm" method="POST" action="/schedule/publish" onsubmit="const b=document.getElementById('publishSubmitBtn'); if(b){b.disabled=true; b.innerHTML='<i class=\'fa-solid fa-spinner fa-spin\'></i> Publishing...'; b.classList.add('opacity-75');}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    
+                    <div class="my-3 p-3 bg-amber-50 rounded-lg border border-amber-200 text-left">
+                        <label class="flex items-start gap-2.5 cursor-pointer">
+                            <input type="checkbox" name="send_broadcast_emails" value="1" class="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4">
+                            <div>
+                                <span class="text-xs font-semibold text-gray-800">Send email broadcast to all proctors & students</span>
+                                <p class="text-[10px] text-gray-500 mt-0.5">Leave unchecked if your database contains mock/unregistered emails to prevent Mailer-Daemon ("Address not found") bounces.</p>
+                            </div>
+                        </label>
+                    </div>
+
                     <div class="flex gap-2.5 justify-end pt-2 border-t border-gray-100">
                         <button type="button" onclick="closePublishModal()"
                                 class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
                             Cancel
                         </button>
-                        <button type="submit"
-                                class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center gap-1.5">
+                        <button type="submit" id="publishSubmitBtn"
+                                class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer">
                             <i class="fa-solid fa-paper-plane"></i> Yes, Publish Timetable
                         </button>
                     </div>
@@ -2260,6 +2159,528 @@
         </div>
     </div>
 
+
+    <!-- ══════════════════════════════════════════════════════════════════════════ -->
+    <!-- STATUS SUMMARY INSPECTOR MODALS (Scheduled, Unscheduled, Conflicts)        -->
+    <!-- ══════════════════════════════════════════════════════════════════════════ -->
+
+    <!-- 1. SCHEDULED EXAMS INSPECTOR MODAL -->
+    <div id="scheduledInspectorModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs no-print" onclick="if(event.target === this) closeInspectorModal('scheduledInspectorModal')">
+        <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-gray-100 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-[#668054] to-[#4e6340] px-6 py-4 flex items-center justify-between text-white">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+                        <i class="fa-solid fa-calendar-check text-base"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-sm leading-tight">Scheduled Examinations Summary</h3>
+                        <p class="text-[11px] text-white/80 mt-0.5">{{ exam_term }} Examination &bull; {{ exam_semester }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2.5">
+                    <span class="px-2.5 py-0.5 rounded-full bg-white/20 text-white text-xs font-bold">{{ sched_count }} / {{ total }}</span>
+                    <button type="button" onclick="closeInspectorModal('scheduledInspectorModal')" class="text-white/80 hover:text-white transition-colors cursor-pointer text-lg leading-none p-1">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Body -->
+            <div class="p-6">
+                {% if sched_count > 0 %}
+                {% set pct = ((sched_count / total) * 100)|round(1) if total > 0 else 100 %}
+                <!-- Progress & Status Box -->
+                <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">Placement Progress</span>
+                        <span class="text-xs font-extrabold text-[#668054]">{{ pct }}% Scheduled</span>
+                    </div>
+                    <div class="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div class="h-full bg-[#668054] rounded-full transition-all" style="width: {{ pct }}%"></div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-3 mt-4 text-center">
+                        <div class="bg-white rounded-lg border border-gray-200 p-2.5">
+                            <span class="block text-[11px] text-gray-400 font-medium">Scheduled</span>
+                            <span class="text-lg font-bold text-[#668054]">{{ sched_count }}</span>
+                        </div>
+                        <div class="bg-white rounded-lg border border-gray-200 p-2.5">
+                            <span class="block text-[11px] text-gray-400 font-medium">Exam Days</span>
+                            <span class="text-lg font-bold text-gray-800">{{ dates|length }}</span>
+                        </div>
+                        <div class="bg-white rounded-lg border border-gray-200 p-2.5">
+                            <span class="block text-[11px] text-gray-400 font-medium">Status</span>
+                            {% if is_schedule_published %}
+                            <span class="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 mt-1"><i class="fa-solid fa-earth-americas"></i> Live</span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 text-xs font-bold text-amber-600 mt-1"><i class="fa-solid fa-pen-ruler"></i> Draft</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {% if dates %}
+                <div>
+                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Active Examination Dates ({{ dates|length }})</h4>
+                    <div class="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1">
+                        {% for d in dates %}
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#eef4ea] border border-[#c3d9b8] text-[#4e6340] text-xs font-semibold">
+                            <i class="fa-regular fa-calendar-days text-[#668054]"></i> {{ date_labels.get(d, d) if date_labels else d }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="py-8 text-center">
+                    <div class="w-16 h-16 rounded-full bg-gray-100 border border-gray-200 text-gray-400 flex items-center justify-center text-2xl mx-auto mb-3">
+                        <i class="fa-regular fa-calendar-xmark"></i>
+                    </div>
+                    <h4 class="font-bold text-gray-900 text-base">No Scheduled Exams at the moment</h4>
+                    <p class="text-xs text-gray-500 mt-1 max-w-sm mx-auto leading-relaxed">
+                        No examinations have been placed on the timetable grid yet. Use the schedule generator above to automatically assign dates, rooms, and proctors.
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Footer -->
+            <div class="bg-gray-50 px-6 py-3.5 border-t border-gray-200 flex items-center justify-end gap-2.5">
+                {% if sched_count > 0 %}
+                <button type="button" onclick="closeInspectorModal('scheduledInspectorModal'); scrollToScheduled();" class="px-4 py-2 rounded-lg bg-[#668054] hover:bg-[#4e6340] text-white text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5">
+                    <i class="fa-solid fa-table-cells"></i> Go to Timetable Grid
+                </button>
+                {% endif %}
+                <button type="button" onclick="closeInspectorModal('scheduledInspectorModal')" class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold transition-colors cursor-pointer">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. UNSCHEDULED EXAMS INSPECTOR MODAL -->
+    <div id="unscheduledInspectorModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs no-print" onclick="if(event.target === this) closeInspectorModal('unscheduledInspectorModal')">
+        <div class="bg-white rounded-2xl {% if unscheduled|length > 0 %}max-w-4xl{% else %}max-w-lg{% endif %} w-full shadow-2xl border border-gray-100 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200">
+            <!-- Header -->
+            <div class="bg-gradient-to-r {% if unscheduled|length > 0 %}from-red-600 to-rose-700{% else %}from-emerald-600 to-teal-700{% endif %} px-6 py-4 flex items-center justify-between text-white">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+                        <i class="fa-solid {% if unscheduled|length > 0 %}fa-circle-exclamation{% else %}fa-circle-check{% endif %} text-base"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-sm leading-tight">Unscheduled Examinations</h3>
+                        <p class="text-[11px] text-white/80 mt-0.5">
+                            {% if unscheduled|length > 0 %}
+                            {{ unscheduled|length }} examination(s) awaiting slot assignment
+                            {% else %}
+                            100% of curriculum examinations are scheduled
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2.5">
+                    <span class="px-2.5 py-0.5 rounded-full bg-white/20 text-white text-xs font-bold">{{ unscheduled|length }} Unscheduled</span>
+                    <button type="button" onclick="closeInspectorModal('unscheduledInspectorModal')" class="text-white/80 hover:text-white transition-colors cursor-pointer text-lg leading-none p-1">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Body -->
+            <div class="p-6">
+                {% if unscheduled|length > 0 %}
+                <!-- Search bar inside modal -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                        <input type="text" id="unscheduledModalSearch" oninput="filterUnscheduledModal()" placeholder="Search subject, section, or institute..." class="w-full pl-8 pr-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-400 outline-none">
+                    </div>
+                    <span class="text-xs text-gray-500 font-medium">Click <strong>Assign Slot</strong> on any exam to schedule it directly.</span>
+                </div>
+
+                <!-- Scrollable Table -->
+                <div class="border border-red-200 rounded-xl overflow-hidden max-h-[55vh] overflow-y-auto">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-red-50 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-4 py-2.5 text-left text-xs font-semibold text-red-700 uppercase tracking-wider">Subject &amp; Section</th>
+                                <th class="px-4 py-2.5 text-left text-xs font-semibold text-red-700 uppercase tracking-wider">Institute</th>
+                                <th class="px-4 py-2.5 text-left text-xs font-semibold text-red-700 uppercase tracking-wider">Type</th>
+                                <th class="px-4 py-2.5 text-left text-xs font-semibold text-red-700 uppercase tracking-wider">Status</th>
+                                <th class="px-4 py-2.5 text-right text-xs font-semibold text-red-700 uppercase tracking-wider">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="unscheduledModalTableBody" class="divide-y divide-gray-100 bg-white">
+                            {% for exam in unscheduled %}
+                            <tr class="unscheduled-modal-row hover:bg-red-50/60 transition-colors">
+                                <td class="px-4 py-2.5 font-medium text-gray-900 text-xs">{{ exam.subject_name }} <span class="text-gray-400 font-normal">&mdash; {{ exam.section }}</span></td>
+                                <td class="px-4 py-2.5 text-gray-500 text-xs">{{ exam.institute_name or '—' }}</td>
+                                <td class="px-4 py-2.5">
+                                    <span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold {% if exam.subject_type == 'Major' %}bg-blue-100 text-blue-700{% else %}bg-yellow-100 text-yellow-700{% endif %}">
+                                        {{ exam.subject_type }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-2.5">
+                                    <span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-red-100 text-red-700">{{ exam.status }}</span>
+                                </td>
+                                <td class="px-4 py-2.5 text-right">
+                                    <button type="button" onclick="closeInspectorModal('unscheduledInspectorModal'); openEditScheduleModal('{{ exam.id }}','','','','{{ (exam.duration_minutes / 60) | round(1) }}')"
+                                            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors cursor-pointer">
+                                        <i class="fa-solid fa-calendar-plus"></i> Assign Slot
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <!-- Clean Empty State when 0 Unscheduled -->
+                <div class="py-6 text-center">
+                    <div class="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center text-2xl mx-auto mb-3 shadow-2xs">
+                        <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold uppercase tracking-wider mb-2">
+                        <i class="fa-solid fa-check-double"></i> 100% Complete
+                    </span>
+                    <h4 class="font-bold text-gray-900 text-base">No Unscheduled Exams at the moment</h4>
+                    <p class="text-xs text-gray-500 mt-1.5 max-w-sm mx-auto leading-relaxed">
+                        All <strong>{{ total }}</strong> examinations in the current term have been successfully placed with assigned dates, time slots, rooms, and proctors.
+                    </p>
+                    <div class="mt-5 inline-flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-700">
+                        <span><strong class="text-emerald-700">{{ sched_count }}</strong> Scheduled</span>
+                        <span class="text-gray-300">&bull;</span>
+                        <span><strong class="text-gray-500">0</strong> Pending</span>
+                        <span class="text-gray-300">&bull;</span>
+                        <span><strong class="text-gray-800">{{ dates|length }}</strong> Exam Days</span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Footer -->
+            <div class="bg-gray-50 px-6 py-3.5 border-t border-gray-200 flex items-center justify-end gap-2.5">
+                <button type="button" onclick="closeInspectorModal('unscheduledInspectorModal')" class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold transition-colors cursor-pointer">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. CONFLICTS INSPECTOR MODAL -->
+    {% set has_any_conflict = (conflict_audit and conflict_audit.total_conflicts_count > 0) or (conflict_ids and conflict_ids|length > 0) %}
+    <div id="conflictsInspectorModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs no-print" onclick="if(event.target === this) closeInspectorModal('conflictsInspectorModal')">
+        <div class="bg-white rounded-2xl {% if has_any_conflict %}max-w-5xl{% else %}max-w-lg{% endif %} w-full shadow-2xl border border-gray-100 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200">
+            <!-- Header -->
+            <div class="bg-gradient-to-r {% if has_any_conflict %}from-orange-600 to-red-700{% else %}from-emerald-600 to-teal-700{% endif %} px-6 py-4 flex items-center justify-between text-white">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+                        <i class="fa-solid {% if has_any_conflict %}fa-triangle-exclamation{% else %}fa-shield-halved{% endif %} text-base"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-sm leading-tight">Scheduling Conflicts Inspector</h3>
+                        <p class="text-[11px] text-white/80 mt-0.5">
+                            {% if has_any_conflict %}
+                            {{ conflict_ids|length if conflict_ids else conflict_audit.total_conflicts_count }} conflicted exam(s) &bull; {{ conflict_audit.total_conflicts_count if conflict_audit else 0 }} conflict rule violation(s)
+                            {% else %}
+                            Automated validation across {{ conflict_audit.total_exams if conflict_audit else sched_count }} scheduled sessions
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2.5">
+                    {% if conflict_ids and conflict_ids|length > 0 %}
+                    <form action="{{ url_for('resolve_conflicts_route') }}" method="POST" class="inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="conflict_ids" value="{{ conflict_ids|join(',') }}">
+                        <button type="submit" class="px-3.5 py-1.5 bg-white text-orange-700 hover:bg-orange-50 rounded-lg shadow-xs text-xs font-bold transition-colors inline-flex items-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-Resolve Conflicts
+                        </button>
+                    </form>
+                    {% elif not has_any_conflict %}
+                    <span class="px-2.5 py-0.5 rounded-full bg-white/20 text-white text-xs font-bold">Verified Clean</span>
+                    {% endif %}
+                    <button type="button" onclick="closeInspectorModal('conflictsInspectorModal')" class="text-white/80 hover:text-white transition-colors cursor-pointer text-lg leading-none p-1">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Body -->
+            <div class="p-6 max-h-[70vh] overflow-y-auto space-y-5">
+                {% if has_any_conflict %}
+                <!-- Conflict Category Summary Strip -->
+                {% if conflict_audit %}
+                <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-gray-200 text-xs">
+                    <div class="flex flex-wrap gap-2">
+                        <span class="px-2.5 py-1 rounded-lg {% if conflict_audit.room_conflicts|length > 0 %}bg-red-100 text-red-800 font-bold{% else %}bg-gray-100 text-gray-500{% endif %}">
+                            <i class="fa-solid fa-door-open mr-1"></i>Room Collisions: {{ conflict_audit.room_conflicts|length }}
+                        </span>
+                        <span class="px-2.5 py-1 rounded-lg {% if conflict_audit.proctor_conflicts|length > 0 %}bg-red-100 text-red-800 font-bold{% else %}bg-gray-100 text-gray-500{% endif %}">
+                            <i class="fa-solid fa-user-tie mr-1"></i>Proctor Overlaps: {{ conflict_audit.proctor_conflicts|length }}
+                        </span>
+                        <span class="px-2.5 py-1 rounded-lg {% if conflict_audit.section_conflicts|length > 0 %}bg-red-100 text-red-800 font-bold{% else %}bg-gray-100 text-gray-500{% endif %}">
+                            <i class="fa-solid fa-users mr-1"></i>Section Clashes: {{ conflict_audit.section_conflicts|length }}
+                        </span>
+                        {% if conflict_audit.subject_conflicts %}
+                        <span class="px-2.5 py-1 rounded-lg bg-red-100 text-red-800 font-bold">
+                            <i class="fa-solid fa-book-bookmark mr-1"></i>Subject Desyncs: {{ conflict_audit.subject_conflicts|length }}
+                        </span>
+                        {% endif %}
+                        {% if conflict_audit.break_conflicts %}
+                        <span class="px-2.5 py-1 rounded-lg bg-red-100 text-red-800 font-bold">
+                            <i class="fa-solid fa-hourglass-half mr-1"></i>Break Violations: {{ conflict_audit.break_conflicts|length }}
+                        </span>
+                        {% endif %}
+                        {% if conflict_audit.integrity_conflicts %}
+                        <span class="px-2.5 py-1 rounded-lg bg-red-100 text-red-800 font-bold">
+                            <i class="fa-solid fa-graduation-cap mr-1"></i>Integrity: {{ conflict_audit.integrity_conflicts|length }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Conflicted Exams Table with Edit & Auto-Resolve -->
+                {% if conflict_ids and conflict_ids|length > 0 and scheduled_exams %}
+                <div class="bg-white rounded-xl border border-orange-200 shadow-2xs overflow-hidden">
+                    <div class="px-4 py-2.5 bg-orange-50 border-b border-orange-200 text-xs text-orange-800 font-medium flex items-center justify-between gap-2">
+                        <span>The following scheduled exams have conflicts. Click <strong>Edit</strong> to reassign the room, proctor, or time slot, or click <strong>Auto-Resolve Conflicts</strong> to fix them automatically.</span>
+                        <span class="px-2 py-0.5 rounded-full bg-orange-200/80 text-orange-900 font-bold whitespace-nowrap">{{ conflict_ids|length }} Exam(s)</span>
+                    </div>
+                    <div class="overflow-x-auto w-full">
+                        <table class="min-w-full divide-y divide-gray-100 text-xs">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wider">Subject &amp; Section</th>
+                                    <th class="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wider">Date &amp; Time</th>
+                                    <th class="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wider">Room</th>
+                                    <th class="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wider">Proctor</th>
+                                    <th class="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wider">Conflict Type</th>
+                                    <th class="px-4 py-2.5 text-right font-semibold text-gray-500 uppercase tracking-wider">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 bg-white">
+                                {% for exam in scheduled_exams %}
+                                {% if exam.id in conflict_ids %}
+                                {% set reasons = conflict_reasons.get(exam.id, []) if conflict_reasons else [] %}
+                                <tr class="hover:bg-orange-50/60 transition-colors">
+                                    <td class="px-4 py-2.5">
+                                        <span class="font-semibold text-gray-900">{{ exam.subject_name }}</span>
+                                        <span class="text-gray-400 font-normal ml-1">&mdash; {{ exam.section }}</span>
+                                        <span class="ml-1 inline-block px-1.5 py-0.5 rounded text-[11px] font-semibold {% if exam.subject_type == 'Major' %}bg-blue-100 text-blue-700{% else %}bg-yellow-100 text-yellow-700{% endif %}">
+                                            {{ exam.subject_type }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-2.5 text-gray-600 whitespace-nowrap">{{ exam._date_str }} {{ exam._time_str }}</td>
+                                    <td class="px-4 py-2.5 text-gray-600">
+                                        {% if exam.room_id %}
+                                        <span class="inline-flex items-center gap-1 cursor-pointer hover:text-[#668054] hover:underline"
+                                              onclick="closeInspectorModal('conflictsInspectorModal'); openAvailabilityModal('room', '{{ exam.room_id }}', '{{ exam.room_name | e }}')">
+                                            <i class="fa-solid fa-door-open fa-xs text-[#668054]"></i>{{ exam.room_name }}
+                                        </span>
+                                        {% else %}&mdash;{% endif %}
+                                    </td>
+                                    <td class="px-4 py-2.5 text-gray-600">
+                                        {% if exam.instructor_id %}
+                                        <span class="inline-flex items-center gap-1 cursor-pointer hover:text-[#668054] hover:underline"
+                                              onclick="closeInspectorModal('conflictsInspectorModal'); openAvailabilityModal('instructor', '{{ exam.instructor_id }}', '{{ exam.instructor_name | e }}')">
+                                            <i class="fa-solid fa-user fa-xs text-[#668054]"></i>{{ exam.instructor_name }}
+                                        </span>
+                                        {% else %}&mdash;{% endif %}
+                                    </td>
+                                    <td class="px-4 py-2.5">
+                                        <div class="flex flex-wrap gap-1">
+                                            {% if 'room' in reasons %}
+                                            <span class="badge badge-conflict-room"><i class="fa-solid fa-door-open mr-0.5"></i> Room</span>
+                                            {% endif %}
+                                            {% if 'proctor' in reasons %}
+                                            <span class="badge badge-conflict-proctor"><i class="fa-solid fa-user-xmark mr-0.5"></i> Proctor</span>
+                                            {% endif %}
+                                            {% if 'section' in reasons %}
+                                            <span class="badge badge-conflict-section"><i class="fa-solid fa-users mr-0.5"></i> Section</span>
+                                            {% endif %}
+                                            {% if 'subject' in reasons %}
+                                            <span class="badge badge-conflict-subject"><i class="fa-solid fa-book mr-0.5"></i> Subject</span>
+                                            {% endif %}
+                                            {% if 'daily_major' in reasons %}
+                                            <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;2 Major/day</span>
+                                            {% endif %}
+                                            {% if 'daily_minor' in reasons %}
+                                            <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;3 Minor/day</span>
+                                            {% endif %}
+                                            {% if 'daily_total' in reasons %}
+                                            <span class="badge badge-conflict-daily"><i class="fa-solid fa-calendar-xmark mr-0.5"></i> &gt;3 Exams/day</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-2.5 text-right">
+                                        <button type="button" onclick="closeInspectorModal('conflictsInspectorModal'); openEditScheduleModal('{{ exam.id }}','{{ exam.datetime_raw }}','{{ exam.room_id }}','{{ exam.instructor_id }}','{{ (exam.duration_minutes / 60) | round(1) }}')"
+                                                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-orange-500 text-white text-xs font-semibold hover:bg-orange-600 transition-colors cursor-pointer">
+                                            <i class="fa-solid fa-pen-to-square"></i> Edit
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Detailed Conflict Explanations -->
+                {% if conflict_audit and conflict_audit.total_conflicts_count > 0 %}
+                <div class="space-y-2 text-xs">
+                    <h4 class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Conflict Rule Explanations</h4>
+                    {% for subc in conflict_audit.subject_conflicts %}
+                    <div class="p-3 bg-red-50/70 rounded-xl border border-red-200 text-red-900 flex items-start gap-2.5">
+                        <i class="fa-solid fa-book-bookmark text-red-500 mt-0.5"></i>
+                        <div><strong>Subject Desynchronization:</strong> {{ subc.reason }}</div>
+                    </div>
+                    {% endfor %}
+                    {% for bc in conflict_audit.break_conflicts %}
+                    <div class="p-3 bg-red-50/70 rounded-xl border border-red-200 text-red-900 flex items-start gap-2.5">
+                        <i class="fa-solid fa-hourglass-half text-red-500 mt-0.5"></i>
+                        <div><strong>Insufficient Break ({{ bc.date }}):</strong> {{ bc.reason }}</div>
+                    </div>
+                    {% endfor %}
+                    {% for rc in conflict_audit.room_conflicts %}
+                    <div class="p-3 bg-red-50/70 rounded-xl border border-red-200 text-red-900 flex items-start gap-2.5">
+                        <i class="fa-solid fa-door-open text-red-500 mt-0.5"></i>
+                        <div><strong>Room {{ rc.room }}</strong> double-booked on <b>{{ rc.date }}</b> at <b>{{ rc.time }}</b>: {{ rc.exam1 }} vs {{ rc.exam2 }}</div>
+                    </div>
+                    {% endfor %}
+                    {% for sc in conflict_audit.section_conflicts %}
+                    <div class="p-3 bg-red-50/70 rounded-xl border border-red-200 text-red-900 flex items-start gap-2.5">
+                        <i class="fa-solid fa-users text-red-500 mt-0.5"></i>
+                        <div><strong>Section {{ sc.section }}</strong> double-booked on <b>{{ sc.date }}</b> at <b>{{ sc.time }}</b>: {{ sc.exam1 }} vs {{ sc.exam2 }}</div>
+                    </div>
+                    {% endfor %}
+                    {% for pc in conflict_audit.proctor_conflicts %}
+                    <div class="p-3 bg-red-50/70 rounded-xl border border-red-200 text-red-900 flex items-start gap-2.5">
+                        <i class="fa-solid fa-user-tie text-red-500 mt-0.5"></i>
+                        <div><strong>Proctor {{ pc.proctor }}</strong> assigned to 2 rooms on <b>{{ pc.date }}</b> at <b>{{ pc.time }}</b>: {{ pc.room1 }} vs {{ pc.room2 }}</div>
+                    </div>
+                    {% endfor %}
+                    {% for ic in conflict_audit.integrity_conflicts %}
+                    <div class="p-3 bg-red-50/70 rounded-xl border border-red-200 text-red-900 flex items-start gap-2.5">
+                        <i class="fa-solid fa-graduation-cap text-red-500 mt-0.5"></i>
+                        <div><strong>Academic Integrity ({{ ic.date }} at {{ ic.time }}):</strong> {{ ic.reason }}</div>
+                    </div>
+                    {% endfor %}
+                    {% for so in conflict_audit.section_overloads %}
+                    <div class="p-3 bg-red-50/70 rounded-xl border border-red-200 text-red-900 flex items-start gap-2.5">
+                        <i class="fa-solid fa-clock text-red-500 mt-0.5"></i>
+                        <div><strong>Section {{ so.section }} Overload ({{ so.date }}):</strong> {{ so.reason }}</div>
+                    </div>
+                    {% endfor %}
+                    {% for po in conflict_audit.proctor_overloads %}
+                    <div class="p-3 bg-red-50/70 rounded-xl border border-red-200 text-red-900 flex items-start gap-2.5">
+                        <i class="fa-solid fa-clock text-red-500 mt-0.5"></i>
+                        <div><strong>Proctor {{ po.proctor }} Overload ({{ po.date }}):</strong> {{ po.reason }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% else %}
+                <!-- Clean Empty State when 0 Conflicts -->
+                <div class="py-4 text-center">
+                    <div class="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center text-2xl mx-auto mb-3 shadow-2xs">
+                        <i class="fa-solid fa-shield-check"></i>
+                    </div>
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold uppercase tracking-wider mb-2">
+                        <i class="fa-solid fa-circle-check"></i> 100% Conflict-Free
+                    </span>
+                    <h4 class="font-bold text-gray-900 text-base">No Conflicts at the moment</h4>
+                    <p class="text-xs text-gray-500 mt-1 max-w-sm mx-auto leading-relaxed">
+                        Automated validation verified all <strong>{{ conflict_audit.total_exams if conflict_audit else sched_count }}</strong> scheduled examination sessions with zero collisions.
+                    </p>
+
+                    <!-- Verification Checklist Grid -->
+                    <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-left">
+                        <div class="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200 flex items-center gap-2.5 text-xs text-emerald-900">
+                            <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                            <span><strong>0</strong> Room Double-Bookings</span>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200 flex items-center gap-2.5 text-xs text-emerald-900">
+                            <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                            <span><strong>0</strong> Proctor Overlaps</span>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200 flex items-center gap-2.5 text-xs text-emerald-900">
+                            <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                            <span><strong>0</strong> Student Section Clashes</span>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200 flex items-center gap-2.5 text-xs text-emerald-900">
+                            <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                            <span><strong>0</strong> Subject Timing Desyncs</span>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Footer -->
+            <div class="bg-gray-50 px-6 py-3.5 border-t border-gray-200 flex items-center justify-end gap-2.5">
+                {% if conflict_ids and conflict_ids|length > 0 %}
+                <form action="{{ url_for('resolve_conflicts_route') }}" method="POST" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="conflict_ids" value="{{ conflict_ids|join(',') }}">
+                    <button type="submit" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg shadow-xs text-xs font-bold transition-colors inline-flex items-center gap-1.5 cursor-pointer">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-Resolve Conflicts ({{ conflict_ids|length }})
+                    </button>
+                </form>
+                {% endif %}
+                <button type="button" onclick="closeInspectorModal('conflictsInspectorModal')" class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold transition-colors cursor-pointer">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        function openInspectorModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('hidden');
+            }
+        }
+
+        function closeInspectorModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function filterUnscheduledModal() {
+            const input = document.getElementById('unscheduledModalSearch');
+            if (!input) return;
+            const q = input.value.toLowerCase().trim();
+            document.querySelectorAll('.unscheduled-modal-row').forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(q) ? '' : 'none';
+            });
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                ['scheduledInspectorModal', 'unscheduledInspectorModal', 'conflictsInspectorModal'].forEach(id => {
+                    closeInspectorModal(id);
+                });
+            }
+        });
+
+        function scrollToScheduled() {
+            const el = document.getElementById('scheduledSection');
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                el.classList.add('ring-2', 'ring-[#668054]', 'ring-offset-2', 'rounded-xl', 'transition-all');
+                setTimeout(() => el.classList.remove('ring-2', 'ring-[#668054]', 'ring-offset-2'), 1800);
+            }
+        }
+    </script>
 </body>
 
 </html>

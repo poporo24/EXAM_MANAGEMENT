@@ -115,13 +115,36 @@
                     <div class="p-6">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Day Start Time</label>
-                                <input type="time" name="day_start" value="{{ settings.day_start|default('07:00') }}" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                                <label class="block text-sm font-medium text-gray-700">Day Start Time (24h Military)</label>
+                                {% set cur_start = (settings.day_start|string)[:5] if settings.day_start else '07:00' %}
+                                <select name="day_start" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2 bg-white">
+                                    <option value="06:00" {% if cur_start == '06:00' %}selected{% endif %}>06:00 (06:00 AM)</option>
+                                    <option value="06:30" {% if cur_start == '06:30' %}selected{% endif %}>06:30 (06:30 AM)</option>
+                                    <option value="07:00" {% if cur_start in ['07:00', ''] %}selected{% endif %}>07:00 (07:00 AM)</option>
+                                    <option value="07:30" {% if cur_start == '07:30' %}selected{% endif %}>07:30 (07:30 AM)</option>
+                                    <option value="08:00" {% if cur_start == '08:00' %}selected{% endif %}>08:00 (08:00 AM)</option>
+                                    <option value="08:30" {% if cur_start == '08:30' %}selected{% endif %}>08:30 (08:30 AM)</option>
+                                    <option value="09:00" {% if cur_start == '09:00' %}selected{% endif %}>09:00 (09:00 AM)</option>
+                                </select>
                                 <p class="text-xs text-gray-500 mt-1">Earliest time an exam can start.</p>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Day End Time</label>
-                                <input type="time" name="day_end" value="{{ settings.day_end|default('18:00') }}" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                                <label class="block text-sm font-medium text-gray-700">Day End Time (24h Military)</label>
+                                {% set cur_end = (settings.day_end|string)[:5] if settings.day_end else '20:00' %}
+                                {% if cur_end in ['08:00', '8:00'] %}{% set cur_end = '20:00' %}{% endif %}
+                                <select name="day_end" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2 bg-white">
+                                    <option value="17:00" {% if cur_end == '17:00' %}selected{% endif %}>17:00 (05:00 PM)</option>
+                                    <option value="17:30" {% if cur_end == '17:30' %}selected{% endif %}>17:30 (05:30 PM)</option>
+                                    <option value="18:00" {% if cur_end == '18:00' %}selected{% endif %}>18:00 (06:00 PM)</option>
+                                    <option value="18:30" {% if cur_end == '18:30' %}selected{% endif %}>18:30 (06:30 PM)</option>
+                                    <option value="19:00" {% if cur_end == '19:00' %}selected{% endif %}>19:00 (07:00 PM)</option>
+                                    <option value="19:30" {% if cur_end == '19:30' %}selected{% endif %}>19:30 (07:30 PM)</option>
+                                    <option value="20:00" {% if cur_end in ['20:00', ''] %}selected{% endif %}>20:00 (08:00 PM)</option>
+                                    <option value="20:30" {% if cur_end == '20:30' %}selected{% endif %}>20:30 (08:30 PM)</option>
+                                    <option value="21:00" {% if cur_end == '21:00' %}selected{% endif %}>21:00 (09:00 PM)</option>
+                                    <option value="21:30" {% if cur_end == '21:30' %}selected{% endif %}>21:30 (09:30 PM)</option>
+                                    <option value="22:00" {% if cur_end == '22:00' %}selected{% endif %}>22:00 (10:00 PM)</option>
+                                </select>
                                 <p class="text-xs text-gray-500 mt-1">Latest time an exam can end.</p>
                             </div>
                             <div>

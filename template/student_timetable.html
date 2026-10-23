@@ -108,7 +108,7 @@
                 font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
                 color: #1e293b !important;
             }
-            .hero, .controls-bar, .ctrl-btn-logout, .info-strip, .main-content, .page-footer, #studentPwModal, #change-password-modal, .no-print {
+            .hero, .controls-bar, .ctrl-btn-logout, .info-strip, .main-content, .page-footer, #studentPwModal, #change-password-modal, #my-account-modal, #studentNotifModal, .no-print {
                 display: none !important;
             }
             .print-container {
@@ -529,6 +529,13 @@
         </a>
         {% endif %}
         {% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
+        <button type="button" onclick="openStudentNotifModal()" data-notif-manual class="ctrl-btn ctrl-btn-outline" title="Notifications" style="position:relative;">
+            <i class="fa-solid fa-bell"></i> Notifications
+            <span id="studentHeaderNotifBadge" data-notif-count style="{% if not unread_count or unread_count <= 0 %}display:none;{% endif %}position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#dc2626;color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center;box-shadow:0 0 0 2px rgba(255,255,255,.85);">{{ '99+' if unread_count and unread_count > 99 else (unread_count or 0) }}</span>
+        </button>
+        <button type="button" class="ctrl-btn ctrl-btn-outline" onclick="openMyAccountModal()" title="Update your account profile">
+            <i class="fa-solid fa-user-pen"></i> My Account
+        </button>
         <button class="ctrl-btn ctrl-btn-outline" onclick="openStudentPwModal()">
             <i class="fa-solid fa-key"></i> Change Password
         </button>
@@ -566,7 +573,7 @@
 
 {% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
 {% include 'change_password_modal.html' %}
-
+{% include 'notifications_modal.html' %}
 {% endif %}
 
 <div class="info-strip">
@@ -583,10 +590,11 @@
     {% endif %}
     <span class="readonly">View-only &mdash; contact admin for changes</span>
     {% if section %}
-    <span class="student-info">
+    <span class="student-info" {% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}onclick="openMyAccountModal()" style="cursor:pointer; padding:4px 10px; border-radius:8px; transition:background 0.15s;" onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background='transparent'" title="Click to update your account"{% endif %}>
         <i class="fa-solid fa-user-graduate"></i>
         <span>{{ full_name }}</span>
         {% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
+        <i class="fa-solid fa-pen-to-square" style="font-size:11px; color:#668054; opacity:0.85;"></i>
         <span style="background:#e0ecd7; color:#2e4520; padding:2px 8px; border-radius:6px; font-weight:700; display:inline-flex; align-items:center; gap:4px;" title="Official Enrolled Section (Managed by Department Administrator)">
             <i class="fa-solid fa-lock" style="font-size:10px; opacity:0.65;"></i> {{ section }}
         </span>
@@ -794,6 +802,11 @@
         }
     }
 </script>
+
+{% if session.get('role') == 'student' and full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
+<!-- Live notification badge polling (logged-in students only) -->
+<script src="{{ url_for('static', filename='js/notif_poll.js') }}" defer></script>
+{% endif %}
 
 </body>
 </html>

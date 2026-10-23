@@ -31,7 +31,7 @@
     </style>
 
     <style>
-                /* Mobile & Tablet Responsive Overrides */
+        /* Mobile & Tablet Responsive Overrides */
         @media screen and (max-width: 1023px) {
             #main-content {
                 margin-left: 0 !important;
@@ -56,7 +56,6 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
-            // Automatically wrap all tables to make them horizontally scrollable on small screens
             document.querySelectorAll("table").forEach(function(table) {
                 if (!table.parentElement.classList.contains("overflow-x-auto")) {
                     const wrapper = document.createElement("div");
@@ -125,6 +124,8 @@
                 </a>
             </div>
         </aside>
+        <!-- Live notification badge polling (student sidebar) -->
+        <script src="{{ url_for('static', filename='js/notif_poll.js') }}" defer></script>
     {% else %}
         {% include 'admin_sidebar.html' %}
     {% endif %}
@@ -150,13 +151,28 @@
                 {% endif %}
             {% endwith %}
 
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-lg font-semibold text-gray-800">Recent Activity</h2>
-                {% if notifications and notifications|length > 0 %}
+            <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
                 <div class="flex items-center gap-4">
+                    <h2 class="text-lg font-semibold text-gray-800">Recent Activity</h2>
+                    {% if notifications and notifications|length > 0 %}
+                    <label class="inline-flex items-center gap-2 text-xs font-semibold text-gray-600 cursor-pointer select-none bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-2xs">
+                        <input type="checkbox" id="pageSelectAllNotifsCb" class="w-4 h-4 rounded text-[#668054] focus:ring-[#668054] cursor-pointer" onchange="togglePageSelectAllNotifs(this.checked)">
+                        <span>Select All</span>
+                    </label>
+                    {% endif %}
+                </div>
+                {% if notifications and notifications|length > 0 %}
+                <div class="flex items-center flex-wrap gap-3">
+                    <form id="deleteSelectedNotifsForm" action="/notifications/delete_selected" method="POST" class="hidden">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="ids_csv" id="deleteSelectedNotifsCsv" value=""/>
+                        <button type="button" onclick="confirmDeleteSelectedPageNotifs()" class="inline-flex items-center px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-2xs cursor-pointer transition-colors">
+                            <i class="fa-solid fa-trash-can mr-1.5"></i> Delete Selected (<span id="pageSelectedNotifCount">0</span>)
+                        </button>
+                    </form>
                     <form action="/notifications/mark_all_read" method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <button type="submit" class="text-sm font-medium text-[#668054] hover:text-[#829c74]">
+                        <button type="submit" class="text-sm font-medium text-[#668054] hover:text-[#829c74] cursor-pointer">
                             <i class="fa-solid fa-check-double mr-1"></i> Mark All as Read
                         </button>
                     </form>
@@ -175,8 +191,11 @@
                     <div class="divide-y divide-gray-100">
                         {% for notif in notifications %}
                         {% set is_absence = 'Absence' in notif.title %}
-                        <div id="notif-{{ notif.id }}" onclick="markRead('{{ notif.id }}')" class="p-4 sm:px-6 hover:bg-gray-50 cursor-pointer transition-colors {% if not notif.is_read %}{% if is_absence %}bg-red-50/40{% else %}bg-blue-50/30{% endif %}{% endif %} flex items-start">
-                            <div class="flex-shrink-0 mt-1 mr-4">
+                        <div id="notif-{{ notif.id }}" onclick="markRead('{{ notif.id }}')" class="p-4 sm:px-6 hover:bg-gray-50 cursor-pointer transition-colors {% if not notif.is_read %}{% if is_absence %}bg-red-50/40{% else %}bg-blue-50/30{% endif %}{% endif %} flex items-start gap-3">
+                            <div class="flex-shrink-0 mt-0.5" onclick="event.stopPropagation()">
+                                <input type="checkbox" class="page-notif-cb w-4 h-4 rounded text-[#668054] focus:ring-[#668054] cursor-pointer" value="{{ notif.id }}" onchange="updatePageNotifSelectionUI()">
+                            </div>
+                            <div class="flex-shrink-0 mt-1.5 mr-1">
                                 {% if not notif.is_read %}
                                     <div class="h-3 w-3 rounded-full {% if is_absence %}bg-red-500{% else %}bg-blue-500{% endif %} animate-pulse" id="dot-{{ notif.id }}"></div>
                                 {% else %}
@@ -197,6 +216,9 @@
                                     <i class="fa-regular fa-clock mr-1 text-gray-300"></i> {{ notif.created_at }}
                                 </p>
                             </div>
+                            <button type="button" onclick="event.stopPropagation(); confirmDeleteSinglePageNotif('{{ notif.id }}')" class="text-gray-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors cursor-pointer" title="Delete notification">
+                                <i class="fa-regular fa-trash-can"></i>
+                            </button>
                         </div>
                         {% endfor %}
                     </div>
@@ -267,6 +289,65 @@
             return true;
         }
 
+        function updatePageNotifSelectionUI() {
+            const allCbs = Array.from(document.querySelectorAll('.page-notif-cb'));
+            const checkedCbs = allCbs.filter(cb => cb.checked);
+            const selectAllCb = document.getElementById('pageSelectAllNotifsCb');
+            const delForm = document.getElementById('deleteSelectedNotifsForm');
+            const countSpan = document.getElementById('pageSelectedNotifCount');
+
+            if (selectAllCb) {
+                selectAllCb.checked = allCbs.length > 0 && checkedCbs.length === allCbs.length;
+                selectAllCb.indeterminate = checkedCbs.length > 0 && checkedCbs.length < allCbs.length;
+            }
+            if (delForm && countSpan) {
+                if (checkedCbs.length > 0) {
+                    countSpan.textContent = String(checkedCbs.length);
+                    delForm.classList.remove('hidden');
+                } else {
+                    delForm.classList.add('hidden');
+                }
+            }
+        }
+
+        function togglePageSelectAllNotifs(checked) {
+            document.querySelectorAll('.page-notif-cb').forEach(cb => {
+                cb.checked = !!checked;
+            });
+            updatePageNotifSelectionUI();
+        }
+
+        function confirmDeleteSelectedPageNotifs() {
+            const checkedIds = Array.from(document.querySelectorAll('.page-notif-cb:checked')).map(cb => cb.value);
+            if (!checkedIds.length) return;
+            const count = checkedIds.length;
+            showConfirmModal({
+                title: count === 1 ? 'Delete Selected Notification' : 'Delete Selected Notifications',
+                message: `Are you sure you want to delete <strong>${count} selected notification${count === 1 ? '' : 's'}</strong>?`,
+                sub: 'This action will permanently remove the selected notification(s) from your inbox and cannot be undone.',
+                type: 'danger',
+                confirmText: `<i class="fa-solid fa-trash-can mr-1"></i> Delete (${count})`,
+                onConfirm: function() {
+                    document.getElementById('deleteSelectedNotifsCsv').value = checkedIds.join(',');
+                    document.getElementById('deleteSelectedNotifsForm').submit();
+                }
+            });
+        }
+
+        function confirmDeleteSinglePageNotif(id) {
+            showConfirmModal({
+                title: 'Delete Notification',
+                message: 'Are you sure you want to delete this notification?',
+                sub: 'This notification will be permanently removed from your inbox.',
+                type: 'danger',
+                confirmText: '<i class="fa-solid fa-trash-can mr-1"></i> Delete',
+                onConfirm: function() {
+                    document.getElementById('deleteSelectedNotifsCsv').value = String(id);
+                    document.getElementById('deleteSelectedNotifsForm').submit();
+                }
+            });
+        }
+
         function confirmClearAllNotifs() {
             showConfirmModal({
                 title: 'Clear All Notifications',
@@ -284,20 +365,15 @@
             const dot = document.getElementById('dot-' + id);
             const container = document.getElementById('notif-' + id);
             
-            // Only fire if it's currently unread visually
             if (dot && dot.classList.contains('bg-blue-500')) {
                 fetch('/notifications/mark_read/' + id, {
                     method: 'POST'
                 }).then(response => {
                     if (response.ok) {
-                        // Update UI
                         dot.classList.remove('bg-blue-500');
                         dot.classList.add('bg-gray-300');
                         container.classList.remove('bg-blue-50/30');
                         container.querySelector('.font-medium').classList.remove('font-bold');
-                        
-                        // Let page reload logic handle badge count update in header if necessary
-                        // or we could decrement a client-side counter here, but this is simpler
                     }
                 }).catch(err => console.error("Error marking read:", err));
             }

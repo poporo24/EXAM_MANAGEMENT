@@ -1,0 +1,963 @@
+<!-- Universal Role-Aware Notification Modal (Super Admin, Admin, Secretary, Proctor, Student) -->
+<style>
+#universalNotifModal.hidden { display: none !important; }
+#universalNotifModal:not(.hidden) { display: flex !important; }
+#universalNotifModal {
+    position: fixed;
+    inset: 0;
+    z-index: 99990;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(17, 24, 39, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    box-sizing: border-box;
+}
+#universalNotifModal *,
+#universalNotifModal *::before,
+#universalNotifModal *::after {
+    box-sizing: border-box;
+}
+.unm-card {
+    background: #ffffff;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 680px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.28);
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    max-height: 85vh;
+    position: relative;
+}
+.unm-header {
+    background: linear-gradient(135deg, #3d5c2e 0%, #4e7038 55%, #668054 100%);
+    padding: 16px 22px;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.unm-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+.unm-icon-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+.unm-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.25;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: #ffffff;
+}
+.unm-role-pill {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+    color: #ffffff;
+}
+.unm-subtitle {
+    font-size: 11.5px;
+    color: rgba(255, 255, 255, 0.82);
+    margin: 2px 0 0 0;
+}
+.unm-badge {
+    background: #dc2626;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+.unm-close-x {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background 0.15s, color 0.15s;
+}
+.unm-close-x:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+}
+.unm-toolbar {
+    padding: 10px 22px;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.unm-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.unm-select-all-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #4b5563;
+    cursor: pointer;
+    user-select: none;
+}
+.unm-checkbox {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1.5px solid #9ca3af;
+    accent-color: #4e7038;
+    cursor: pointer;
+    margin: 0;
+    flex-shrink: 0;
+}
+.unm-selected-pill {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #fee2e2;
+    color: #b91c1c;
+    display: none;
+}
+.unm-toolbar-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.unm-action-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: 7px;
+    transition: all 0.15s;
+}
+.unm-btn-read {
+    color: #3d5c2e;
+}
+.unm-btn-read:hover {
+    background: #e8f0e3;
+}
+.unm-btn-del-selected {
+    background: #dc2626;
+    color: #ffffff;
+    border-color: #dc2626;
+    box-shadow: 0 1px 2px rgba(220, 38, 38, 0.2);
+}
+.unm-btn-del-selected:hover {
+    background: #b91c1c;
+    border-color: #b91c1c;
+}
+.unm-btn-clear {
+    color: #dc2626;
+}
+.unm-btn-clear:hover {
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+.unm-body {
+    overflow-y: auto;
+    flex: 1;
+    max-height: 58vh;
+}
+.unm-item {
+    padding: 14px 22px;
+    border-bottom: 1px solid #f3f4f6;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    transition: background 0.15s;
+}
+.unm-item.unread {
+    background: #f4f9f1;
+    cursor: pointer;
+}
+.unm-item.unread:hover {
+    background: #ebf4e6;
+}
+.unm-item.read {
+    background: #ffffff;
+    opacity: 0.88;
+}
+.unm-item.read:hover {
+    background: #f9fafb;
+}
+.unm-item.selected {
+    background: #fef2f2 !important;
+    opacity: 1 !important;
+}
+.unm-cb-wrap {
+    display: flex;
+    align-items: center;
+    padding-top: 2px;
+    flex-shrink: 0;
+}
+.unm-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    margin-top: 5px;
+    flex-shrink: 0;
+}
+.unm-item.unread .unm-dot { background: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); }
+.unm-item.read .unm-dot { background: #d1d5db; }
+.unm-item-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 3px;
+}
+.unm-item-msg {
+    font-size: 13px;
+    color: #4b5563;
+    line-height: 1.45;
+}
+.unm-item-time {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.unm-single-del-btn {
+    background: transparent;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    transition: color 0.15s, background 0.15s;
+    flex-shrink: 0;
+    margin-top: -2px;
+}
+.unm-single-del-btn:hover {
+    color: #dc2626;
+    background: #fee2e2;
+}
+.unm-empty {
+    padding: 48px 24px;
+    text-align: center;
+    color: #6b7280;
+}
+.unm-empty-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #f0f4ed;
+    color: #4e7038;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin: 0 auto 14px;
+}
+.unm-footer {
+    padding: 12px 22px;
+    background: #f9fafb;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.unm-footer-hint {
+    font-size: 11.5px;
+    color: #9ca3af;
+}
+.unm-close-btn {
+    padding: 8px 18px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    color: #374151;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.unm-close-btn:hover { background: #f3f4f6; }
+
+/* Custom In-App Confirmation Dialog for Notifications (replaces native browser confirm()) */
+#unmConfirmOverlay.hidden { display: none !important; }
+#unmConfirmOverlay:not(.hidden) { display: flex !important; }
+#unmConfirmOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100050;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(17, 24, 39, 0.62);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+.unm-confirm-card {
+    background: #ffffff;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 430px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+    border: 1px solid #f3f4f6;
+    animation: unmConfirmPop 0.15s ease-out;
+}
+@keyframes unmConfirmPop {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+.unm-confirm-header {
+    background: #dc2626;
+    color: #ffffff;
+    padding: 15px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.unm-confirm-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.unm-confirm-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+}
+.unm-confirm-title {
+    font-size: 15.5px;
+    font-weight: 700;
+    margin: 0;
+    color: #ffffff;
+}
+.unm-confirm-close {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+}
+.unm-confirm-close:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.15);
+}
+.unm-confirm-body {
+    padding: 20px 22px;
+}
+.unm-confirm-msg {
+    font-size: 14px;
+    font-weight: 500;
+    color: #1f2937;
+    margin: 0;
+    line-height: 1.5;
+}
+.unm-confirm-sub {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    font-size: 12px;
+    line-height: 1.45;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+.unm-confirm-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+.unm-confirm-btn-cancel {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    color: #374151;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.unm-confirm-btn-cancel:hover {
+    background: #f9fafb;
+}
+.unm-confirm-btn-ok {
+    padding: 8px 18px;
+    border-radius: 8px;
+    border: none;
+    background: #dc2626;
+    color: #ffffff;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    transition: background 0.15s;
+}
+.unm-confirm-btn-ok:hover {
+    background: #b91c1c;
+}
+</style>
+
+{% set _u_role = session.get('role', '') %}
+{% set _is_sa = session.get('is_super_admin') %}
+{% if _is_sa %}
+    {% set _modal_title = "System & Super Admin Notifications" %}
+    {% set _modal_sub = "Schedule Reset Authorizations, Security Audits & Portal Alerts" %}
+    {% set _role_label = "Super Admin" %}
+{% elif _u_role == 'admin' %}
+    {% set _modal_title = "Administrative Notifications" %}
+    {% set _modal_sub = "Master Schedule Audits, Faculty Updates & Examination Alerts" %}
+    {% set _role_label = "Administrator" %}
+{% elif _u_role == 'secretary' %}
+    {% set _modal_title = "Departmental Secretary Notifications" %}
+    {% set _modal_sub = "Proctor Absence Reliever Requests & Exam Collection Updates" %}
+    {% set _role_label = "Secretary" %}
+{% elif _u_role == 'proctor' %}
+    {% set _modal_title = "Proctor Duty Notifications" %}
+    {% set _modal_sub = "Assigned Examination Rooms, Schedule Updates & Reliever Duties" %}
+    {% set _role_label = "Proctor" %}
+{% elif _u_role == 'student' %}
+    {% set _modal_title = "Your Notifications" %}
+    {% set _modal_sub = "Official Exam Timetable & Room Updates • Section " ~ (section or session.get('section') or 'Portal') %}
+    {% set _role_label = "Student" %}
+{% else %}
+    {% set _modal_title = "Your Notifications" %}
+    {% set _modal_sub = "Recent system activity and updates" %}
+    {% set _role_label = "Portal" %}
+{% endif %}
+
+<div id="universalNotifModal" class="hidden no-print" onclick="if(event.target === this) closeUniversalNotifModal()">
+    <div class="unm-card">
+        <!-- Header -->
+        <div class="unm-header">
+            <div class="unm-header-left">
+                <div class="unm-icon-circle">
+                    <i class="fa-solid fa-bell"></i>
+                </div>
+                <div>
+                    <h3 class="unm-title">
+                        <span>{{ _modal_title }}</span>
+                        <span class="unm-role-pill">{{ _role_label }}</span>
+                    </h3>
+                    <p class="unm-subtitle">{{ _modal_sub }}</p>
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+                <span id="unmUnreadBadge" class="unm-badge" style="{% if not unread_count or unread_count <= 0 %}display:none;{% endif %}">
+                    <span id="unmUnreadBadgeCount">{{ unread_count or 0 }}</span> New
+                </span>
+                <button type="button" class="unm-close-x" onclick="closeUniversalNotifModal()" title="Close">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div id="unmToolbar" class="unm-toolbar" style="display:none;">
+            <div class="unm-toolbar-left">
+                <label class="unm-select-all-label" title="Select or deselect all notifications">
+                    <input type="checkbox" id="unmSelectAllCb" class="unm-checkbox" onchange="toggleSelectAllUniversalNotifs(this.checked)">
+                    <span>Select All</span>
+                </label>
+                <span id="unmSelectedCountPill" class="unm-selected-pill">0 selected</span>
+            </div>
+            <div class="unm-toolbar-actions">
+                <button type="button" id="unmDeleteSelectedBtn" onclick="deleteSelectedUniversalNotifs()" class="unm-action-btn unm-btn-del-selected" style="display:none;">
+                    <i class="fa-solid fa-trash-can"></i> Delete Selected (<span id="unmDeleteSelectedCount">0</span>)
+                </button>
+                <button type="button" id="unmMarkAllReadBtn" onclick="markAllUniversalNotifsRead()" class="unm-action-btn unm-btn-read" style="display:none;">
+                    <i class="fa-solid fa-check-double"></i> Mark All as Read
+                </button>
+                <button type="button" onclick="clearAllUniversalNotifs()" class="unm-action-btn unm-btn-clear">
+                    <i class="fa-solid fa-trash-can"></i> Clear All
+                </button>
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div class="unm-body" id="unmBodyContainer">
+            <div id="unmLoadingState" class="unm-empty" style="display:none;">
+                <i class="fa-solid fa-spinner fa-spin" style="font-size:24px; color:#668054; margin-bottom:10px;"></i>
+                <p style="font-size:13px; color:#6b7280;">Loading notifications...</p>
+            </div>
+            <div id="unmItemsList"></div>
+            <div id="unmEmptyState" class="unm-empty" style="display:none;">
+                <div class="unm-empty-icon">
+                    <i class="fa-regular fa-bell-slash"></i>
+                </div>
+                <h4 style="font-size:15px; font-weight:700; color:#111827; margin-bottom:4px;">No Notifications at the moment</h4>
+                <p style="font-size:12.5px; color:#6b7280; max-width:360px; margin:0 auto; line-height:1.5;">
+                    You're all caught up! New system alerts and schedule updates for your account will appear right here.
+                </p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="unm-footer">
+            <span class="unm-footer-hint"><i class="fa-regular fa-hand-pointer"></i> Click any unread notification to mark as read, or check items to delete</span>
+            <button type="button" class="unm-close-btn" onclick="closeUniversalNotifModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Custom In-App Confirmation Modal for Notification Deletion -->
+<div id="unmConfirmOverlay" class="hidden no-print" onclick="if(event.target === this) closeUnmConfirmModal()">
+    <div class="unm-confirm-card" role="dialog" aria-modal="true" aria-labelledby="unmConfirmTitle">
+        <div class="unm-confirm-header">
+            <div class="unm-confirm-header-left">
+                <div class="unm-confirm-icon">
+                    <i class="fa-solid fa-trash-can"></i>
+                </div>
+                <h4 id="unmConfirmTitle" class="unm-confirm-title">Confirm Delete</h4>
+            </div>
+            <button type="button" class="unm-confirm-close" onclick="closeUnmConfirmModal()" title="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="unm-confirm-body">
+            <p id="unmConfirmMessage" class="unm-confirm-msg">Are you sure you want to delete these notifications?</p>
+            <div class="unm-confirm-sub">
+                <i class="fa-solid fa-triangle-exclamation" style="margin-top:2px; flex-shrink:0;"></i>
+                <span id="unmConfirmSub">This action will permanently remove the notification(s) from your inbox and cannot be undone.</span>
+            </div>
+            <div class="unm-confirm-actions">
+                <button type="button" class="unm-confirm-btn-cancel" onclick="closeUnmConfirmModal()">Cancel</button>
+                <button type="button" id="unmConfirmActionBtn" class="unm-confirm-btn-ok">
+                    <i class="fa-solid fa-trash-can"></i> <span>Delete</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    if (window.__universalNotifModalInit) return;
+    window.__universalNotifModalInit = true;
+
+    const _csrfToken = "{{ csrf_token() }}";
+    let _unmConfirmCallback = null;
+
+    function _escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str == null ? '' : String(str);
+        return div.innerHTML;
+    }
+
+    window.openUnmConfirmModal = function(opts) {
+        opts = opts || {};
+        const overlay = document.getElementById('unmConfirmOverlay');
+        const titleEl = document.getElementById('unmConfirmTitle');
+        const msgEl = document.getElementById('unmConfirmMessage');
+        const subEl = document.getElementById('unmConfirmSub');
+        const actionBtn = document.getElementById('unmConfirmActionBtn');
+        if (!overlay) return;
+
+        if (titleEl) titleEl.textContent = opts.title || 'Confirm Delete';
+        if (msgEl) msgEl.innerHTML = opts.message || 'Are you sure you want to proceed?';
+        if (subEl) subEl.textContent = opts.sub || 'This action will permanently remove the notification(s) from your inbox and cannot be undone.';
+        if (actionBtn) {
+            actionBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i> <span>' + (opts.confirmLabel || 'Delete') + '</span>';
+        }
+        _unmConfirmCallback = typeof opts.onConfirm === 'function' ? opts.onConfirm : null;
+        overlay.classList.remove('hidden');
+    };
+
+    window.closeUnmConfirmModal = function() {
+        const overlay = document.getElementById('unmConfirmOverlay');
+        if (overlay) overlay.classList.add('hidden');
+        _unmConfirmCallback = null;
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const actionBtn = document.getElementById('unmConfirmActionBtn');
+        if (actionBtn) {
+            actionBtn.addEventListener('click', function() {
+                const cb = _unmConfirmCallback;
+                window.closeUnmConfirmModal();
+                if (cb) cb();
+            });
+        }
+    });
+
+    function _syncGlobalBellCount(n) {
+        const count = Math.max(0, parseInt(n, 10) || 0);
+        const badge = document.getElementById('unmUnreadBadge');
+        const badgeCount = document.getElementById('unmUnreadBadgeCount');
+        const markAllBtn = document.getElementById('unmMarkAllReadBtn');
+
+        if (badge && badgeCount) {
+            if (count > 0) {
+                badgeCount.textContent = count > 99 ? '99+' : String(count);
+                badge.style.display = '';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+        if (markAllBtn) {
+            markAllBtn.style.display = count > 0 ? '' : 'none';
+        }
+        document.querySelectorAll('[data-notif-count]').forEach(function(el) {
+            el.textContent = count > 99 ? '99+' : String(count);
+            el.style.display = count > 0 ? '' : 'none';
+        });
+        if (typeof window.__updateNotifBellCount === 'function') {
+            window.__updateNotifBellCount(count);
+        }
+    }
+
+    window.updateUniversalNotifSelectionUI = function() {
+        const allCbs = Array.from(document.querySelectorAll('#unmItemsList .unm-item-cb'));
+        const checkedCbs = allCbs.filter(cb => cb.checked);
+        const selectAllCb = document.getElementById('unmSelectAllCb');
+        const delBtn = document.getElementById('unmDeleteSelectedBtn');
+        const delCount = document.getElementById('unmDeleteSelectedCount');
+        const pill = document.getElementById('unmSelectedCountPill');
+
+        allCbs.forEach(cb => {
+            const row = cb.closest('.unm-item');
+            if (row) {
+                if (cb.checked) row.classList.add('selected');
+                else row.classList.remove('selected');
+            }
+        });
+
+        if (selectAllCb) {
+            selectAllCb.checked = allCbs.length > 0 && checkedCbs.length === allCbs.length;
+            selectAllCb.indeterminate = checkedCbs.length > 0 && checkedCbs.length < allCbs.length;
+        }
+        if (delBtn && delCount) {
+            if (checkedCbs.length > 0) {
+                delCount.textContent = String(checkedCbs.length);
+                delBtn.style.display = 'inline-flex';
+            } else {
+                delBtn.style.display = 'none';
+            }
+        }
+        if (pill) {
+            if (checkedCbs.length > 0) {
+                pill.textContent = checkedCbs.length + ' selected';
+                pill.style.display = 'inline-block';
+            } else {
+                pill.style.display = 'none';
+            }
+        }
+    };
+
+    window.toggleSelectAllUniversalNotifs = function(checked) {
+        document.querySelectorAll('#unmItemsList .unm-item-cb').forEach(cb => {
+            cb.checked = !!checked;
+        });
+        window.updateUniversalNotifSelectionUI();
+    };
+
+    function _checkIfListEmptyAfterDelete() {
+        const remainingItems = document.querySelectorAll('#unmItemsList .unm-item');
+        const unreadItems = document.querySelectorAll('#unmItemsList .unm-item.unread');
+        _syncGlobalBellCount(unreadItems.length);
+        window.updateUniversalNotifSelectionUI();
+        if (remainingItems.length === 0) {
+            _renderNotifItems([], 0);
+        }
+    }
+
+    function _renderNotifItems(items, unreadCount) {
+        const loadingEl = document.getElementById('unmLoadingState');
+        const listEl = document.getElementById('unmItemsList');
+        const emptyEl = document.getElementById('unmEmptyState');
+        const toolbarEl = document.getElementById('unmToolbar');
+
+        if (loadingEl) loadingEl.style.display = 'none';
+
+        if (!items || items.length === 0) {
+            if (listEl) listEl.innerHTML = '';
+            if (emptyEl) emptyEl.style.display = '';
+            if (toolbarEl) toolbarEl.style.display = 'none';
+            _syncGlobalBellCount(0);
+            window.updateUniversalNotifSelectionUI();
+            return;
+        }
+
+        if (emptyEl) emptyEl.style.display = 'none';
+        if (toolbarEl) toolbarEl.style.display = '';
+
+        let html = '';
+        items.forEach(item => {
+            const isRead = !!item.is_read;
+            html += `
+                <div class="unm-item ${isRead ? 'read' : 'unread'}" data-notif-id="${item.id}" onclick="markSingleUniversalNotifRead(this, '${item.id}')">
+                    <div class="unm-cb-wrap" onclick="event.stopPropagation()">
+                        <input type="checkbox" class="unm-checkbox unm-item-cb" value="${item.id}" onchange="updateUniversalNotifSelectionUI()">
+                    </div>
+                    <span class="unm-dot"></span>
+                    <div style="flex:1; min-width:0;">
+                        <div class="unm-item-title">${_escapeHtml(item.title)}</div>
+                        <div class="unm-item-msg">${_escapeHtml(item.message)}</div>
+                        <div class="unm-item-time"><i class="fa-regular fa-clock"></i> ${_escapeHtml(item.created_at)}</div>
+                    </div>
+                    <button type="button" class="unm-single-del-btn" title="Delete notification" onclick="event.stopPropagation(); deleteSingleUniversalNotif('${item.id}')">
+                        <i class="fa-regular fa-trash-can"></i>
+                    </button>
+                </div>
+            `;
+        });
+        if (listEl) listEl.innerHTML = html;
+        _syncGlobalBellCount(unreadCount);
+        window.updateUniversalNotifSelectionUI();
+    }
+
+    window.openUniversalNotifModal = function() {
+        const m = document.getElementById('universalNotifModal');
+        if (!m) return;
+        m.classList.remove('hidden');
+
+        const loadingEl = document.getElementById('unmLoadingState');
+        const listEl = document.getElementById('unmItemsList');
+        const emptyEl = document.getElementById('unmEmptyState');
+        if (listEl && !listEl.innerHTML.trim()) {
+            if (loadingEl) loadingEl.style.display = '';
+            if (emptyEl) emptyEl.style.display = 'none';
+        }
+
+        fetch('/api/notifications/list', {
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+            if (data && Array.isArray(data.notifications)) {
+                _renderNotifItems(data.notifications, data.unread_count || 0);
+            }
+        })
+        .catch(() => {
+            if (loadingEl) loadingEl.style.display = 'none';
+        });
+    };
+
+    window.closeUniversalNotifModal = function() {
+        window.closeUnmConfirmModal();
+        const m = document.getElementById('universalNotifModal');
+        if (m) m.classList.add('hidden');
+    };
+
+    // Alias for student timetable button compatibility
+    window.openStudentNotifModal = window.openUniversalNotifModal;
+    window.closeStudentNotifModal = window.closeUniversalNotifModal;
+
+    window.markSingleUniversalNotifRead = function(el, notifId) {
+        if (!el || !el.classList.contains('unread')) return;
+        el.classList.remove('unread');
+        el.classList.add('read');
+        const remaining = document.querySelectorAll('#universalNotifModal .unm-item.unread').length;
+        _syncGlobalBellCount(remaining);
+        fetch('/notifications/mark_read/' + notifId, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': _csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        }).catch(() => {});
+    };
+
+    window.markAllUniversalNotifsRead = function() {
+        document.querySelectorAll('#universalNotifModal .unm-item.unread').forEach(el => {
+            el.classList.remove('unread');
+            el.classList.add('read');
+        });
+        _syncGlobalBellCount(0);
+        fetch('/notifications/mark_all_read', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': _csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        }).catch(() => {});
+    };
+
+    function _executeDeleteNotifIds(ids) {
+        if (!ids || !ids.length) return;
+        ids.forEach(id => {
+            const row = document.querySelector(`#unmItemsList .unm-item[data-notif-id="${id}"]`);
+            if (row) row.remove();
+        });
+        _checkIfListEmptyAfterDelete();
+
+        fetch('/notifications/delete_selected', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': _csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ ids: ids })
+        })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+            if (data && typeof data.unread_count === 'number') {
+                _syncGlobalBellCount(data.unread_count);
+            }
+        })
+        .catch(() => {});
+    }
+
+    window.deleteSingleUniversalNotif = function(notifId) {
+        if (!notifId) return;
+        window.openUnmConfirmModal({
+            title: 'Delete Notification',
+            message: 'Are you sure you want to delete this notification?',
+            sub: 'This notification will be permanently removed from your inbox.',
+            confirmLabel: 'Delete',
+            onConfirm: function() {
+                _executeDeleteNotifIds([notifId]);
+            }
+        });
+    };
+
+    window.deleteSelectedUniversalNotifs = function() {
+        const checkedCbs = Array.from(document.querySelectorAll('#unmItemsList .unm-item-cb:checked'));
+        const ids = checkedCbs.map(cb => cb.value).filter(Boolean);
+        if (!ids.length) return;
+
+        const count = ids.length;
+        window.openUnmConfirmModal({
+            title: count === 1 ? 'Delete Selected Notification' : 'Delete Selected Notifications',
+            message: `Are you sure you want to delete <strong>${count} selected notification${count === 1 ? '' : 's'}</strong>?`,
+            sub: 'This action will permanently remove the selected notification(s) from your inbox and cannot be undone.',
+            confirmLabel: `Delete (${count})`,
+            onConfirm: function() {
+                _executeDeleteNotifIds(ids);
+            }
+        });
+    };
+
+    window.clearAllUniversalNotifs = function() {
+        window.openUnmConfirmModal({
+            title: 'Clear All Notifications',
+            message: 'Are you sure you want to clear <strong>all notifications</strong> from your inbox?',
+            sub: 'This action will permanently delete all your notifications and cannot be undone.',
+            confirmLabel: 'Clear All',
+            onConfirm: function() {
+                _renderNotifItems([], 0);
+                fetch('/notifications/clear_all', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': _csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                }).catch(() => {});
+            }
+        });
+    };
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            const confirmOverlay = document.getElementById('unmConfirmOverlay');
+            if (confirmOverlay && !confirmOverlay.classList.contains('hidden')) {
+                window.closeUnmConfirmModal();
+                return;
+            }
+            window.closeUniversalNotifModal();
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // 1. Ensure top page <header> has a notification bell icon if not already present
+        const header = document.querySelector('#main-content header, main header, body > div > header');
+        if (header && !header.querySelector('a[href="/notifications"]') && !header.querySelector('[data-notif-manual]')) {
+            const bellLink = document.createElement('a');
+            bellLink.href = '/notifications';
+            bellLink.title = 'Notifications';
+            bellLink.className = 'relative p-2 text-gray-500 hover:text-[#668054] transition-colors ml-auto';
+            const initUnread = parseInt("{{ unread_count or 0 }}", 10) || 0;
+            bellLink.innerHTML = '<i class="fa-solid fa-bell text-xl"></i>' + (
+                initUnread > 0
+                ? `<span data-notif-badge class="absolute top-0 right-0 flex h-4 min-w-[1rem]"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-4 min-w-[1rem] px-1 bg-red-500 text-white text-[10px] font-bold items-center justify-center">${initUnread > 99 ? '99+' : initUnread}</span></span>`
+                : ''
+            );
+            const rightFlex = header.querySelector('.flex.items-center.gap-3, .flex.items-center.gap-4, .flex.items-center.space-x-4');
+            if (rightFlex && rightFlex !== header.firstElementChild) {
+                rightFlex.insertBefore(bellLink, rightFlex.firstChild);
+            } else {
+                header.appendChild(bellLink);
+            }
+        }
+
+        // 2. Intercept clicks on any a[href="/notifications"] to open the modal in-place
+        document.addEventListener('click', function(e) {
+            const link = e.target.closest('a[href="/notifications"]');
+            if (link) {
+                e.preventDefault();
+                window.openUniversalNotifModal();
+            }
+        });
+
+        // 3. Auto-open if redirected with ?open_notifications=1
+        if (window.location.search.includes('open_notifications=1')) {
+            window.openUniversalNotifModal();
+            if (window.history && window.history.replaceState) {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('open_notifications');
+                window.history.replaceState({}, document.title, url.pathname + url.search);
+            }
+        }
+    });
+})();
+</script>

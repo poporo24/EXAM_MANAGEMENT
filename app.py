@@ -8,7 +8,7 @@ from flask import (Flask, render_template, session, redirect, url_for,
 from flask_mail import Mail, Message as MailMessage
 from datetime import date, datetime, timedelta
 from collections import defaultdict
-import io, os, time
+import io, os, time, threading
 os.environ['TZ'] = 'Asia/Manila'
 if hasattr(time, 'tzset'):
     try:
@@ -32,6 +32,7 @@ from system.database import (
     get_subject_content_groups, bulk_import_subjects,
     # users
     register_user, get_all_users, get_user_by_id, update_user, delete_user,
+    bulk_delete_users_and_proctors,
     get_all_students, get_pending_users, approve_student,
     deactivate_student, bulk_deactivate_students, bulk_delete_students,
     # rooms
@@ -48,6 +49,7 @@ from system.database import (
     get_student_exam_load_per_day, bulk_import_exams, bulk_delete_exams,
     # scheduling
     get_already_scheduled_slots, apply_schedule_results, reset_schedule, unschedule_exams,
+    sync_exam_and_subject_institutes,
     get_schedule_results, check_edit_conflicts, apply_exam_edit, get_available_resources,
     save_exam_period, save_exam_term, get_exam_term, get_exam_period,
     create_schedule_reset_request, get_pending_schedule_reset_request,
@@ -67,7 +69,8 @@ from system.database import (
     record_proctor_absence, get_proctor_absence_report, get_absence_stats, clear_absence_reports,
     # notifications
     create_notification, get_notifications, get_unread_count, clear_all_notifications,
-    mark_notification_read, mark_all_read, create_notification_for_role,
+    delete_selected_notifications,
+    mark_notification_read, mark_all_read, create_notification_for_role, get_live_sync_signature,
     # reports
     get_scheduling_report, get_assignment_report, get_student_exam_load_report,
     # archives
@@ -109,7 +112,9 @@ app.config.update(
 @app.before_request
 def check_session_inactivity():
     # Skip idle check for static resources and public login/register/reset endpoints
-    if request.path.startswith('/static/') or request.endpoint in ('static', 'public_timetable', 'login', 'register_page', 'register_submit', 'forgot_password', 'reset_password'):
+    # 'api_unread_count' is skipped so background polling does NOT refresh _last_active
+    # (otherwise idle users would never be auto-logged out). It enforces the idle check itself.
+    if request.path.startswith('/static/') or request.endpoint in ('static', 'public_timetable', 'login', 'register_page', 'register_submit', 'forgot_password', 'reset_password', 'api_unread_count'):
         return None
 
     if 'user_id' in session:
@@ -161,8 +166,36 @@ mail = Mail(app)
 from concurrent.futures import ThreadPoolExecutor
 _MAIL_POOL = ThreadPoolExecutor(max_workers=2)
 
-def send_email_notification(to_email, subject, body):
-    """Send an email in a background thread via Brevo API or Flask-Mail."""
+import time as _time_mod
+_RECENT_EMAIL_CACHE = {}  # (to_email_lower, subject_lower) -> timestamp
+_EMAIL_CACHE_LOCK = threading.Lock()
+_PUBLISH_EMAIL_LOCK = threading.Lock()
+_PUBLISH_IN_PROGRESS = False
+
+def _can_send_email(to_email, subject, cooldown_seconds=600):
+    """Anti-spam guard: prevents sending duplicate emails to the same address within cooldown_seconds."""
+    if not to_email:
+        return False
+    key = (to_email.strip().lower(), (subject or '').strip().lower())
+    now = _time_mod.time()
+    with _EMAIL_CACHE_LOCK:
+        last = _RECENT_EMAIL_CACHE.get(key)
+        if last and (now - last) < cooldown_seconds:
+            print(f"[Anti-Spam Suppressed] Duplicate email to {to_email} ('{subject}') within {cooldown_seconds}s cooldown.")
+            return False
+        _RECENT_EMAIL_CACHE[key] = now
+        # Periodic cleanup of old entries
+        if len(_RECENT_EMAIL_CACHE) > 1000:
+            for k in list(_RECENT_EMAIL_CACHE.keys()):
+                if now - _RECENT_EMAIL_CACHE[k] > 3600:
+                    del _RECENT_EMAIL_CACHE[k]
+        return True
+
+
+def send_email_notification(to_email, subject, body, bypass_cooldown=False):
+    """Send an email in a background thread via Brevo API or Flask-Mail with anti-spam cooldown."""
+    if not bypass_cooldown and not _can_send_email(to_email, subject):
+        return
     try:
         s = get_system_settings()
         brevo_key = os.environ.get('BREVO_API_KEY') or s.get('brevo_api_key')
@@ -811,10 +844,20 @@ def generate_schedule():
         flash("End date must be after start date.", "warning")
         return redirect(url_for('schedule_view'))
 
+    span_days = (period_end - period_start).days + 1
+    if span_days < 4:
+        flash(f"Exam period is only {span_days} day(s). With 1,000+ exams across all sections, scheduling requires at least a 5 to 6-day period (e.g., Oct 26 to Oct 31) because student regulations limit each section to at most 2 Major exams per day.", "warning")
+
     save_exam_period(period_start, period_end)
     
     settings = get_system_settings()
     if day_start_str and day_end_str:
+        try:
+            parts = day_end_str.strip().split(':')
+            if len(parts) >= 2 and int(parts[0]) <= 11:
+                day_end_str = f"{int(parts[0]) + 12:02d}:{parts[1]}"
+        except Exception:
+            pass
         save_system_settings(
             day_start=day_start_str,
             day_end=day_end_str,
@@ -832,6 +875,9 @@ def generate_schedule():
             max_daily_proctor_hrs=settings.get('max_daily_proctor_hrs', 4.0)
         )
         settings = get_system_settings() # reload
+
+    # Ensure all exams and subjects have consistent CCA institute assignments before scheduling
+    sync_exam_and_subject_institutes()
 
     if request.form.get("regenerate_all"):
         reset_schedule()
@@ -868,9 +914,10 @@ def generate_schedule():
     )
 
     failed_ids = [f['exam_id'] for f in result['failed']]
+    unpublish_schedule()  # Newly generated schedule starts in unapproved Draft mode BEFORE applying results
     apply_schedule_results(result['scheduled'], failed_ids)
-    unpublish_schedule()  # Newly generated schedule starts in unapproved Draft mode
-    session['last_failed']          = result['failed']
+    session.pop('last_failed', None)  # Never store full failed list in cookie header (prevents Nginx 502 Bad Gateway)
+    session['last_failed_flag']     = 1 if failed_ids else 0
     session['last_scheduled_count'] = len(result['scheduled'])
     log_audit_event('SCHEDULE_GENERATED',
         f"Automated schedule generation run by {session.get('full_name')}. Scheduled: {len(result['scheduled'])}, Unscheduled: {len(failed_ids)}. Period: {period_start} to {period_end}.",
@@ -880,34 +927,9 @@ def generate_schedule():
         ip_address=request.remote_addr
     )
 
-    # Email notifications to assigned proctors
-    db = open_db()
-    if db:
-        try:
-            c = db.cursor(dictionary=True)
-            for item in result['scheduled']:
-                c.execute("""
-                    SELECT u.email, u.full_name, e.subject_name, e.section, e.exam_date_time
-                    FROM exams e
-                    JOIN users u ON u.instructor_id = e.instructor_id
-                    WHERE e.id = %s
-                """, (item['exam_id'],))
-                row = c.fetchone()
-                if row and row.get('email'):
-                    dt = row['exam_date_time']
-                    dt_str = dt.strftime('%B %d, %Y at %I:%M %p') if dt else 'TBD'
-                    send_email_notification(
-                        row['email'],
-                        f"CCA Exam Proctoring Assignment â€” {row['subject_name']}",
-                        f"Dear {row['full_name']},\n\nYou have been assigned to proctor:\n"
-                        f"Subject: {row['subject_name']} ({row['section'] or 'â€”'})\n"
-                        f"Date/Time: {dt_str}\n\nPlease log in to view full details.\n\n"
-                        f"CCA Exam Management System"
-                    )
-        except Exception as e:
-            print(f"[Email batch error] {e}")
-        finally:
-            db.close()
+    # Note: Broadcast emails are NOT dispatched during draft generation
+    # to prevent spamming proctors with tentative assignments. Official notifications
+    # are dispatched in a single batch only when 'Finalize & Publish Timetable' is executed.
 
     flash(f" Scheduled {len(result['scheduled'])} exam(s). "
           f"{len(result['failed'])} could not be placed.", "success")
@@ -1014,8 +1036,10 @@ def log_email_event(msg):
     except Exception:
         pass
 
-def send_single_email_sync(to_email, subject, body):
-    """Synchronously send one email via Brevo API or Flask-Mail."""
+def send_single_email_sync(to_email, subject, body, bypass_cooldown=False):
+    """Synchronously send one email via Brevo API or Flask-Mail with anti-spam check."""
+    if not bypass_cooldown and not _can_send_email(to_email, subject):
+        return True, "Suppressed by anti-spam cooldown"
     try:
         s = get_system_settings()
         brevo_key = os.environ.get('BREVO_API_KEY') or s.get('brevo_api_key')
@@ -1047,13 +1071,23 @@ def _dispatch_publish_emails_async(admin_email=None, admin_name=None):
     """
     Asynchronously queries all active proctors and students, compiles their assigned schedules,
     and dispatches broadcast notification emails via Brevo/SMTP in the background.
+    Protected by single-flight lock and per-recipient de-duplication to prevent email spam.
     """
     import threading
     import time
     from collections import defaultdict
+    global _PUBLISH_IN_PROGRESS
+
+    with _PUBLISH_EMAIL_LOCK:
+        if _PUBLISH_IN_PROGRESS:
+            log_email_event("DISPATCH_SKIPPED: A publish broadcast is already in progress.")
+            return False
+        _PUBLISH_IN_PROGRESS = True
 
     def _run():
+        global _PUBLISH_IN_PROGRESS
         log_email_event(f"DISPATCH_START: admin_email={admin_email}")
+        sent_recipients = set()
         try:
             db = open_db()
             if not db:
@@ -1061,81 +1095,21 @@ def _dispatch_publish_emails_async(admin_email=None, admin_name=None):
             cursor = db.cursor(dictionary=True)
 
             # 0. Send confirmation to Admin who clicked Publish
-            if admin_email:
+            if admin_email and admin_email.strip().lower() not in sent_recipients:
+                sent_recipients.add(admin_email.strip().lower())
                 adm_name = admin_name or "Administrator"
                 admin_body = f"""Dear {adm_name},
 
 The official Examination Timetable for City College of Angeles has been successfully published and is now LIVE!
 
 Timetable Status: Live on Student and Proctor Portals
-Portal Link: http://cca-exam.duckdns.org/schedule
+Portal Link: https://cca-exam.duckdns.org/schedule
 
 Best regards,
 CCA Exam Management System"""
-                send_single_email_sync(admin_email, "CCA Examination Timetable Published - Admin Confirmation", admin_body)
+                send_single_email_sync(admin_email, "CCA Examination Timetable Published - Admin Confirmation", admin_body, bypass_cooldown=True)
 
-            # 1. Fetch and notify ALL active STUDENTS first!
-            cursor.execute("""
-                SELECT u.email, u.full_name, u.section
-                FROM users u
-                WHERE u.role = 'student' AND u.is_active = 1 AND u.email IS NOT NULL AND u.email != ''
-            """)
-            students = cursor.fetchall()
-            log_email_event(f"Sending to {len(students)} active student(s)...")
-            for s in students:
-                try:
-                    email = s.get('email')
-                    if not email:
-                        continue
-                    body = f"""Dear {s['full_name']},
-
-The official Examination Timetable has been officially approved and published!
-
-You can now log in to the Student Portal to view your complete exam schedule, room assignments, and download your Examination Permit:
-http://cca-exam.duckdns.org/student/timetable
-
-Best regards,
-CCA Exam Management System"""
-                    send_single_email_sync(
-                        email,
-                        "Official CCA Examination Timetable Published",
-                        body
-                    )
-                    time.sleep(0.1)
-                except Exception as ex_st:
-                    log_email_event(f"Student mail error for {s.get('email')}: {ex_st}")
-
-            # 2. Fetch and notify active SECRETARIES
-            cursor.execute("""
-                SELECT u.email, u.full_name
-                FROM users u
-                WHERE u.role = 'secretary' AND u.is_active = 1 AND u.email IS NOT NULL AND u.email != ''
-            """)
-            secretaries = cursor.fetchall()
-            for sec in secretaries:
-                try:
-                    email = sec.get('email')
-                    if not email:
-                        continue
-                    body = f"""Dear {sec['full_name']},
-
-The official Examination Timetable has been finalized and published by the administration.
-
-You may access your Departmental Secretary Dashboard to manage exam collection and monitor attendance:
-http://cca-exam.duckdns.org/secretary/dashboard
-
-Best regards,
-CCA Exam Management System"""
-                    send_single_email_sync(
-                        email,
-                        "CCA Examination Timetable Published - Departmental Notice",
-                        body
-                    )
-                    time.sleep(0.1)
-                except Exception as ex_sec:
-                    log_email_event(f"Secretary mail error for {sec.get('email')}: {ex_sec}")
-
-            # 3. Fetch scheduled exams with rooms
+            # 1. Fetch scheduled exams with rooms for proctors
             cursor.execute("""
                 SELECT e.instructor_id, e.subject_name, e.section, e.exam_date_time, r.room_name
                 FROM exams e
@@ -1147,7 +1121,7 @@ CCA Exam Management System"""
             for exam in cursor.fetchall():
                 exams_by_instructor[exam['instructor_id']].append(exam)
 
-            # 4. Fetch and notify PROCTORS
+            # 2. Fetch and notify PROCTORS (each proctor receives at most 1 duty summary)
             cursor.execute("""
                 SELECT u.id as user_id, u.email, u.full_name, u.instructor_id
                 FROM users u
@@ -1157,9 +1131,11 @@ CCA Exam Management System"""
             log_email_event(f"Sending to {len(proctors)} active proctor(s)...")
             for p in proctors:
                 try:
-                    email = p.get('email')
-                    if not email:
+                    email = (p.get('email') or '').strip().lower()
+                    if not email or email in sent_recipients:
                         continue
+                    sent_recipients.add(email)
+
                     assigned = exams_by_instructor.get(p.get('instructor_id'), [])
                     if assigned:
                         lines = []
@@ -1178,7 +1154,7 @@ Here is your assigned proctoring schedule ({len(assigned)} exam session{'s' if l
 {schedule_text}
 
 You can log in to your Proctor Portal to review full details and download your official Proctor Duty Slip:
-http://cca-exam.duckdns.org/proctor/dashboard
+https://cca-exam.duckdns.org/proctor/dashboard
 
 Best regards,
 CCA Exam Management System"""
@@ -1188,19 +1164,22 @@ CCA Exam Management System"""
 The official Examination Timetable for City College of Angeles has been finalized and published.
 
 You currently do not have any proctoring assignments for this examination period. You may verify your status in your portal:
-http://cca-exam.duckdns.org/proctor/dashboard
+https://cca-exam.duckdns.org/proctor/dashboard
 
 Best regards,
 CCA Exam Management System"""
 
                     send_single_email_sync(
-                        email,
+                        p['email'],
                         "CCA Examination Timetable Published - Proctor Duties",
-                        body
+                        body,
+                        bypass_cooldown=True
                     )
                     time.sleep(0.1)
                 except Exception as ex_pr:
                     log_email_event(f"Proctor mail error for {p.get('email')}: {ex_pr}")
+
+            # 3. Fetch and notify active SECRETARIES (only once!)
             cursor.execute("""
                 SELECT u.email, u.full_name
                 FROM users u
@@ -1208,33 +1187,76 @@ CCA Exam Management System"""
             """)
             secretaries = cursor.fetchall()
             for sec in secretaries:
-                email = sec.get('email')
-                if not email:
-                    continue
-                body = f"""Dear {sec['full_name']},
+                try:
+                    email = (sec.get('email') or '').strip().lower()
+                    if not email or email in sent_recipients:
+                        continue
+                    sent_recipients.add(email)
+
+                    body = f"""Dear {sec['full_name']},
 
 The official Examination Timetable has been finalized and published by the administration.
 
 You may access your Departmental Secretary Dashboard to manage exam collection and monitor attendance:
-http://cca-exam.duckdns.org/secretary/dashboard
+https://cca-exam.duckdns.org/secretary/dashboard
 
 Best regards,
 CCA Exam Management System"""
+                    send_single_email_sync(
+                        sec['email'],
+                        "CCA Examination Timetable Published - Departmental Notice",
+                        body,
+                        bypass_cooldown=True
+                    )
+                    time.sleep(0.1)
+                except Exception as ex_sec:
+                    log_email_event(f"Secretary mail error for {sec.get('email')}: {ex_sec}")
 
-                send_single_email_sync(
-                    email,
-                    "CCA Examination Timetable Published - Departmental Notice",
-                    body
-                )
-                time.sleep(0.05)
+            # 4. Fetch and notify active STUDENTS (strictly de-duplicated)
+            cursor.execute("""
+                SELECT u.email, u.full_name, u.section
+                FROM users u
+                WHERE u.role = 'student' AND u.is_active = 1 AND u.email IS NOT NULL AND u.email != ''
+            """)
+            students = cursor.fetchall()
+            log_email_event(f"Sending to {len(students)} active student(s)...")
+            for s in students:
+                try:
+                    email = (s.get('email') or '').strip().lower()
+                    if not email or email in sent_recipients:
+                        continue
+                    sent_recipients.add(email)
+
+                    body = f"""Dear {s['full_name']},
+
+The official Examination Timetable has been officially approved and published!
+
+You can now log in to the Student Portal to view your complete exam schedule, room assignments, and download your Examination Permit:
+https://cca-exam.duckdns.org/student/timetable
+
+Best regards,
+CCA Exam Management System"""
+                    send_single_email_sync(
+                        s['email'],
+                        "Official CCA Examination Timetable Published",
+                        body,
+                        bypass_cooldown=True
+                    )
+                    time.sleep(0.1)
+                except Exception as ex_st:
+                    log_email_event(f"Student mail error for {s.get('email')}: {ex_st}")
 
             db.close()
+            log_email_event(f"DISPATCH_COMPLETE: Total distinct recipients emailed: {len(sent_recipients)}")
         except Exception as e:
             print(f"[Publish Email Dispatch Error] {e}")
+        finally:
+            with _PUBLISH_EMAIL_LOCK:
+                _PUBLISH_IN_PROGRESS = False
 
     threading.Thread(target=_run, daemon=True).start()
+    return True
 
-@app.route("/admin/email_log")
 def view_email_log():
     guard = require_role('admin')
     if guard: return guard
@@ -1280,8 +1302,12 @@ def schedule_publish():
                 db_adm.close()
         except Exception:
             pass
-        _dispatch_publish_emails_async(admin_email=admin_email, admin_name=admin_name)
-        flash("Exam timetable has been finalized and published! Notification emails are being dispatched to your email and all proctors/students.", "success")
+        send_emails = bool(request.form.get('send_broadcast_emails'))
+        if send_emails:
+            _dispatch_publish_emails_async(admin_email=admin_email, admin_name=admin_name)
+            flash("Exam timetable has been finalized and published! Notification emails are being dispatched to proctors and students.", "success")
+        else:
+            flash("Exam timetable has been finalized and published live to student and proctor portals! (Email broadcast skipped to prevent delivery bounces).", "success")
     else:
         flash(f"Failed to publish timetable: {msg}", "danger")
     return redirect(url_for('schedule_view'))
@@ -1355,13 +1381,15 @@ def resolve_conflicts_route():
     failed_ids = [f['exam_id'] for f in result['failed']]
     apply_schedule_results(result['scheduled'], failed_ids)
     
-    session['last_failed'] = result['failed']
+    session.pop('last_failed', None)
+    session['last_failed_flag'] = 1 if failed_ids else 0
     session['last_scheduled_count'] = len(result['scheduled'])
     
     resolved_info = ""
     if result['scheduled']:
-        resolved_details = [f"{e.get('subject_name')} ({e.get('section')})" for e in result['scheduled']]
-        resolved_info = " Resolved: " + ", ".join(resolved_details)
+        resolved_details = [f"{e.get('subject_name')} ({e.get('section')})" for e in result['scheduled'][:8]]
+        extra_cnt = len(result['scheduled']) - len(resolved_details)
+        resolved_info = " Resolved: " + ", ".join(resolved_details) + (f" and {extra_cnt} more" if extra_cnt > 0 else "")
 
     if failed_ids:
         flash(f"Auto-resolve completed, but {len(failed_ids)} exam(s) could still not be scheduled.{resolved_info}", "warning")
@@ -1375,7 +1403,9 @@ def schedule_view():
     guard = require_role('admin')
     if guard: return guard
     all_exams   = get_schedule_results()
-    failed      = session.pop('last_failed', [])
+    session.pop('last_failed', None)
+    had_failed_flag = bool(session.pop('last_failed_flag', 0))
+    failed      = []
     
     # Enrich each exam with parsed datetime, formatted strings
     scheduled_exams = []
@@ -1400,6 +1430,13 @@ def schedule_view():
             scheduled_exams.append(exam)
         else:
             unscheduled.append(exam)
+            if had_failed_flag and exam.get('status') == 'Unscheduled':
+                failed.append({
+                    'exam_id': exam.get('id'),
+                    'subject_name': exam.get('subject_name'),
+                    'section': exam.get('section'),
+                    'reason': 'No slot found satisfying room, proctor, and section daily load constraints.'
+                })
 
     # Unified conflict audit synchronized with validator
     from system.database import audit_schedule_conflicts
@@ -1434,6 +1471,7 @@ def schedule_view():
 
     institutes = get_all_institutes()
     unread     = _get_unread(session['user_id'])
+    p_start, p_end = get_exam_period()
     return render_template("schedule.html",
                            conflict_audit=conflict_audit,
                            timetable=timetable,
@@ -1456,6 +1494,8 @@ def schedule_view():
                            filter_section=filter_section,
                            exam_term=get_exam_term()[0],
                            exam_semester=get_exam_term()[1],
+                           period_start=p_start,
+                           period_end=p_end,
                            is_published=is_schedule_published(),
                            pending_reset_request=get_pending_schedule_reset_request())
 
@@ -1591,26 +1631,27 @@ def edit_exam_schedule(exam_id):
             ip_address=request.remote_addr
         )
         flash('Exam schedule updated.', 'success')
-        # Also send email to the proctor as an extra channel
+        # Only send email if schedule is already live/published (never spam during draft edits)
         try:
-            exam = get_exam_by_id(exam_id)
-            if exam and exam.get('instructor_id'):
-                db = open_db()
-                if db:
-                    c = db.cursor(dictionary=True)
-                    c.execute("SELECT u.email, u.full_name FROM users u WHERE u.instructor_id = %s AND u.role='proctor'",
-                              (exam['instructor_id'],))
-                    row = c.fetchone()
-                    db.close()
-                    if row and row.get('email'):
-                        dt_str = new_dt_str.replace('T', ' ')
-                        send_email_notification(
-                            row['email'],
-                            f"CCA Exam Schedule Updated â€” {exam['subject_name']}",
-                            f"Dear {row['full_name']},\n\nYour proctoring assignment has been updated:\n"
-                            f"Subject: {exam['subject_name']}\nNew Date/Time: {dt_str}\n\n"
-                            f"CCA Exam Management System"
-                        )
+            if is_schedule_published():
+                exam = get_exam_by_id(exam_id)
+                if exam and exam.get('instructor_id'):
+                    db = open_db()
+                    if db:
+                        c = db.cursor(dictionary=True)
+                        c.execute("SELECT u.email, u.full_name FROM users u WHERE u.instructor_id = %s AND u.role='proctor'",
+                                  (exam['instructor_id'],))
+                        row = c.fetchone()
+                        db.close()
+                        if row and row.get('email'):
+                            dt_str = new_dt_str.replace('T', ' ')
+                            send_email_notification(
+                                row['email'],
+                                f"CCA Exam Schedule Updated â€” {exam['subject_name']}",
+                                f"Dear {row['full_name']},\n\nYour proctoring assignment has been updated:\n"
+                                f"Subject: {exam['subject_name']}\nNew Date/Time: {dt_str}\n\n"
+                                f"CCA Exam Management System"
+                            )
         except Exception as e:
             print(f"[Edit email error] {e}")
     else:
@@ -2069,52 +2110,53 @@ def import_exams():
     subjects_by_name = {s['name'].upper().strip(): s for s in all_subs if s and s.get('name')}
     
     new_subjects_created = 0
-    for r in rows:
-        inst_code = (r.pop('institute_code', '') or '').upper().strip()
-        r['institute_id'] = institutes.get(inst_code)
-        
-        subj_code = (r.pop('subject_code', '') or '').strip()
-        subj_name = (r.get('subject_name', '') or subj_code).strip()
-        
-        # 1. Match by code or by name (case-insensitive)
-        subj = None
-        if subj_code:
-            subj = subjects_by_code.get(subj_code.upper())
-        if not subj and subj_name:
-            subj = subjects_by_name.get(subj_name.upper())
-        if not subj and subj_code:
-            subj = subjects_by_name.get(subj_code.upper())
+    db_conn = open_db()
+    try:
+        c_cur = db_conn.cursor(dictionary=True) if db_conn else None
+        for r in rows:
+            inst_code = (r.pop('institute_code', '') or '').upper().strip()
+            r['institute_id'] = institutes.get(inst_code)
             
-        # 2. If subject doesn't exist yet, auto-create it so it immediately reflects in Subject Management!
-        if not subj and (subj_name or subj_code):
-            c_name = subj_name or subj_code
-            c_code = subj_code or c_name
-            db_conn = open_db()
-            if db_conn:
-                try:
-                    c_cur = db_conn.cursor(dictionary=True)
-                    c_cur.execute(
-                        "INSERT INTO subjects (name, code, institute_id, is_common, content_group_id) VALUES (%s, %s, %s, 0, NULL)",
-                        (c_name, c_code, r.get('institute_id'))
-                    )
-                    db_conn.commit()
-                    new_id = c_cur.lastrowid
-                    subj = {'id': new_id, 'name': c_name, 'code': c_code}
-                    new_subjects_created += 1
-                finally:
-                    db_conn.close()
-            if subj:
+            subj_code = (r.pop('subject_code', '') or '').strip()
+            subj_name = (r.get('subject_name', '') or subj_code).strip()
+            
+            # 1. Match by code or by name (case-insensitive)
+            subj = None
+            if subj_code:
+                subj = subjects_by_code.get(subj_code.upper())
+            if not subj and subj_name:
+                subj = subjects_by_name.get(subj_name.upper())
+            if not subj and subj_code:
+                subj = subjects_by_name.get(subj_code.upper())
+                
+            # 2. If subject doesn't exist yet, auto-create it so it immediately reflects in Subject Management!
+            if not subj and (subj_name or subj_code) and c_cur:
+                c_name = subj_name or subj_code
+                c_code = subj_code or c_name
+                c_cur.execute(
+                    "INSERT INTO subjects (name, code, institute_id, is_common, content_group_id) VALUES (%s, %s, %s, 0, NULL)",
+                    (c_name, c_code, r.get('institute_id'))
+                )
+                new_id = c_cur.lastrowid
+                subj = {'id': new_id, 'name': c_name, 'code': c_code}
+                new_subjects_created += 1
                 if c_code: subjects_by_code[c_code.upper()] = subj
                 if c_name: subjects_by_name[c_name.upper()] = subj
-        
-        if subj:
-            r['subject_id'] = subj['id']
-            r['subject_name'] = subj['name']
-        else:
-            r['subject_id'] = None
-            r['subject_name'] = subj_name or subj_code
+            
+            if subj:
+                r['subject_id'] = subj['id']
+                r['subject_name'] = subj['name']
+            else:
+                r['subject_id'] = None
+                r['subject_name'] = subj_name or subj_code
+        if db_conn:
+            db_conn.commit()
+    finally:
+        if db_conn:
+            db_conn.close()
 
     ok, errors = bulk_import_exams(rows)
+    sync_exam_and_subject_institutes()
     msg = f"Imported {ok} exam(s)."
     if new_subjects_created > 0:
         msg += f" {new_subjects_created} new subject(s) automatically added to Subject Management."
@@ -2898,6 +2940,14 @@ def super_edit_user(id):
             finally:
                 db.close()
 
+        # Security safeguard: Student accounts cannot be promoted to Admin or Super Admin
+        if old_user and old_user.get('role') == 'student':
+            if role == 'admin' or is_sa:
+                flash("Security Policy: Student accounts cannot be promoted to Admin or granted Super Admin privileges.", "danger")
+                return redirect(url_for('super_admin_page'))
+        if role == 'student':
+            is_sa = 0
+
         # Update local DB
         update_user(id, full_name, email, role, section, institute_id, is_sa)
         
@@ -2989,6 +3039,48 @@ def super_delete_user(id):
         flash("User deleted.", "success")
     return redirect(url_for('super_admin_page'))
 
+@app.route("/super_admin/bulk_delete_users", methods=["POST"])
+def super_bulk_delete_users():
+    guard = require_super_admin()
+    if guard: return guard
+
+    delete_all_role = (request.form.get("delete_all_role") or "").strip().lower()
+    raw_ids = request.form.getlist("user_ids")
+    csv_ids = request.form.get("user_ids_csv", "").strip()
+    if csv_ids:
+        raw_ids.extend([x.strip() for x in csv_ids.split(",") if x.strip()])
+
+    if not delete_all_role and not raw_ids:
+        flash("No users selected for deletion.", "warning")
+        return redirect(url_for('super_admin_page'))
+
+    deleted_count, errors = bulk_delete_users_and_proctors(
+        user_ids=raw_ids if not delete_all_role else None,
+        delete_all_role=delete_all_role if delete_all_role in ('proctor', 'student', 'secretary') else None,
+        exclude_user_id=session.get('user_id')
+    )
+
+    if deleted_count > 0:
+        action_target = f"all {delete_all_role} accounts ({deleted_count})" if delete_all_role else f"{deleted_count} selected user account(s)"
+        log_audit_event('USER_BULK_DELETED',
+            f"Super Admin {session.get('full_name')} permanently bulk-deleted {action_target}.",
+            user_id=session.get('user_id'),
+            user_name=session.get('full_name'),
+            user_role='super_admin',
+            ip_address=request.remote_addr
+        )
+        if delete_all_role == 'proctor':
+            flash(f"Successfully deleted all {deleted_count} proctor account(s) and cleared faculty proctor records.", "success")
+        else:
+            flash(f"Successfully deleted {deleted_count} user account(s).", "success")
+    elif not errors:
+        flash("No matching user accounts were found to delete.", "info")
+
+    if errors:
+        flash("Some accounts could not be deleted: " + "; ".join(errors[:5]), "warning")
+
+    return redirect(url_for('super_admin_page'))
+
 @app.route("/super_admin/reset_password/<int:id>", methods=["POST"])
 def super_reset_password(id):
     guard = require_super_admin()
@@ -3023,6 +3115,7 @@ def super_reset_password(id):
 # â”€â”€ PROCTOR DASHBOARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/proctor")
+@app.route("/proctor/dashboard")
 def proctor_dashboard():
     guard = require_role('proctor')
     if guard: return guard
@@ -3063,11 +3156,36 @@ def proctor_dashboard():
     exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
     full_name = session.get('full_name', 'Faculty Proctor')
     prepared_by = session.get('full_name', 'Faculty Proctor')
+
+    proctor_institute_name = ''
+    proctor_institute_code = ''
+    db = open_db()
+    if db:
+        try:
+            c = db.cursor(dictionary=True)
+            c.execute("""
+                SELECT inst.name AS institute_name, inst.code AS institute_code
+                FROM users u
+                LEFT JOIN instructors i ON u.instructor_id = i.id
+                LEFT JOIN institutes inst ON COALESCE(i.institute_id, u.institute_id) = inst.id
+                WHERE u.id = %s
+            """, (session['user_id'],))
+            inst_row = c.fetchone()
+            if inst_row:
+                proctor_institute_name = inst_row.get('institute_name') or ''
+                proctor_institute_code = inst_row.get('institute_code') or ''
+                session['institute_name'] = proctor_institute_name
+                session['institute_code'] = proctor_institute_code
+        finally:
+            db.close()
+
     return render_template("proctor_dashboard.html",
                            grouped=sorted_groups,
                            exams=exams,
                            total=len(exams),
                            full_name=full_name,
+                           proctor_institute_name=proctor_institute_name,
+                           proctor_institute_code=proctor_institute_code,
                            exam_term=exam_term,
                            exam_semester=exam_semester,
                            saved_dates=saved_dates,
@@ -3221,6 +3339,7 @@ def remove_reliever_route(id):
 # â”€â”€ SECRETARY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route("/secretary")
+@app.route("/secretary/dashboard")
 def secretary_dashboard():
     guard = require_role('secretary', 'admin')
     if guard: return guard
@@ -3359,6 +3478,45 @@ def secretary_assign_substitute():
             user_role=session.get('role'),
             ip_address=request.remote_addr
         )
+        # Notify the substitute proctor immediately via email
+        try:
+            db_sub = open_db()
+            if db_sub:
+                c_sub = db_sub.cursor(dictionary=True)
+                c_sub.execute("""
+                    SELECT e.subject_name, e.section, e.exam_date_time, r.room_name
+                    FROM exams e
+                    LEFT JOIN rooms r ON e.room_id = r.id
+                    WHERE e.id = %s
+                """, (eid,))
+                ex_info = c_sub.fetchone()
+                c_sub.execute("SELECT email, full_name FROM users WHERE instructor_id = %s", (new_inst_id,))
+                sub_user = c_sub.fetchone()
+                if ex_info and sub_user and sub_user.get('email'):
+                    dt = ex_info.get('exam_date_time')
+                    dt_str = dt.strftime('%B %d, %Y at %I:%M %p') if dt else 'TBD'
+                    rm_str = ex_info.get('room_name') or 'TBD'
+                    sec_name = session.get('full_name', 'Department Secretary')
+                    sub_body = (
+                        f"Dear Prof. {sub_user['full_name']},\n\n"
+                        f"You have been assigned as a substitute proctor for the following examination:\n\n"
+                        f"Subject: {ex_info.get('subject_name')} ({ex_info.get('section') or '-' })\n"
+                        f"Date & Time: {dt_str}\n"
+                        f"Room: {rm_str}\n"
+                        f"Reason: {reason or 'Emergency substitute proctor duty'}\n"
+                        f"Assigned By: {sec_name}\n\n"
+                        f"Please log in to your Proctor Dashboard to review details and download your duty pass:\n"
+                        f"https://cca-exam.duckdns.org/proctor/dashboard\n\n"
+                        f"Best regards,\nCCA Exam Management System"
+                    )
+                    send_email_notification(
+                        sub_user['email'],
+                        f"CCA Exam Proctoring Assignment (Substitute Reliever) - {ex_info.get('subject_name')}",
+                        sub_body
+                    )
+                db_sub.close()
+        except Exception as sub_mail_err:
+            print(f"[Secretary Substitute Mail Error] {sub_mail_err}")
         flash(msg, "success")
     else:
         flash(f"Failed to assign substitute: {msg}", "danger")
@@ -3535,24 +3693,97 @@ def clear_all_notifications_route():
     guard = require_login()
     if guard: return guard
     clear_all_notifications(session['user_id'])
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'ok': True, 'unread_count': 0})
     flash("All notifications cleared.", "success")
+    if session.get('role') == 'student':
+        return redirect(url_for('student_timetable', open_notifications='1'))
+    return redirect(url_for('notifications_page'))
+
+@app.route("/notifications/delete_selected", methods=["POST"])
+def delete_selected_notifications_route():
+    guard = require_login()
+    if guard: return guard
+    notif_ids = []
+    if request.is_json:
+        payload = request.get_json(silent=True) or {}
+        notif_ids = payload.get('ids') or []
+    else:
+        notif_ids = request.form.getlist('ids') or request.form.getlist('ids[]')
+        if not notif_ids and request.form.get('ids_csv'):
+            notif_ids = [x.strip() for x in request.form.get('ids_csv', '').split(',') if x.strip()]
+
+    deleted_count = delete_selected_notifications(session['user_id'], notif_ids)
+    unread = _get_unread(session['user_id'])
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+        return jsonify({'ok': True, 'deleted': deleted_count, 'unread_count': unread})
+
+    if deleted_count > 0:
+        flash(f"Deleted {deleted_count} notification(s).", "success")
+    else:
+        flash("No notifications selected to delete.", "info")
+    if session.get('role') == 'student':
+        return redirect(url_for('student_timetable', open_notifications='1'))
     return redirect(url_for('notifications_page'))
 
 @app.route("/notifications")
 def notifications_page():
     guard = require_login()
     if guard: return guard
+    role = session.get('role')
+    if role == 'student':
+        return redirect(url_for('student_timetable', open_notifications='1'))
+    elif role == 'proctor':
+        return redirect(url_for('proctor_dashboard', open_notifications='1'))
+    elif role == 'secretary':
+        return redirect(url_for('secretary_dashboard', open_notifications='1'))
+    elif role in ('admin', 'super_admin') or session.get('is_super_admin'):
+        return redirect(url_for('dashboard', open_notifications='1'))
     notifs = get_notifications(session['user_id'])
     unread = _get_unread(session['user_id'])
-    pending_count = 0
-    if session.get('role') in ['admin', 'super_admin']:
-        try:
-            pending_count = len(get_pending_users())
-        except Exception:
-            pending_count = 0
     return render_template("notifications.html",
                            notifications=notifs, unread_count=unread,
-                           pending_count=pending_count)
+                           pending_count=0)
+
+@app.route("/api/notifications/list")
+@limiter.exempt
+def api_notifications_list():
+    """Returns JSON list of notifications and unread count for the universal in-page modal."""
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'expired': True}), 401
+    notifs = get_notifications(uid) or []
+    unread = _get_unread(uid)
+    serialized = []
+    for n in notifs:
+        serialized.append({
+            'id': n.get('id'),
+            'title': n.get('title', ''),
+            'message': n.get('message', ''),
+            'is_read': int(bool(n.get('is_read'))),
+            'created_at': str(n.get('created_at', ''))
+        })
+    resp = jsonify({'unread_count': unread, 'notifications': serialized})
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
+@app.route("/api/notifications/unread_count")
+@limiter.exempt  # polled every ~20s per open tab; must not consume the shared per-IP quota
+def api_unread_count():
+    """Lightweight polling endpoint for the live notification badge (static/js/notif_poll.js)."""
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'expired': True}), 401
+    # Enforce the same 20-minute idle timeout without refreshing _last_active
+    last_active = session.get('_last_active')
+    if last_active and (time.time() - float(last_active) > 1200):
+        return jsonify({'expired': True}), 401
+    resp = jsonify({
+        'unread_count': _get_unread(uid),
+        'live_signature': get_live_sync_signature()
+    })
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 
 @app.route("/notifications/mark_read/<int:id>", methods=["POST"])
 def mark_read(id):
@@ -3566,10 +3797,115 @@ def mark_all_notifs_read():
     guard = require_login()
     if guard: return guard
     mark_all_read(session['user_id'])
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'ok': True})
     flash("All notifications marked as read.", "success")
+    if session.get('role') == 'student':
+        return redirect(url_for('student_timetable', open_notifications='1'))
     return redirect(url_for('notifications_page'))
 
 # â”€â”€ CHANGE OWN PASSWORD (Proctor / Student) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+# ── UNIVERSAL MY ACCOUNT PROFILE & PASSWORD ────────────────────────────────
+
+@app.route("/api/account/me")
+def api_account_me():
+    guard = require_login()
+    if guard:
+        return jsonify({'error': 'Unauthorized'}), 401
+    user = get_user_by_id(session['user_id'])
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    return jsonify({
+        'id': user.get('id'),
+        'full_name': user.get('full_name') or session.get('full_name', ''),
+        'email': user.get('email') or session.get('email', ''),
+        'role': user.get('role') or session.get('role', ''),
+        'is_super_admin': bool(user.get('is_super_admin') or session.get('is_super_admin')),
+        'section': user.get('section') or '',
+        'institute_name': user.get('institute_name') or '',
+    })
+
+@app.route("/account/update_profile", methods=["POST"])
+def update_my_profile():
+    guard = require_login()
+    if guard: return guard
+
+    role = session.get('role')
+    safe_redirects = {
+        'proctor': 'proctor_dashboard',
+        'student': 'student_timetable',
+        'admin': 'dashboard',
+        'super_admin': 'super_admin_page',
+        'secretary': 'secretary_dashboard',
+    }
+    fallback = safe_redirects.get(role, 'login')
+
+    def get_redirect():
+        ref = request.referrer
+        if ref and (request.host in ref):
+            return redirect(ref)
+        return redirect(url_for(fallback))
+
+    last = request.form.get("last_name", "").strip()
+    first = request.form.get("first_name", "").strip()
+    middle = request.form.get("middle_name", "").strip()
+    suffix = request.form.get("suffix", "").strip()
+    if last and first:
+        full_name = f"{last}, {first}"
+        if middle:
+            full_name += f" {middle[0]}." if len(middle) == 1 else f" {middle}"
+        if suffix:
+            full_name += f" {suffix}"
+    else:
+        full_name = request.form.get("full_name", "").strip()
+
+    new_email = request.form.get("email", "").strip().lower()
+    if not full_name:
+        flash("Full name cannot be empty.", "danger")
+        return get_redirect()
+    if not new_email or not new_email.endswith("@cca.edu.ph"):
+        flash("Email must be a valid @cca.edu.ph address.", "danger")
+        return get_redirect()
+
+    user_id = session['user_id']
+    db = open_db()
+    if db:
+        try:
+            c = db.cursor(dictionary=True)
+            c.execute("SELECT id FROM users WHERE LOWER(email) = LOWER(%s) AND id != %s", (new_email, user_id))
+            if c.fetchone():
+                flash("That email address is already in use by another account.", "danger")
+                return get_redirect()
+
+            c.execute("SELECT full_name, email, role, instructor_id FROM users WHERE id = %s", (user_id,))
+            curr = c.fetchone()
+            if not curr:
+                flash("User account not found.", "danger")
+                return get_redirect()
+
+            c_w = db.cursor()
+            c_w.execute("UPDATE users SET full_name = %s, email = %s WHERE id = %s", (full_name, new_email, user_id))
+            if curr.get('role') == 'proctor' and curr.get('instructor_id'):
+                c_w.execute("UPDATE instructors SET name = %s WHERE id = %s", (full_name, curr['instructor_id']))
+            db.commit()
+
+            session['full_name'] = full_name
+            session['email'] = new_email
+
+            log_audit_event('ACCOUNT_PROFILE_UPDATED',
+                f"User '{full_name}' ({new_email}, role: {curr.get('role')}) updated their account profile.",
+                user_id=user_id,
+                user_name=full_name,
+                user_role=curr.get('role'),
+                ip_address=request.remote_addr
+            )
+            flash("Your account profile has been updated successfully.", "success")
+        except Exception as e:
+            flash(f"Error updating account: {e}", "danger")
+        finally:
+            db.close()
+    return get_redirect()
 
 @app.route("/change_my_password", methods=["POST"])
 def change_my_password():
@@ -3811,6 +4147,7 @@ def admin_print_section():
                            exam_semester=get_exam_term()[1])
 
 @app.route("/timetable")
+@app.route("/student/timetable")
 def student_timetable():
     guard = require_role('student')
     if guard: return guard
@@ -3837,7 +4174,7 @@ def student_timetable():
         exams = []
         sorted_groups = []
     else:
-        exams = get_public_timetable(section=section, institute_id=institute_id)
+        exams = get_public_timetable(section=section)
         grouped = defaultdict(list)
         for exam in exams:
             dt = exam['exam_date_time']
@@ -3860,6 +4197,7 @@ def student_timetable():
     exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
     exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
     unread = _get_unread(session['user_id'])
+    student_notifs = get_notifications(session['user_id'])
     
     db_conn = open_db()
     available_sections = []
@@ -3880,6 +4218,7 @@ def student_timetable():
                            exam_term=exam_term,
                            exam_semester=exam_semester,
                            unread_count=unread,
+                           notifications=student_notifs,
                            is_published=is_pub,
                            available_sections=available_sections)
 
@@ -3893,7 +4232,7 @@ def export_student_schedule_pdf_route():
     section      = session.get('section', '')
     institute_id = session.get('institute_id')
     full_name    = session.get('full_name', 'Student')
-    exams = get_public_timetable(section=section, institute_id=institute_id)
+    exams = get_public_timetable(section=section)
     term_tuple = get_exam_term()
     exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
     exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'

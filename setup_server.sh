@@ -44,7 +44,7 @@ Environment="DB_HOST=localhost"
 Environment="DB_USER=cca_user"
 Environment="DB_PASSWORD=ExamPass123!"
 Environment="DB_NAME=cca_exam_management_db"
-ExecStart=/var/www/cca_exam/venv/bin/gunicorn -w 3 -b 127.0.0.1:9999 app:app
+ExecStart=/var/www/cca_exam/venv/bin/gunicorn -w 3 --timeout 120 -b 127.0.0.1:9999 app:app
 Restart=always
 
 [Install]

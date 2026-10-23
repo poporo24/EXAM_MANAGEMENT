@@ -17,7 +17,7 @@ if %ERRORLEVEL% NEQ 0 (
 echo.
 echo [2/2] Applying update, setting Philippine Timezone, and restarting app...
 echo Enter your root password one more time:
-ssh root@165.22.100.18 "timedatectl set-timezone Asia/Manila && unzip -o /root/cca_exam_deploy.zip -d /var/www/cca_exam/ && systemctl restart cca_exam && echo. && echo [SUCCESS] Server time is now: && date"
+ssh root@165.22.100.18 "timedatectl set-timezone Asia/Manila && unzip -o /root/cca_exam_deploy.zip -d /var/www/cca_exam/ && sed -i 's/gunicorn -w 3 -b/gunicorn -w 3 --timeout 120 -b/g' /etc/systemd/system/cca_exam.service && systemctl daemon-reload && systemctl restart cca_exam && echo. && echo [SUCCESS] Server time is now: && date"
 
 echo.
 echo ========================================================

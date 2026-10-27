@@ -269,6 +269,23 @@
             color: #475569;
             text-transform: uppercase;
         }
+    
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: #94a3b8;
+        }
+
     </style>
 
     <style>
@@ -445,11 +462,11 @@
                 </div>
             </div>
         </div>
-        <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
-            <h1 class="text-xl font-semibold text-gray-800">Proctor Dashboard</h1>
-            <div class="flex items-center gap-3">
-                <button type="button" onclick="openModal('change-password-modal')" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg shadow-2xs transition-colors cursor-pointer" title="Change Password">
-                    <i class="fa-solid fa-key text-[#668054]"></i> Change Password
+        <header class="bg-white shadow-sm h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 z-10 sticky top-0 border-b border-gray-200/80">
+            <h1 class="text-lg sm:text-xl font-semibold text-gray-800 truncate">Proctor Dashboard</h1>
+            <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                <button type="button" onclick="openModal('change-password-modal')" class="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg shadow-2xs transition-colors cursor-pointer" title="Change Password">
+                    <i class="fa-solid fa-key text-[#668054]"></i> <span class="hidden sm:inline">Change Password</span>
                 </button>
                 <a href="/notifications" class="text-gray-500 hover:text-[#668054] relative p-2 rounded-full hover:bg-gray-100 transition-colors" title="Notifications">
                     <i class="fa-regular fa-bell text-xl"></i>
@@ -491,8 +508,8 @@
             </div>
             {% endif %}
 
-            <div class="mb-8 bg-[#668054] text-white rounded-xl shadow-sm p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
+            <div class="mb-8 bg-[#668054] text-white rounded-xl shadow-sm p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div class="min-w-0">
                     <div class="mb-2">
                         {% if proctor_institute_code or proctor_institute_name %}
                         <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/20 text-white border border-white/30">
@@ -505,158 +522,182 @@
                         </span>
                         {% endif %}
                     </div>
-                    <h2 class="text-2xl font-bold">Welcome back, {{ full_name }}!</h2>
-                    <p class="mt-1 text-green-100">Here are your proctoring assignments.</p>
+                    <div class="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+                        <h2 class="text-xl sm:text-2xl font-bold truncate">Welcome back, {{ full_name }}!</h2>
+                        <button type="button" onclick="openAccountGuidelinesModal()" class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white bg-white/20 hover:bg-white/30 border border-white/30 rounded-full transition-all cursor-pointer shadow-2xs active:scale-95" title="View Proctor Guidelines">
+                            <i class="fa-solid fa-circle-info"></i>
+                            <span>Account Guide</span>
+                        </button>
+                    </div>
+                    <p class="mt-1 text-xs sm:text-sm text-green-100">Here are your proctoring assignments.</p>
                 </div>
-                <div class="text-right bg-white bg-opacity-20 p-4 rounded-lg">
-                    <p class="text-sm text-green-100 uppercase font-semibold tracking-wider">Total Assigned</p>
-                    <p class="text-3xl font-bold">{{ (total_hours|float)|int if (total_hours|float) % 1 == 0 else (total_hours|float)|round(1) }} <span class="text-lg font-normal">hrs</span></p>
+                <div class="text-left sm:text-right bg-white bg-opacity-20 p-4 rounded-lg w-full sm:w-auto flex-shrink-0">
+                    <p class="text-xs sm:text-sm text-green-100 uppercase font-semibold tracking-wider">Total Assigned</p>
+                    <p class="text-2xl sm:text-3xl font-bold">{{ (total_hours|float)|int if (total_hours|float) % 1 == 0 else (total_hours|float)|round(1) }} <span class="text-base sm:text-lg font-normal">hrs</span></p>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Assignments -->
-                <div class="lg:col-span-2">
-                    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-                        <h3 class="text-lg font-semibold text-gray-800">My Assigned Exams ({{ total }})</h3>
-                        <div class="flex items-center gap-2">
-                            <button onclick="window.print()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-700 hover:text-[#3d5c2e] hover:bg-gray-50 border border-gray-300 rounded-lg text-xs font-semibold shadow-xs transition-all cursor-pointer" title="Print proctoring schedule">
+            <!-- My Assigned Exams (Full Width) -->
+            <div class="w-full bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 mb-8">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3 pb-4 border-b border-gray-100">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-clipboard-list text-[#3d5c2e]"></i>
+                                <h3 class="text-base sm:text-lg font-bold text-gray-900">My Assigned Exams ({{ total }})</h3>
+                                <button type="button" onclick="openProctorGuidelinesModal()" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-600 transition-colors cursor-pointer border border-amber-200 ml-1 shadow-2xs" title="Click to view Proctoring Guidelines Modal">
+                                    <i class="fa-solid fa-circle-exclamation text-xs"></i>
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-0.5">Official examination invigilation schedule &bull; Scroll to browse all assigned duties</p>
+                        </div>
+                        <div class="flex items-center gap-2 self-stretch sm:self-auto justify-end flex-wrap">
+                            <button onclick="window.print()" class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white text-gray-700 hover:text-[#3d5c2e] hover:bg-gray-50 border border-gray-300 rounded-lg text-xs font-semibold shadow-xs transition-all cursor-pointer flex-1 sm:flex-none" title="Print proctoring schedule">
                                 <i class="fa-solid fa-print text-[#668054]"></i> Print Schedule
                             </button>
-                            <a href="/proctor/schedule.pdf" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#3d5c2e] text-white hover:bg-[#2d4520] rounded-lg text-xs font-semibold shadow-xs transition-all" title="Download official proctoring schedule PDF">
+                            <a href="/proctor/schedule.pdf" class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-[#3d5c2e] text-white hover:bg-[#2d4520] rounded-lg text-xs font-semibold shadow-xs transition-all flex-1 sm:flex-none" title="Download official proctoring schedule PDF">
                                 <i class="fa-solid fa-file-pdf"></i> Download PDF
                             </a>
                         </div>
                     </div>
                     
-                    <div class="space-y-10">
+                    <!-- Scrollable Exam Container -->
+                    <div class="max-h-[660px] overflow-y-auto pr-1 sm:pr-3 custom-scrollbar space-y-8">
                         {% if grouped %}
                             {% for date, exams in grouped %}
                             <div>
-                                <div class="flex items-center justify-between mb-4">
-                                    <div class="inline-flex items-center gap-2 bg-[#668054] text-white text-sm font-bold tracking-wider uppercase px-4 py-2 rounded-lg shadow-sm">
+                                <div class="flex items-center justify-between mb-4 sticky top-0 bg-white/95 backdrop-blur-xs py-2 z-10 border-b border-gray-100">
+                                    <div class="inline-flex items-center gap-2 bg-[#668054] text-white text-xs sm:text-sm font-bold tracking-wider uppercase px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg shadow-sm">
                                         <i class="fa-regular fa-calendar-alt opacity-75"></i> {{ date }}
                                     </div>
                                     <div class="text-xs text-gray-500 font-medium">{{ exams|length }} exam{{ 's' if exams|length != 1 else '' }}</div>
                                 </div>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                                     {% for exam in exams %}
                                     {% if exam.is_absent_reported %}
                                     <!-- PROCTOR REPORTED ABSENT FOR THIS DUTY -->
-                                    <div class="{% if exam.has_reliever %}bg-amber-50/40 border-2 border-amber-300{% else %}bg-red-50/40 border-2 border-red-300{% endif %} rounded-xl p-5 hover:shadow-lg transition-all relative">
-                                        <div class="absolute top-4 right-4 flex items-center gap-1.5 text-[10px] font-bold {% if exam.has_reliever %}text-amber-800 bg-amber-100 border-amber-300{% else %}text-red-800 bg-red-100 border-red-300{% endif %} border px-2.5 py-1 rounded-full uppercase tracking-wider shadow-2xs">
-                                            {% if exam.has_reliever %}
-                                                <i class="fa-solid fa-user-xmark text-amber-700"></i> Reported Absent &bull; Relieved
-                                            {% else %}
-                                                <i class="fa-solid fa-triangle-exclamation text-red-600"></i> Reported Absent
-                                            {% endif %}
-                                        </div>
-                                        <h4 class="text-base font-bold text-gray-900 tracking-tight pr-36 mb-2.5">{{ exam.subject_name }}</h4>
-                                        <div class="flex flex-wrap gap-1.5 mb-3">
-                                            <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
-                                                <i class="fa-solid fa-users text-blue-600"></i> {{ exam.section }}
-                                            </span>
-                                            <span class="inline-flex items-center gap-1 {% if exam.subject_type == 'Major' %}bg-green-100 text-green-800{% else %}bg-yellow-100 text-yellow-800{% endif %} px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
-                                                <i class="fa-solid fa-bookmark {% if exam.subject_type == 'Major' %}text-green-600{% else %}text-yellow-600{% endif %}"></i> {{ exam.subject_type or 'General' }} Subject
-                                            </span>
-                                        </div>
-                                        <div class="flex flex-col gap-2 mb-3">
-                                            <div class="flex items-center gap-2 text-sm text-gray-700">
-                                                <i class="fa-regular fa-clock w-4 text-center text-[#829c74]"></i>
-                                                <span class="font-medium">{% if exam.time_end %}{{ exam.time }} &ndash; {{ exam.time_end }}{% else %}{{ exam.time }}{% endif %} <span class="text-xs text-gray-400 ml-1">({{ exam.duration_minutes }} min)</span></span>
+                                    <div class="{% if exam.has_reliever %}bg-amber-50/40 border-2 border-amber-300{% else %}bg-red-50/40 border-2 border-red-300{% endif %} rounded-xl p-4 sm:p-5 hover:shadow-lg transition-all flex flex-col justify-between">
+                                        <div>
+                                            <div class="flex items-start justify-between gap-2.5 mb-2.5">
+                                                <h4 class="text-base font-bold text-gray-900 tracking-tight leading-snug flex-1 min-w-0">{{ exam.subject_name }}</h4>
+                                                <div class="flex items-center gap-1.5 text-[10px] font-bold {% if exam.has_reliever %}text-amber-800 bg-amber-100 border-amber-300{% else %}text-red-800 bg-red-100 border-red-300{% endif %} border px-2.5 py-1 rounded-full uppercase tracking-wider shadow-2xs shrink-0 whitespace-nowrap">
+                                                    {% if exam.has_reliever %}
+                                                        <i class="fa-solid fa-user-xmark text-amber-700"></i> Reported Absent &bull; Relieved
+                                                    {% else %}
+                                                        <i class="fa-solid fa-triangle-exclamation text-red-600"></i> Reported Absent
+                                                    {% endif %}
+                                                </div>
                                             </div>
-                                            <div class="flex items-center gap-2 text-sm text-gray-700">
-                                                <i class="fa-solid fa-location-dot w-4 text-center text-[#829c74]"></i>
-                                                <span class="font-medium">{{ exam.room_name or 'TBA' }}</span>
+                                            <div class="flex flex-wrap gap-1.5 mb-3">
+                                                <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                                                    <i class="fa-solid fa-users text-blue-600"></i> {{ exam.section }}
+                                                </span>
+                                                <span class="inline-flex items-center gap-1 {% if exam.subject_type == 'Major' %}bg-green-100 text-green-800{% else %}bg-yellow-100 text-yellow-800{% endif %} px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                                                    <i class="fa-solid fa-bookmark {% if exam.subject_type == 'Major' %}text-green-600{% else %}text-yellow-600{% endif %}"></i> {{ exam.subject_type or 'General' }} Subject
+                                                </span>
                                             </div>
-                                        </div>
+                                            <div class="flex flex-col gap-2 mb-3">
+                                                <div class="flex items-center gap-2 text-sm text-gray-700">
+                                                    <i class="fa-regular fa-clock w-4 text-center text-[#829c74]"></i>
+                                                    <span class="font-medium">{% if exam.time_end %}{{ exam.time }} &ndash; {{ exam.time_end }}{% else %}{{ exam.time }}{% endif %} <span class="text-xs text-gray-400 ml-1">({{ exam.duration_minutes }} min)</span></span>
+                                                </div>
+                                                <div class="flex items-center gap-2 text-sm text-gray-700">
+                                                    <i class="fa-solid fa-location-dot w-4 text-center text-[#829c74]"></i>
+                                                    <span class="font-medium">{{ exam.room_name or 'TBA' }}</span>
+                                                </div>
+                                            </div>
 
-                                        {% if exam.has_reliever %}
-                                        <div class="p-3 bg-amber-100/70 border border-amber-300 rounded-lg text-xs mb-3">
-                                            <div class="font-bold text-amber-900 flex items-center gap-1.5 mb-0.5">
-                                                <i class="fa-solid fa-circle-check text-green-600"></i> Substitute Reliever Assigned &bull; You are Excused
+                                            {% if exam.has_reliever %}
+                                            <div class="p-3 bg-amber-100/70 border border-amber-300 rounded-lg text-xs mb-3">
+                                                <div class="font-bold text-amber-900 flex items-center gap-1.5 mb-0.5">
+                                                    <i class="fa-solid fa-circle-check text-green-600"></i> Substitute Reliever Assigned &bull; You are Excused
+                                                </div>
+                                                <p class="text-amber-900 text-[11px]">Duty reassigned to: <strong class="font-semibold text-gray-900">Prof. {{ exam.reliever_name or 'Designated Reliever' }}</strong></p>
+                                                {% if exam.absence_reason %}
+                                                <p class="text-amber-800 text-[11px] mt-1 italic font-medium">Your reported reason: "{{ exam.absence_reason }}"</p>
+                                                {% endif %}
                                             </div>
-                                            <p class="text-amber-900 text-[11px]">Duty reassigned to: <strong class="font-semibold text-gray-900">Prof. {{ exam.reliever_name or 'Designated Reliever' }}</strong></p>
-                                            {% if exam.absence_reason %}
-                                            <p class="text-amber-800 text-[11px] mt-1 italic font-medium">Your reported reason: "{{ exam.absence_reason }}"</p>
+                                            {% else %}
+                                            <div class="p-3 bg-red-100/70 border border-red-300 rounded-lg text-xs mb-3">
+                                                <div class="font-bold text-red-900 flex items-center gap-1.5 mb-0.5">
+                                                    <i class="fa-solid fa-clock-rotate-left text-red-600"></i> Absence Reported &bull; Awaiting Substitute Reliever
+                                                </div>
+                                                <p class="text-red-800 text-[11px]">You reported you cannot attend this duty. Your Department Secretary has been alerted to dispatch a reliever.</p>
+                                                {% if exam.absence_reason %}
+                                                <p class="text-red-700 text-[11px] mt-1 italic font-medium">Your reported reason: "{{ exam.absence_reason }}"</p>
+                                                {% endif %}
+                                            </div>
                                             {% endif %}
                                         </div>
-                                        <div class="border-t border-gray-100 pt-3 flex items-center justify-between text-xs">
+                                        <div class="border-t border-gray-100 pt-3 flex items-center justify-between text-xs mt-2">
+                                            {% if exam.has_reliever %}
                                             <span class="text-gray-500 text-[11px] flex items-center gap-1">
                                                 <i class="fa-solid fa-shield-check text-green-600"></i> Duty transferred to reliever
                                             </span>
                                             <span class="text-amber-800 bg-amber-100 font-bold px-2.5 py-1 rounded-md text-[11px] cursor-not-allowed border border-amber-200">
                                                 <i class="fa-solid fa-user-xmark mr-1"></i> Reported Absent
                                             </span>
-                                        </div>
-                                        {% else %}
-                                        <div class="p-3 bg-red-100/70 border border-red-300 rounded-lg text-xs mb-3">
-                                            <div class="font-bold text-red-900 flex items-center gap-1.5 mb-0.5">
-                                                <i class="fa-solid fa-clock-rotate-left text-red-600"></i> Absence Reported &bull; Awaiting Substitute Reliever
-                                            </div>
-                                            <p class="text-red-800 text-[11px]">You reported you cannot attend this duty. Your Department Secretary has been alerted to dispatch a reliever.</p>
-                                            {% if exam.absence_reason %}
-                                            <p class="text-red-700 text-[11px] mt-1 italic font-medium">Your reported reason: "{{ exam.absence_reason }}"</p>
-                                            {% endif %}
-                                        </div>
-                                        <div class="border-t border-gray-100 pt-3 flex items-center justify-between text-xs">
+                                            {% else %}
                                             <span class="text-red-700 font-medium text-[11px] flex items-center gap-1">
                                                 <i class="fa-solid fa-hourglass-half"></i> Pending Secretary Dispatch
                                             </span>
                                             <span class="text-red-800 bg-red-100 font-bold px-2.5 py-1 rounded-md text-[11px] cursor-not-allowed border border-red-200">
                                                 <i class="fa-solid fa-triangle-exclamation mr-1"></i> Reported Absent
                                             </span>
+                                            {% endif %}
                                         </div>
-                                        {% endif %}
                                     </div>
                                     {% elif exam.is_assigned_reliever %}
                                     <!-- PROCTOR IS ASSIGNED AS THE SUBSTITUTE RELIEVER -->
-                                    <div class="bg-blue-50/20 border-2 border-blue-300 rounded-xl p-5 hover:shadow-lg transition-all relative">
-                                        <div class="absolute top-4 right-4 flex items-center gap-1.5 text-[10px] font-bold text-blue-800 bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                                            <i class="fa-solid fa-user-shield text-blue-600"></i> Confirmed (Reliever Duty)
-                                        </div>
-                                        <h4 class="text-base font-bold text-gray-900 tracking-tight pr-36 mb-2.5">{{ exam.subject_name }}</h4>
-                                        <div class="flex flex-wrap gap-1.5 mb-3">
-                                            <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
-                                                <i class="fa-solid fa-users text-blue-600"></i> {{ exam.section }}
-                                            </span>
-                                            <span class="inline-flex items-center gap-1 {% if exam.subject_type == 'Major' %}bg-green-100 text-green-800{% else %}bg-yellow-100 text-yellow-800{% endif %} px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
-                                                <i class="fa-solid fa-bookmark {% if exam.subject_type == 'Major' %}text-green-600{% else %}text-yellow-600{% endif %}"></i> {{ exam.subject_type or 'General' }} Subject
-                                            </span>
-                                        </div>
-                                        <div class="flex flex-col gap-2 mb-3">
-                                            <div class="flex items-center gap-2 text-sm text-gray-700">
-                                                <i class="fa-regular fa-clock w-4 text-center text-[#829c74]"></i>
-                                                <span class="font-medium">{% if exam.time_end %}{{ exam.time }} &ndash; {{ exam.time_end }}{% else %}{{ exam.time }}{% endif %} <span class="text-xs text-gray-400 ml-1">({{ exam.duration_minutes }} min)</span></span>
-                                            </div>
-                                            <div class="flex items-center gap-2 text-sm text-gray-700">
-                                                <i class="fa-solid fa-location-dot w-4 text-center text-[#829c74]"></i>
-                                                <span class="font-medium">{{ exam.room_name or 'TBA' }}</span>
-                                            </div>
-                                        </div>
-                                        <!-- Test Paper Claim Office Indicator -->
-                                        <div class="flex items-center justify-between gap-2 text-xs bg-emerald-50/70 border border-emerald-200/80 rounded-lg px-3 py-2.5 mb-3">
-                                            <div class="flex items-center gap-2 text-emerald-950">
-                                                <i class="fa-solid fa-box-archive text-emerald-700 text-sm"></i>
-                                                <div class="leading-tight">
-                                                    <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">Claim Test Papers At:</span>
-                                                    <span class="font-bold text-gray-900">{{ exam.claim_office }}</span>
+                                    <div class="bg-blue-50/20 border-2 border-blue-300 rounded-xl p-4 sm:p-5 hover:shadow-lg transition-all flex flex-col justify-between">
+                                        <div>
+                                            <div class="flex items-start justify-between gap-2.5 mb-2.5">
+                                                <h4 class="text-base font-bold text-gray-900 tracking-tight leading-snug flex-1 min-w-0">{{ exam.subject_name }}</h4>
+                                                <div class="flex items-center gap-1.5 text-[10px] font-bold text-blue-800 bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0 whitespace-nowrap">
+                                                    <i class="fa-solid fa-user-shield text-blue-600"></i> Confirmed (Reliever Duty)
                                                 </div>
                                             </div>
-                                            {% if exam.offering_institute_code == 'ICSLIS' %}
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-[#668054] text-white tracking-wider shadow-2xs">
-                                                ICSLIS
-                                            </span>
-                                            {% elif exam.offering_institute_code and exam.offering_institute_code != 'N/A' %}
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-200 text-gray-800 tracking-wider">
-                                                {{ exam.offering_institute_code }}
-                                            </span>
-                                            {% endif %}
+                                            <div class="flex flex-wrap gap-1.5 mb-3">
+                                                <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                                                    <i class="fa-solid fa-users text-blue-600"></i> {{ exam.section }}
+                                                </span>
+                                                <span class="inline-flex items-center gap-1 {% if exam.subject_type == 'Major' %}bg-green-100 text-green-800{% else %}bg-yellow-100 text-yellow-800{% endif %} px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                                                    <i class="fa-solid fa-bookmark {% if exam.subject_type == 'Major' %}text-green-600{% else %}text-yellow-600{% endif %}"></i> {{ exam.subject_type or 'General' }} Subject
+                                                </span>
+                                            </div>
+                                            <div class="flex flex-col gap-2 mb-3">
+                                                <div class="flex items-center gap-2 text-sm text-gray-700">
+                                                    <i class="fa-regular fa-clock w-4 text-center text-[#829c74]"></i>
+                                                    <span class="font-medium">{% if exam.time_end %}{{ exam.time }} &ndash; {{ exam.time_end }}{% else %}{{ exam.time }}{% endif %} <span class="text-xs text-gray-400 ml-1">({{ exam.duration_minutes }} min)</span></span>
+                                                </div>
+                                                <div class="flex items-center gap-2 text-sm text-gray-700">
+                                                    <i class="fa-solid fa-location-dot w-4 text-center text-[#829c74]"></i>
+                                                    <span class="font-medium">{{ exam.room_name or 'TBA' }}</span>
+                                                </div>
+                                            </div>
+                                            <!-- Test Paper Claim Office Indicator -->
+                                            <div class="flex items-center justify-between gap-2 text-xs bg-emerald-50/70 border border-emerald-200/80 rounded-lg px-3 py-2.5 mb-3">
+                                                <div class="flex items-center gap-2 text-emerald-950">
+                                                    <i class="fa-solid fa-box-archive text-emerald-700 text-sm"></i>
+                                                    <div class="leading-tight">
+                                                        <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">Claim Test Papers At:</span>
+                                                        <span class="font-bold text-gray-900">{{ exam.claim_office }}</span>
+                                                    </div>
+                                                </div>
+                                                {% if exam.offering_institute_code == 'ICSLIS' %}
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-[#668054] text-white tracking-wider shadow-2xs">
+                                                    ICSLIS
+                                                </span>
+                                                {% elif exam.offering_institute_code and exam.offering_institute_code != 'N/A' %}
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-200 text-gray-800 tracking-wider">
+                                                    {{ exam.offering_institute_code }}
+                                                </span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs mb-3 text-blue-800">
+                                                <span class="font-semibold"><i class="fa-solid fa-info-circle mr-1 text-blue-600"></i> Reliever Assignment:</span> You were dispatched by the Department Secretary to cover this exam duty.
+                                            </div>
                                         </div>
-                                        <div class="p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs mb-3 text-blue-800">
-                                            <span class="font-semibold"><i class="fa-solid fa-info-circle mr-1 text-blue-600"></i> Reliever Assignment:</span> You were dispatched by the Department Secretary to cover this exam duty.
-                                        </div>
-                                        <div class="border-t border-gray-100 pt-3 flex justify-end">
+                                        <div class="border-t border-gray-100 pt-3 flex justify-end mt-2">
                                             <button onclick="openAbsenceModal('{{ exam.id }}', '{{ exam.subject_name }} - {{ exam.section }}', '{{ date }}', '{% if exam.time_end %}{{ exam.time }} &ndash; {{ exam.time_end }}{% else %}{{ exam.time }}{% endif %}')" class="inline-flex items-center text-xs font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg border border-red-100 transition-colors cursor-pointer">
                                                 <i class="fa-solid fa-triangle-exclamation mr-1.5 text-red-500"></i> Report Absence
                                             </button>
@@ -664,49 +705,53 @@
                                     </div>
                                     {% else %}
                                     <!-- NORMAL ACTIVE PROCTOR ASSIGNMENT -->
-                                    <div class="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-lg transition-all relative">
-                                        <div class="absolute top-4 right-4 flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                                            <i class="fa-solid fa-circle-check"></i> Confirmed
-                                        </div>
-                                        <h4 class="text-base font-bold text-gray-900 tracking-tight pr-24 mb-2.5">{{ exam.subject_name }}</h4>
-                                        <div class="flex flex-wrap gap-1.5 mb-4">
-                                            <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
-                                                <i class="fa-solid fa-users text-blue-600"></i> {{ exam.section }}
-                                            </span>
-                                            <span class="inline-flex items-center gap-1 {% if exam.subject_type == 'Major' %}bg-green-100 text-green-800{% else %}bg-yellow-100 text-yellow-800{% endif %} px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
-                                                <i class="fa-solid fa-bookmark {% if exam.subject_type == 'Major' %}text-green-600{% else %}text-yellow-600{% endif %}"></i> {{ exam.subject_type or 'General' }} Subject
-                                            </span>
-                                        </div>
-                                        <div class="flex flex-col gap-2 mb-4">
-                                            <div class="flex items-center gap-2 text-sm text-gray-700">
-                                                <i class="fa-regular fa-clock w-4 text-center text-[#829c74]"></i>
-                                                <span class="font-medium">{% if exam.time_end %}{{ exam.time }} &ndash; {{ exam.time_end }}{% else %}{{ exam.time }}{% endif %} <span class="text-xs text-gray-400 ml-1">({{ exam.duration_minutes }} min)</span></span>
-                                            </div>
-                                            <div class="flex items-center gap-2 text-sm text-gray-700">
-                                                <i class="fa-solid fa-location-dot w-4 text-center text-[#829c74]"></i>
-                                                <span class="font-medium">{{ exam.room_name or 'TBA' }}</span>
-                                            </div>
-                                        </div>
-                                        <!-- Test Paper Claim Office Indicator -->
-                                        <div class="flex items-center justify-between gap-2 text-xs bg-emerald-50/70 border border-emerald-200/80 rounded-lg px-3 py-2.5 mb-4">
-                                            <div class="flex items-center gap-2 text-emerald-950">
-                                                <i class="fa-solid fa-box-archive text-emerald-700 text-sm"></i>
-                                                <div class="leading-tight">
-                                                    <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">Claim Test Papers At:</span>
-                                                    <span class="font-bold text-gray-900">{{ exam.claim_office }}</span>
+                                    <div class="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 hover:shadow-lg transition-all flex flex-col justify-between">
+                                        <div>
+                                            <div class="flex items-start justify-between gap-2.5 mb-2.5">
+                                                <h4 class="text-base font-bold text-gray-900 tracking-tight leading-snug flex-1 min-w-0">{{ exam.subject_name }}</h4>
+                                                <div class="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0 whitespace-nowrap">
+                                                    <i class="fa-solid fa-circle-check"></i> Confirmed
                                                 </div>
                                             </div>
-                                            {% if exam.offering_institute_code == 'ICSLIS' %}
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-[#668054] text-white tracking-wider shadow-2xs">
-                                                ICSLIS
-                                            </span>
-                                            {% elif exam.offering_institute_code and exam.offering_institute_code != 'N/A' %}
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-200 text-gray-800 tracking-wider">
-                                                {{ exam.offering_institute_code }}
-                                            </span>
-                                            {% endif %}
+                                            <div class="flex flex-wrap gap-1.5 mb-4">
+                                                <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                                                    <i class="fa-solid fa-users text-blue-600"></i> {{ exam.section }}
+                                                </span>
+                                                <span class="inline-flex items-center gap-1 {% if exam.subject_type == 'Major' %}bg-green-100 text-green-800{% else %}bg-yellow-100 text-yellow-800{% endif %} px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                                                    <i class="fa-solid fa-bookmark {% if exam.subject_type == 'Major' %}text-green-600{% else %}text-yellow-600{% endif %}"></i> {{ exam.subject_type or 'General' }} Subject
+                                                </span>
+                                            </div>
+                                            <div class="flex flex-col gap-2 mb-4">
+                                                <div class="flex items-center gap-2 text-sm text-gray-700">
+                                                    <i class="fa-regular fa-clock w-4 text-center text-[#829c74]"></i>
+                                                    <span class="font-medium">{% if exam.time_end %}{{ exam.time }} &ndash; {{ exam.time_end }}{% else %}{{ exam.time }}{% endif %} <span class="text-xs text-gray-400 ml-1">({{ exam.duration_minutes }} min)</span></span>
+                                                </div>
+                                                <div class="flex items-center gap-2 text-sm text-gray-700">
+                                                    <i class="fa-solid fa-location-dot w-4 text-center text-[#829c74]"></i>
+                                                    <span class="font-medium">{{ exam.room_name or 'TBA' }}</span>
+                                                </div>
+                                            </div>
+                                            <!-- Test Paper Claim Office Indicator -->
+                                            <div class="flex items-center justify-between gap-2 text-xs bg-emerald-50/70 border border-emerald-200/80 rounded-lg px-3 py-2.5 mb-4">
+                                                <div class="flex items-center gap-2 text-emerald-950">
+                                                    <i class="fa-solid fa-box-archive text-emerald-700 text-sm"></i>
+                                                    <div class="leading-tight">
+                                                        <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">Claim Test Papers At:</span>
+                                                        <span class="font-bold text-gray-900">{{ exam.claim_office }}</span>
+                                                    </div>
+                                                </div>
+                                                {% if exam.offering_institute_code == 'ICSLIS' %}
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-[#668054] text-white tracking-wider shadow-2xs">
+                                                    ICSLIS
+                                                </span>
+                                                {% elif exam.offering_institute_code and exam.offering_institute_code != 'N/A' %}
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-200 text-gray-800 tracking-wider">
+                                                    {{ exam.offering_institute_code }}
+                                                </span>
+                                                {% endif %}
+                                            </div>
                                         </div>
-                                        <div class="border-t border-gray-100 pt-3 flex justify-end">
+                                        <div class="border-t border-gray-100 pt-3 flex justify-end mt-2">
                                             <button onclick="openAbsenceModal('{{ exam.id }}', '{{ exam.subject_name }} - {{ exam.section }}', '{{ date }}', '{% if exam.time_end %}{{ exam.time }} &ndash; {{ exam.time_end }}{% else %}{{ exam.time }}{% endif %}')" class="inline-flex items-center text-xs font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg border border-red-100 transition-colors cursor-pointer">
                                                 <i class="fa-solid fa-triangle-exclamation mr-1.5 text-red-500"></i> Report Absence
                                             </button>
@@ -734,29 +779,6 @@
                             </div>
                         {% endif %}
                     </div>
-
-                <!-- Availability -->
-                <div class="lg:col-span-1">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">My Assigned Availability</h3>
-                    <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                        <p class="text-sm text-gray-500 mb-4">Your available dates and time slots as set by the administration.</p>
-                        {% if saved_dates %}
-                            <ul class="space-y-3">
-                                {% for slot in saved_dates %}
-                                <li class="flex flex-col border-b border-gray-100 last:border-0 pb-3 last:pb-0">
-                                    <span class="text-sm font-bold text-gray-800"><i class="fa-regular fa-calendar text-[#668054] w-4 mr-1"></i> {{ slot.date }}</span>
-                                    <span class="text-xs text-gray-500 ml-6"><i class="fa-regular fa-clock w-3 mr-1"></i> {{ slot.start_time }} - {{ slot.end_time }}</span>
-                                </li>
-                                {% endfor %}
-                            </ul>
-                        {% else %}
-                            <div class="text-center py-6 text-gray-400 text-sm bg-gray-50 rounded-lg">
-                                <i class="fa-solid fa-calendar-xmark text-3xl mb-2 opacity-50 block"></i>
-                                <p>No availability set.</p>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
                 </div>
 
             </div>
@@ -806,11 +828,11 @@
                         <div id="absenceWarningAlert" class="hidden mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700"></div>
                     </form>
                 </div>
-                <div class="bg-gray-50 px-5 py-3.5 sm:px-6 flex flex-row-reverse gap-2">
-                    <button type="button" onclick="showAbsenceConfirmation()" class="inline-flex items-center justify-center rounded-lg shadow-sm px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold text-xs transition-colors cursor-pointer">
+                <div class="bg-gray-50 px-5 py-3.5 sm:px-6 flex flex-col-reverse sm:flex-row-reverse gap-2">
+                    <button type="button" onclick="showAbsenceConfirmation()" class="w-full sm:w-auto inline-flex items-center justify-center rounded-lg shadow-sm px-4 py-2.5 sm:py-2 bg-red-600 hover:bg-red-700 text-white font-semibold text-xs transition-colors cursor-pointer">
                         Proceed to Confirm <i class="fa-solid fa-arrow-right ml-1.5"></i>
                     </button>
-                    <button type="button" onclick="closeModal('absenceModal')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 font-semibold text-xs transition-colors cursor-pointer">
+                    <button type="button" onclick="closeModal('absenceModal')" class="w-full sm:w-auto inline-flex items-center justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2.5 sm:py-2 bg-white text-gray-700 hover:bg-gray-50 font-semibold text-xs transition-colors cursor-pointer">
                         Cancel
                     </button>
                 </div>
@@ -859,11 +881,11 @@
                         </div>
                     </div>
                 </div>
-                <div class="bg-gray-50 px-5 py-3.5 sm:px-6 flex flex-row-reverse gap-2">
-                    <button type="button" onclick="submitFinalAbsenceReport()" class="inline-flex items-center justify-center rounded-lg shadow-sm px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-colors cursor-pointer">
+                <div class="bg-gray-50 px-5 py-3.5 sm:px-6 flex flex-col-reverse sm:flex-row-reverse gap-2">
+                    <button type="button" onclick="submitFinalAbsenceReport()" class="w-full sm:w-auto inline-flex items-center justify-center rounded-lg shadow-sm px-4 py-2.5 sm:py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-colors cursor-pointer">
                         <i class="fa-solid fa-check mr-1.5"></i> Yes, Confirm Absence
                     </button>
-                    <button type="button" onclick="backToAbsenceForm()" class="inline-flex items-center justify-center rounded-lg border border-gray-300 shadow-sm px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 font-semibold text-xs transition-colors cursor-pointer">
+                    <button type="button" onclick="backToAbsenceForm()" class="w-full sm:w-auto inline-flex items-center justify-center rounded-lg border border-gray-300 shadow-sm px-3 py-2.5 sm:py-2 bg-white text-gray-700 hover:bg-gray-50 font-semibold text-xs transition-colors cursor-pointer">
                         Back to Edit
                     </button>
                 </div>
@@ -995,6 +1017,113 @@
         });
     </script>
     {% include 'confirm_modal.html' %}
+
+    <!-- Dedicated Proctoring Guidelines Modal -->
+    <div id="proctorGuidelinesModal" class="fixed inset-0 z-50 hidden overflow-y-auto" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-900/60 transition-opacity backdrop-blur-2xs" onclick="closeProctorGuidelinesModal()"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-gray-200">
+                
+                <!-- Modal Header -->
+                <div class="bg-gradient-to-r from-[#2f4f24] to-[#3d5c2e] text-white px-6 py-5 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-white/20 text-white flex items-center justify-center text-lg flex-shrink-0 border border-white/20">
+                            <i class="fa-solid fa-clipboard-check"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white">Faculty Proctoring Guidelines</h3>
+                            <p class="text-xs text-green-100">Official Invigilation Responsibilities &bull; City College of Angeles</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closeProctorGuidelinesModal()" class="text-white/80 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors focus:outline-none cursor-pointer">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-6 max-h-[75vh] overflow-y-auto custom-scrollbar space-y-4 text-sm text-gray-700">
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 text-amber-900">
+                        <i class="fa-solid fa-circle-exclamation text-amber-600 text-lg flex-shrink-0 mt-0.5"></i>
+                        <p class="text-xs leading-relaxed">
+                            All faculty proctors are legally and academically designated invigilators. Strict compliance with examination protocols ensures institutional integrity and fair student evaluation.
+                        </p>
+                    </div>
+
+                    <div class="space-y-3.5">
+                        <div class="border border-gray-200 rounded-xl p-4 bg-gray-50/50">
+                            <div class="flex items-center gap-2 text-[#3d5c2e] font-bold text-sm mb-1.5">
+                                <span class="w-6 h-6 rounded-full bg-[#3d5c2e] text-white flex items-center justify-center text-xs">1</span>
+                                <h4>Test Questionnaire &amp; Material Claiming</h4>
+                            </div>
+                            <p class="text-xs text-gray-600 pl-8 leading-relaxed">
+                                Claim sealed examination envelopes, test questionnaires, and official attendance sheets from the offering Institute Dean's Office / Secretary <strong>at least 15 minutes before</strong> the scheduled start time. Present your faculty ID or duty docket upon claim.
+                            </p>
+                        </div>
+
+                        <div class="border border-gray-200 rounded-xl p-4 bg-gray-50/50">
+                            <div class="flex items-center gap-2 text-[#3d5c2e] font-bold text-sm mb-1.5">
+                                <span class="w-6 h-6 rounded-full bg-[#3d5c2e] text-white flex items-center justify-center text-xs">2</span>
+                                <h4>Student Admission &amp; Permit Verification</h4>
+                            </div>
+                            <p class="text-xs text-gray-600 pl-8 leading-relaxed">
+                                Admit students strictly in designated uniform or approved attire. Inspect each student's official Examination Permit and valid CCA student ID. Unpermitted students must be directed to the College Registrar/Treasury for permit issuance.
+                            </p>
+                        </div>
+
+                        <div class="border border-gray-200 rounded-xl p-4 bg-gray-50/50">
+                            <div class="flex items-center gap-2 text-[#3d5c2e] font-bold text-sm mb-1.5">
+                                <span class="w-6 h-6 rounded-full bg-[#3d5c2e] text-white flex items-center justify-center text-xs">3</span>
+                                <h4>Active Room Invigilation &amp; Conduct</h4>
+                            </div>
+                            <p class="text-xs text-gray-600 pl-8 leading-relaxed">
+                                Ensure mobile phones and unauthorized electronic devices are silenced and deposited at the room front. Maintain continuous vigilant proctoring throughout the examination duration. Refrain from cell phone distractions or leaving the room unattended.
+                            </p>
+                        </div>
+
+                        <div class="border border-gray-200 rounded-xl p-4 bg-gray-50/50">
+                            <div class="flex items-center gap-2 text-[#3d5c2e] font-bold text-sm mb-1.5">
+                                <span class="w-6 h-6 rounded-full bg-[#3d5c2e] text-white flex items-center justify-center text-xs">4</span>
+                                <h4>Turnover &amp; Attendance Documentation</h4>
+                            </div>
+                            <p class="text-xs text-gray-600 pl-8 leading-relaxed">
+                                Collect all test papers, answer sheets, and booklets before any examinee leaves. Re-count all answered and unused test materials to match the student head count. Seal and return the envelope directly to the Dean's Office / Secretary immediately.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+                    <span class="text-xs text-gray-500 flex items-center gap-1.5">
+                        <i class="fa-solid fa-shield-check text-[#3d5c2e]"></i>
+                        Office of Academic Affairs &bull; CCA
+                    </span>
+                    <button type="button" onclick="closeProctorGuidelinesModal()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs font-bold rounded-xl transition-colors cursor-pointer">
+                        Understood &bull; Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openProctorGuidelinesModal() {
+            const modal = document.getElementById('proctorGuidelinesModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                document.body.classList.add('overflow-hidden');
+            }
+        }
+        function closeProctorGuidelinesModal() {
+            const modal = document.getElementById('proctorGuidelinesModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            }
+        }
+    </script>
+
 </body>
 </html>
 

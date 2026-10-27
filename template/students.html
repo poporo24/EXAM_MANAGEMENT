@@ -32,6 +32,10 @@
         .overflow-x-auto::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
         .overflow-x-auto::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .overflow-x-auto::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .table-scroll-container::-webkit-scrollbar { width: 6px; height: 6px; }
+        .table-scroll-container::-webkit-scrollbar-track { background: #f8fafc; border-radius: 4px; }
+        .table-scroll-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .table-scroll-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 
     <style>
@@ -174,22 +178,44 @@
         });
     </script>
 </head>
-<body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
+<body class="bg-[#f8faf9] text-gray-800 min-h-screen flex">
 
     <!-- Sidebar -->
     {% set active_page = 'students' %}
     {% include 'admin_sidebar.html' %}
 
-    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen">
-        <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
-            <h1 class="text-xl font-semibold text-gray-800">Student Management</h1>
-            <a href="/notifications" class="relative text-gray-500 hover:text-[#668054]">
-                <i class="fa-solid fa-bell text-xl"></i>
-                {% if unread_count > 0 %}<span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">{{ unread_count }}</span>{% endif %}
-            </a>
+    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen pb-16">
+        <!-- Top Sticky Header -->
+        <header class="no-print bg-white/90 backdrop-blur-md border-b border-gray-200/80 h-16 flex items-center justify-between px-6 sm:px-8 z-20 sticky top-0 transition-all">
+            <div class="flex items-center gap-3">
+                <span class="w-8 h-8 rounded-lg bg-[#668054]/10 text-[#668054] flex items-center justify-center text-sm font-bold shadow-xs">
+                    <i class="fa-solid fa-user-graduate"></i>
+                </span>
+                <div>
+                    <h1 class="text-base sm:text-lg font-bold text-gray-900 leading-tight">Student Management &amp; Cohorts</h1>
+                    <p class="text-[11px] text-gray-500 hidden sm:block">Enrolled students, section allocations &amp; irregular student approvals</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <a href="/notifications" class="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:text-[#668054] hover:border-[#668054]/40 hover:bg-[#668054]/5 transition-all relative" title="Notifications">
+                    <i class="fa-regular fa-bell text-base"></i>
+                    {% if unread_count and unread_count > 0 %}
+                    <span class="absolute top-1 right-1 flex h-2.5 w-2.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                    </span>
+                    {% endif %}
+                </a>
+
+                <button type="button" onclick="openModal('addStudentModal')" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#668054] hover:bg-[#526843] text-white text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer">
+                    <i class="fa-solid fa-user-plus"></i>
+                    <span class="hidden sm:inline">Add Student</span>
+                </button>
+            </div>
         </header>
 
-        <div class="px-4 sm:px-6 lg:px-8 py-6">
+        <div class="px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}<div class="mb-6">{% for category, message in messages %}
                 <div class="p-4 rounded-md shadow-sm mb-2 {% if category == 'danger' %}bg-red-50 text-red-700 border-l-4 border-red-500{% elif category == 'warning' %}bg-amber-50 text-amber-700 border-l-4 border-amber-500{% else %}bg-green-50 text-green-700 border-l-4 border-[#668054]{% endif %}">{{ message }}</div>
@@ -198,15 +224,15 @@
 
             <!-- ── Pending Approvals ─────────────────────────────── -->
             {% if pending_students %}
-            <div class="bg-white shadow-sm rounded-xl border border-amber-200 overflow-hidden mb-8 no-print">
+            <div class="bg-white shadow-xs rounded-2xl border border-amber-200 overflow-hidden mb-8 no-print">
                 <div class="px-6 py-4 border-b border-amber-200 bg-amber-50 flex items-center gap-3">
                     <i class="fa-solid fa-user-clock text-amber-600 text-lg"></i>
                     <h2 class="font-semibold text-amber-800 text-lg">Pending Approvals</h2>
                     <span class="ml-auto inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">{{ pending_students|length }} waiting</span>
                 </div>
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto overflow-y-auto max-h-[550px] w-full table-scroll-container">
                     <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50"><tr>
+                        <thead class="bg-gray-50 sticky top-0 z-10 shadow-2xs"><tr>
                             <th class="px-4 py-3 w-10"><input type="checkbox" id="checkAllPending" onclick="toggleAll('pending-cb')" class="rounded border-gray-300 text-[#668054]"></th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
@@ -268,7 +294,7 @@
             {% set pending_ids = pending_students | map(attribute="id") | list %}
             {% set inactive_students = all_students | selectattr("is_active", "equalto", 0) | rejectattr("id", "in", pending_ids) | list %}
 
-            <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden mb-6">
+            <div class="bg-white shadow-xs rounded-2xl border border-gray-200 overflow-hidden mb-6">
                 <div class="no-print px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between flex-wrap gap-3">
                     <h2 class="font-semibold text-gray-800 text-lg">
                         <i class="fa-solid fa-users mr-2 text-[#668054]"></i>Active Students
@@ -282,9 +308,9 @@
                                class="w-56 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#668054]">
                     </div>
                 </div>
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto overflow-y-auto max-h-[550px] w-full table-scroll-container">
                     <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50"><tr>
+                        <thead class="bg-gray-50 sticky top-0 z-10 shadow-2xs"><tr>
                             <th class="px-3 py-3 w-10 no-print"><input type="checkbox" id="checkAllActive" onclick="toggleAll('active-cb')" class="rounded border-gray-300 text-[#668054]"></th>
                             <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
                             <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Email</th>
@@ -309,7 +335,6 @@
                                     <td class="px-3.5 py-3 whitespace-nowrap text-right sticky right-0 bg-white shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] z-10 no-print">
                                         <div class="inline-flex items-center justify-end gap-1.5">
                                             <button onclick="openEditStudentModal({{ s.id }}, '{{ s.full_name|e }}', '{{ s.email|e }}', '{{ (s.section or '')|e }}')" class="p-1.5 rounded-md text-[#668054] hover:bg-green-50 transition-colors" title="Edit Student & Section"><i class="fa-solid fa-pen-to-square text-sm"></i></button>
-                                            <button onclick="openResetPwModal({{ s.id }}, '{{ s.full_name|e }}')" class="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 transition-colors" title="Reset Password"><i class="fa-solid fa-rotate-left text-sm"></i></button>
                                             <form action="/students/deactivate/{{ s.id }}" method="POST" id="deactForm_{{ s.id }}" class="inline m-0 p-0">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                                 <button type="button" onclick="confirmDeactivateStudent({{ s.id }}, '{{ s.full_name|e }}')" class="p-1.5 rounded-md text-amber-600 hover:bg-amber-50 transition-colors" title="Deactivate"><i class="fa-solid fa-ban text-sm"></i></button>
@@ -332,11 +357,8 @@
                 {% if active_students %}
                 <div class="px-6 py-3 bg-gray-50 border-t border-gray-200 flex items-center gap-3 flex-wrap">
                     <span class="text-xs text-gray-500 font-medium">Bulk action on selected:</span>
-                    <button type="button" onclick="confirmBulkResetPassword()" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"><i class="fa-solid fa-rotate-left mr-1"></i>Reset Password</button>
                     <button type="button" onclick="confirmBulkDeactivate()" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-amber-500 hover:bg-amber-600"><i class="fa-solid fa-ban mr-1"></i>Deactivate</button>
                     <button type="button" onclick="confirmBulkDelete()" class="px-3 py-1.5 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"><i class="fa-solid fa-trash mr-1"></i>Delete</button>
-                    <form action="/students/bulk_action" method="POST" id="activeBulkResetPw">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><input type="hidden" name="bulk_action" value="reset_password"><div id="activeBulkResetPwIds"></div></form>
                     <form action="/students/bulk_action" method="POST" id="activeBulkDeact">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><input type="hidden" name="bulk_action" value="deactivate"><div id="activeBulkDeactIds"></div></form>
                     <form action="/students/bulk_action" method="POST" id="activeBulkDel">
@@ -347,14 +369,14 @@
 
             <!-- ── Deactivated Students ─────────────────────────────── -->
             {% if inactive_students %}
-            <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden no-print">
+            <div class="bg-white shadow-xs rounded-2xl border border-gray-200 overflow-hidden no-print">
                 <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-3">
                     <i class="fa-solid fa-user-slash text-gray-400 text-lg"></i>
                     <h2 class="font-semibold text-gray-600 text-lg">Deactivated Students <span class="text-sm font-normal text-gray-400">({{ inactive_students|length }})</span></h2>
                 </div>
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto overflow-y-auto max-h-[550px] w-full table-scroll-container">
                     <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50"><tr>
+                        <thead class="bg-gray-50 sticky top-0 z-10 shadow-2xs"><tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Section</th>
@@ -390,64 +412,6 @@
             {% endif %}
         </div>
     </main>
-
-    <!-- ── Reset Password Modal ──────────────────────────────── -->
-    <div id="resetPwModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
-        <div class="flex items-center justify-center min-h-screen px-4">
-            <div class="fixed inset-0 bg-gray-900 bg-opacity-60 transition-opacity" onclick="closeResetPwModal()"></div>
-            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden border border-gray-100">
-                <div class="bg-blue-600 px-6 py-4 flex items-center justify-between text-white">
-                    <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center text-white">
-                            <i class="fa-solid fa-rotate-left text-base"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-base font-bold leading-tight">Reset Password</h3>
-                            <p class="text-xs text-white/80">Reset student account credentials</p>
-                        </div>
-                    </div>
-                    <button type="button" onclick="closeResetPwModal()" class="text-white/80 hover:text-white transition-colors">
-                        <i class="fa-solid fa-xmark text-lg"></i>
-                    </button>
-                </div>
-                <form id="resetPwForm" method="POST" action="" class="p-6 space-y-4">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <input type="hidden" name="redirect_to" value="students_page">
-                    <input type="hidden" name="new_password" id="resetPwInputNewPw" value="">
-                    <input type="hidden" name="confirm_password" id="resetPwInputConfirmPw" value="">
-
-                    <div class="text-center py-2">
-                        <div class="w-12 h-12 rounded-full bg-blue-50 text-blue-600 mx-auto flex items-center justify-center mb-3">
-                            <i class="fa-solid fa-key text-xl"></i>
-                        </div>
-                        <p class="text-sm text-gray-600">
-                            Are you sure you want to reset the password for:
-                        </p>
-                        <h4 id="resetPwName" class="font-bold text-gray-900 text-base mt-1">—</h4>
-                    </div>
-
-                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-center">
-                        <span class="text-xs text-blue-700 font-medium block mb-1">New Default Password:</span>
-                        <code id="resetPwCode" class="text-base font-mono font-bold text-blue-900 bg-white px-3 py-1 rounded-md border border-blue-200 inline-block tracking-wider">lastname123</code>
-                        <p class="text-[11px] text-blue-600/80 mt-1.5">
-                            Formed automatically from their <strong>lastname + 123</strong>.
-                        </p>
-                    </div>
-
-                    <div class="flex justify-end gap-2.5 pt-2 border-t border-gray-100">
-                        <button type="button" onclick="closeResetPwModal()"
-                                class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
-                            Cancel
-                        </button>
-                        <button type="submit"
-                                class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors flex items-center gap-1.5">
-                            <i class="fa-solid fa-check"></i> <span id="resetPwBtnText">Reset Password</span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
 
     <!-- Edit Student & Section Modal (Admin Only) -->
     <div id="editStudentModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
@@ -677,41 +641,6 @@
             });
         }
 
-        function deriveLastnamePw(name) {
-            const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-            let p1 = '', p2 = '';
-            for (let i = 0; i < 4; i++) p1 += chars.charAt(Math.floor(Math.random() * chars.length));
-            for (let i = 0; i < 4; i++) p2 += chars.charAt(Math.floor(Math.random() * chars.length));
-            return 'CCA-' + p1 + '-' + p2;
-        }
-
-        function confirmBulkResetPassword() {
-            const ids = getChecked("active-cb");
-            if (!ids.length) {
-                openStudentConfirmModal({
-                    title: 'No Students Selected',
-                    message: 'Please select at least one student using the checkboxes before resetting passwords.',
-                    sub: '',
-                    headerClass: 'bg-gray-600',
-                    btnClass: 'bg-gray-600 hover:bg-gray-700',
-                    iconClass: 'fa-solid fa-circle-exclamation',
-                    confirmText: 'OK',
-                    onConfirm: null
-                });
-                return;
-            }
-            openStudentConfirmModal({
-                title: 'Bulk Reset Passwords',
-                message: 'Reset passwords for <strong>' + ids.length + '</strong> selected student(s)?',
-                sub: 'Each student\'s password will be regenerated with a cryptographically unique temporary credential (format: <strong>CCA-XXXX-XXXX</strong>).',
-                headerClass: 'bg-blue-600',
-                btnClass: 'bg-blue-600 hover:bg-blue-700',
-                iconClass: 'fa-solid fa-rotate-left',
-                confirmText: '<i class="fa-solid fa-rotate-left mr-1"></i> Reset Passwords',
-                onConfirm: () => submitBulk("activeBulkResetPw", "active-cb", "reset_password")
-            });
-        }
-
         function confirmBulkPendingDelete() {
             const ids = getChecked("pending-cb");
             if (!ids.length) {
@@ -738,21 +667,6 @@
                 onConfirm: () => submitBulk('pendingDeleteForm', 'pending-cb', 'delete')
             });
         }
-        function openResetPwModal(userId, name) {
-            const derivedPw = deriveLastnamePw(name);
-            document.getElementById('resetPwName').textContent = name;
-            document.getElementById('resetPwCode').textContent = derivedPw;
-            document.getElementById('resetPwBtnText').textContent = 'Reset to ' + derivedPw;
-            const np = document.getElementById('resetPwInputNewPw');
-            if (np) np.value = derivedPw;
-            const cp = document.getElementById('resetPwInputConfirmPw');
-            if (cp) cp.value = derivedPw;
-            document.getElementById('resetPwForm').action = '/admin/reset_password/' + userId;
-            document.getElementById('resetPwModal').classList.remove('hidden');
-        }
-        function closeResetPwModal() {
-            document.getElementById('resetPwModal').classList.add('hidden');
-        }
         function openEditStudentModal(id, name, email, section) {
             document.getElementById('editStudentName').value = name || '';
             document.getElementById('editStudentEmail').value = email || '';
@@ -765,9 +679,6 @@
             document.getElementById('editStudentModal').classList.add('hidden');
         }
 
-        // Backward-compatible aliases
-        const openChangePwModal = openResetPwModal;
-        const closeChangePwModal = closeResetPwModal;
     </script>
 
 <script>

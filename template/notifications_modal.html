@@ -320,6 +320,48 @@
 }
 .unm-close-btn:hover { background: #f3f4f6; }
 
+@media (max-width: 540px) {
+    #universalNotifModal {
+        padding: 8px;
+    }
+    .unm-card {
+        border-radius: 12px;
+        max-height: 92vh;
+    }
+    .unm-header {
+        padding: 12px 14px;
+        gap: 8px;
+    }
+    .unm-title {
+        font-size: 14px;
+    }
+    .unm-subtitle {
+        font-size: 11px;
+    }
+    .unm-toolbar {
+        padding: 8px 12px;
+        gap: 8px;
+    }
+    .unm-toolbar-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+    .unm-item {
+        padding: 12px 12px;
+        gap: 8px;
+    }
+    .unm-footer {
+        padding: 10px 12px;
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+    .unm-close-btn {
+        width: 100%;
+        text-align: center;
+        padding: 9px 16px;
+    }
+}
+
 /* Custom In-App Confirmation Dialog for Notifications (replaces native browser confirm()) */
 #unmConfirmOverlay.hidden { display: none !important; }
 #unmConfirmOverlay:not(.hidden) { display: flex !important; }

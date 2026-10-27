@@ -1406,12 +1406,12 @@ def bulk_delete_exams(exam_ids):
         db.close()
     return (deleted, errors)
 
-def get_pending_exams():
+def get_pending_exams(institute_id=None):
     db = open_db()
     if not db: return []
     try:
         cursor = db.cursor(dictionary=True)
-        cursor.execute("""
+        query = """
             SELECT e.*, s.content_group_id, s.code AS subject_code, s.name AS subject_catalog_name,
                    COALESCE(inst.capacity_default, 40) AS institute_capacity_default,
                    COALESCE(u_cnt.stu_cnt, 0) AS section_student_count
@@ -1424,8 +1424,13 @@ def get_pending_exams():
                 WHERE role = 'student' AND section IS NOT NULL
                 GROUP BY section
             ) u_cnt ON u_cnt.section = e.section
-            WHERE e.exam_date_time IS NULL OR e.status IN ('Pending', 'Unscheduled')
-        """)
+            WHERE (e.exam_date_time IS NULL OR e.status IN ('Pending', 'Unscheduled'))
+        """
+        params = []
+        if institute_id:
+            query += " AND e.institute_id = %s"
+            params.append(int(institute_id))
+        cursor.execute(query, tuple(params))
         return cursor.fetchall()
     finally:
         db.close()
@@ -1486,7 +1491,7 @@ def get_student_exam_load_per_day(section, institute_id=None):
 def get_dashboard_stats():
     db = open_db()
     if not db: return {}
-    stats = {'total_exams': 0, 'rooms': 0, 'instructors': 0, 'scheduled': 0, 'pending': 0, 'by_institute': []}
+    stats = {'total_exams': 0, 'rooms': 0, 'instructors': 0, 'scheduled': 0, 'unscheduled': 0, 'pending': 0, 'by_institute': []}
     try:
         cursor = db.cursor(dictionary=True)
         cursor.execute("SELECT COUNT(*) as c FROM exams")
@@ -1497,11 +1502,25 @@ def get_dashboard_stats():
         stats['instructors'] = cursor.fetchone()['c']
         cursor.execute("SELECT COUNT(*) as c FROM exams WHERE status = 'Scheduled'")
         stats['scheduled'] = cursor.fetchone()['c']
-        cursor.execute("SELECT COUNT(*) as c FROM exams WHERE status = 'Pending' OR status = 'Unscheduled'")
+        cursor.execute("SELECT COUNT(*) as c FROM exams WHERE status = 'Unscheduled'")
+        stats['unscheduled'] = cursor.fetchone()['c']
+        cursor.execute("SELECT COUNT(*) as c FROM exams WHERE status = 'Pending'")
         stats['pending'] = cursor.fetchone()['c']
         
-        cursor.execute("SELECT i.name, COUNT(e.id) as c FROM institutes i LEFT JOIN exams e ON e.institute_id = i.id GROUP BY i.id")
+        cursor.execute("""
+            SELECT i.name,
+                   COUNT(e.id) as total,
+                   COUNT(e.id) as c,
+                   COALESCE(SUM(CASE WHEN e.status = 'Scheduled' THEN 1 ELSE 0 END), 0) as scheduled
+            FROM institutes i
+            LEFT JOIN exams e ON e.institute_id = i.id
+            GROUP BY i.id, i.name
+            ORDER BY i.name ASC
+        """)
         stats['by_institute'] = cursor.fetchall()
+        for row in stats['by_institute']:
+            if 'scheduled' in row and row['scheduled'] is not None:
+                row['scheduled'] = int(row['scheduled'])
     finally:
         db.close()
     return stats
@@ -1706,7 +1725,7 @@ def apply_schedule_results(scheduled, failed_ids):
     finally:
         db.close()
 
-def reset_schedule():
+def reset_schedule(institute_id=None):
     was_published = is_schedule_published()
     db = open_db()
     if not db: return
@@ -1724,7 +1743,9 @@ def reset_schedule():
 
         # ── Notify proctors and students BEFORE clearing (ONLY if schedule was live/published) ──
         if was_published:
-            cursor.execute("""
+            inst_clause = " AND e.institute_id = %s" if institute_id else ""
+            params = (int(institute_id),) if institute_id else ()
+            cursor.execute(f"""
                 INSERT INTO notifications (user_id, title, message, created_at, is_read)
                 SELECT DISTINCT u.id,
                        '🔄 Schedule Reset by Admin',
@@ -1732,9 +1753,9 @@ def reset_schedule():
                        NOW(), 0
                 FROM exams e
                 JOIN users u ON u.instructor_id = e.instructor_id AND u.role = 'proctor'
-                WHERE e.status = 'Scheduled' AND e.exam_date_time IS NOT NULL
-            """)
-            cursor.execute("""
+                WHERE e.status = 'Scheduled' AND e.exam_date_time IS NOT NULL{inst_clause}
+            """, params)
+            cursor.execute(f"""
                 INSERT INTO notifications (user_id, title, message, created_at, is_read)
                 SELECT DISTINCT u.id,
                        '🔄 Exam Schedule Reset',
@@ -1742,18 +1763,41 @@ def reset_schedule():
                        NOW(), 0
                 FROM exams e
                 JOIN users u ON u.section = e.section AND u.role = 'student'
-                WHERE e.status = 'Scheduled' AND e.exam_date_time IS NOT NULL AND e.section IS NOT NULL AND e.section != ''
-            """)
+                WHERE e.status = 'Scheduled' AND e.exam_date_time IS NOT NULL AND e.section IS NOT NULL AND e.section != ''{inst_clause}
+            """, params)
 
         # ── Clear the schedule & associated schedule records ──────────────
-        cursor.execute("DELETE FROM exam_collection")
-        cursor.execute("DELETE FROM relievers")
-        cursor.execute("DELETE FROM proctor_absence")
-        cursor.execute("UPDATE system_settings SET schedule_published = 0 WHERE id = 1")
-        cursor.execute(
-            "UPDATE exams SET room_id=NULL, instructor_id=NULL, instructor_name=NULL, "
-            "exam_date_time=NULL, status='Pending'"
-        )
+        if institute_id:
+            iid = int(institute_id)
+            cursor.execute("""
+                DELETE ec FROM exam_collection ec
+                JOIN exams e ON ec.exam_id = e.id
+                WHERE e.institute_id = %s
+            """, (iid,))
+            cursor.execute("""
+                DELETE r FROM relievers r
+                JOIN exams e ON r.exam_id = e.id
+                WHERE e.institute_id = %s
+            """, (iid,))
+            cursor.execute("""
+                DELETE pa FROM proctor_absence pa
+                JOIN exams e ON pa.exam_id = e.id
+                WHERE e.institute_id = %s
+            """, (iid,))
+            cursor.execute(
+                "UPDATE exams SET room_id=NULL, instructor_id=NULL, instructor_name=NULL, "
+                "exam_date_time=NULL, status='Pending' WHERE institute_id = %s",
+                (iid,)
+            )
+        else:
+            cursor.execute("DELETE FROM exam_collection")
+            cursor.execute("DELETE FROM relievers")
+            cursor.execute("DELETE FROM proctor_absence")
+            cursor.execute("UPDATE system_settings SET schedule_published = 0 WHERE id = 1")
+            cursor.execute(
+                "UPDATE exams SET room_id=NULL, instructor_id=NULL, instructor_name=NULL, "
+                "exam_date_time=NULL, status='Pending'"
+            )
         db.commit()
     finally:
         db.close()
@@ -2436,6 +2480,8 @@ def get_proctor_availability():
             if isinstance(et, _td): et = (datetime.min + et).time()
             elif isinstance(et, str): et = _time(int(et.split(':')[0]), int(et.split(':')[1]))
             elif et is None: et = _time(20, 0)
+            if et and et.hour <= 11:
+                et = _time(et.hour + 12, et.minute, et.second)
             res[iid].append({'date': d, 'start_time': st, 'end_time': et})
         return res
     finally:
@@ -2898,15 +2944,82 @@ def create_notification_for_role(role, title, message):
 
 # ── REPORTS ─────────────────────────────────────────────────────────────
 
-def get_scheduling_report():
-    stats = get_dashboard_stats()
+def get_scheduling_report(date_from=None, date_to=None):
     db = open_db()
-    if not db: return stats
+    if not db: return get_dashboard_stats()
+    stats = {'total_exams': 0, 'rooms': 0, 'instructors': 0, 'scheduled': 0, 'unscheduled': 0, 'pending': 0, 'by_institute': [], 'by_type': {}}
     try:
         cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT subject_type, COUNT(*) as c FROM exams GROUP BY subject_type")
-        by_type = {r['subject_type']: r['c'] for r in cursor.fetchall()}
-        stats['by_type'] = by_type
+        cursor.execute("SELECT COUNT(*) as c FROM rooms")
+        stats['rooms'] = cursor.fetchone()['c']
+        cursor.execute("SELECT COUNT(*) as c FROM instructors")
+        stats['instructors'] = cursor.fetchone()['c']
+
+        date_cond = ""
+        params = []
+        if date_from and date_to:
+            date_cond = " AND DATE(e.exam_date_time) >= %s AND DATE(e.exam_date_time) <= %s"
+            params = [date_from, date_to]
+        elif date_from:
+            date_cond = " AND DATE(e.exam_date_time) >= %s"
+            params = [date_from]
+        elif date_to:
+            date_cond = " AND DATE(e.exam_date_time) <= %s"
+            params = [date_to]
+
+        if date_cond:
+            cursor.execute(f"SELECT COUNT(*) as c FROM exams e WHERE 1=1 {date_cond}", tuple(params))
+            stats['total_exams'] = cursor.fetchone()['c']
+            cursor.execute(f"SELECT COUNT(*) as c FROM exams e WHERE e.status = 'Scheduled' {date_cond}", tuple(params))
+            stats['scheduled'] = cursor.fetchone()['c']
+            cursor.execute(f"SELECT COUNT(*) as c FROM exams e WHERE e.status = 'Unscheduled' {date_cond}", tuple(params))
+            stats['unscheduled'] = cursor.fetchone()['c']
+            cursor.execute(f"SELECT COUNT(*) as c FROM exams e WHERE e.status = 'Pending' {date_cond}", tuple(params))
+            stats['pending'] = cursor.fetchone()['c']
+
+            cursor.execute(f"""
+                SELECT i.name,
+                       COUNT(e.id) as total,
+                       COUNT(e.id) as c,
+                       COALESCE(SUM(CASE WHEN e.status = 'Scheduled' THEN 1 ELSE 0 END), 0) as scheduled
+                FROM institutes i
+                LEFT JOIN exams e ON e.institute_id = i.id {date_cond}
+                GROUP BY i.id, i.name
+                ORDER BY i.name ASC
+            """, tuple(params))
+            stats['by_institute'] = cursor.fetchall()
+
+            cursor.execute(f"SELECT e.subject_type, COUNT(*) as c FROM exams e WHERE 1=1 {date_cond} GROUP BY e.subject_type", tuple(params))
+            stats['by_type'] = {r['subject_type']: r['c'] for r in cursor.fetchall() if r.get('subject_type')}
+        else:
+            cursor.execute("SELECT COUNT(*) as c FROM exams")
+            stats['total_exams'] = cursor.fetchone()['c']
+            cursor.execute("SELECT COUNT(*) as c FROM exams WHERE status = 'Scheduled'")
+            stats['scheduled'] = cursor.fetchone()['c']
+            cursor.execute("SELECT COUNT(*) as c FROM exams WHERE status = 'Unscheduled'")
+            stats['unscheduled'] = cursor.fetchone()['c']
+            cursor.execute("SELECT COUNT(*) as c FROM exams WHERE status = 'Pending'")
+            stats['pending'] = cursor.fetchone()['c']
+
+            cursor.execute("""
+                SELECT i.name,
+                       COUNT(e.id) as total,
+                       COUNT(e.id) as c,
+                       COALESCE(SUM(CASE WHEN e.status = 'Scheduled' THEN 1 ELSE 0 END), 0) as scheduled
+                FROM institutes i
+                LEFT JOIN exams e ON e.institute_id = i.id
+                GROUP BY i.id, i.name
+                ORDER BY i.name ASC
+            """)
+            stats['by_institute'] = cursor.fetchall()
+
+            cursor.execute("SELECT subject_type, COUNT(*) as c FROM exams GROUP BY subject_type")
+            stats['by_type'] = {r['subject_type']: r['c'] for r in cursor.fetchall() if r.get('subject_type')}
+
+        for row in stats['by_institute']:
+            if 'scheduled' in row and row['scheduled'] is not None:
+                row['scheduled'] = int(row['scheduled'])
+
         return stats
     finally:
         db.close()
@@ -4274,8 +4387,17 @@ def audit_schedule_conflicts(db=None):
             # Time interval overlap
             has_overlap = (r1['start'] < r2['end'] and r1['end'] > r2['start'])
 
-            # Room collision (strictly concurrent)
-            if has_overlap and r1['room_id'] and r2['room_id'] and r1['room_id'] == r2['room_id']:
+            # Room collision (strictly concurrent - checked by ID and by Room Name)
+            same_room = False
+            if r1['room_id'] and r2['room_id'] and r1['room_id'] == r2['room_id']:
+                same_room = True
+            elif r1.get('room_name') and r2.get('room_name'):
+                rn1 = r1['room_name'].strip().lower()
+                rn2 = r2['room_name'].strip().lower()
+                if rn1 and rn2 and rn1 == rn2 and rn1 not in ('tba', 'unassigned', ''):
+                    same_room = True
+
+            if has_overlap and same_room:
                 conflict_exam_ids.add(r1['id'])
                 conflict_exam_ids.add(r2['id'])
                 if 'room' not in conflict_reasons[r1['id']]: conflict_reasons[r1['id']].append('room')
@@ -4288,8 +4410,17 @@ def audit_schedule_conflicts(db=None):
                     'exam2': f"{r2['subject']} ({r2['section']})"
                 })
 
-            # Proctor collision (strictly concurrent)
-            if has_overlap and r1['instructor_id'] and r2['instructor_id'] and r1['instructor_id'] == r2['instructor_id']:
+            # Proctor collision (strictly concurrent - checked by ID and by Proctor Name)
+            same_proctor = False
+            if r1['instructor_id'] and r2['instructor_id'] and r1['instructor_id'] == r2['instructor_id']:
+                same_proctor = True
+            elif r1.get('instructor_name') and r2.get('instructor_name'):
+                pn1 = r1['instructor_name'].strip().lower()
+                pn2 = r2['instructor_name'].strip().lower()
+                if pn1 and pn2 and pn1 == pn2 and pn1 not in ('tba', 'unassigned', ''):
+                    same_proctor = True
+
+            if has_overlap and same_proctor:
                 conflict_exam_ids.add(r1['id'])
                 conflict_exam_ids.add(r2['id'])
                 if 'proctor' not in conflict_reasons[r1['id']]: conflict_reasons[r1['id']].append('proctor')

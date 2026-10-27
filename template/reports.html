@@ -21,6 +21,10 @@
         body { font-family: 'Inter', sans-serif; }
         .sidebar-transition { transition: width 0.3s ease; }
         .content-transition { transition: margin-left 0.3s ease; }
+        .table-scroll-container::-webkit-scrollbar { width: 6px; height: 6px; }
+        .table-scroll-container::-webkit-scrollbar-track { background: #f8fafc; border-radius: 4px; }
+        .table-scroll-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .table-scroll-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         html, body { overflow-x: hidden; }
         #main-content { min-width: 0; max-width: 100%; }
         html.sidebar-collapsed #sidebar { width: 4rem !important; }
@@ -91,6 +95,11 @@
             .border {
                 border-color: #cbd5e1 !important;
             }
+            .overflow-x-auto, .table-scroll-container {
+                overflow: visible !important;
+                max-height: none !important;
+                display: block !important;
+            }
             @page {
                 size: auto;
                 margin: 10mm 12mm;
@@ -128,7 +137,7 @@
         }
     </style>
 </head>
-<body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
+<body class="bg-[#f8faf9] text-gray-800 min-h-screen flex">
 
     <!-- Sidebar -->
     {% set active_page = 'reports' %}
@@ -138,28 +147,38 @@
         {% include 'admin_sidebar.html' %}
     {% endif %}
 
-    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen">
-        <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
-            <h1 class="text-xl font-semibold text-gray-800">Reports Center</h1>
+    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen pb-16">
+        <!-- Top Sticky Header -->
+        <header class="no-print bg-white/90 backdrop-blur-md border-b border-gray-200/80 h-16 flex items-center justify-between px-6 sm:px-8 z-20 sticky top-0 transition-all">
             <div class="flex items-center gap-3">
-                <a href="/export/schedule.pdf" class="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50" title="Download Master Exam Schedule PDF">
-                    <i class="fa-solid fa-file-pdf mr-1.5 text-red-500"></i> Master Schedule PDF
-                </a>
-                <a href="/export/collection_report.pdf" class="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50" title="Download Exam Paper/Envelope Collection Report PDF">
-                    <i class="fa-solid fa-file-pdf mr-1.5 text-orange-500"></i> Collection Report PDF
-                </a>
-                <a href="/notifications" class="text-gray-500 hover:text-[#668054] relative ml-2">
-                    <i class="fa-regular fa-bell text-xl"></i>
+                <span class="w-8 h-8 rounded-lg bg-[#668054]/10 text-[#668054] flex items-center justify-center text-sm font-bold shadow-xs">
+                    <i class="fa-solid fa-chart-line"></i>
+                </span>
+                <div>
+                    <h1 class="text-base sm:text-lg font-bold text-gray-900 leading-tight">Examination Analytics &amp; Reports</h1>
+                    <p class="text-[11px] text-gray-500 hidden sm:block">Proctor absence audits, assignment rosters &amp; scheduling compliance</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <a href="/notifications" class="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:text-[#668054] hover:border-[#668054]/40 hover:bg-[#668054]/5 transition-all relative" title="Notifications">
+                    <i class="fa-regular fa-bell text-base"></i>
                     {% if unread_count and unread_count > 0 %}
-                    <span class="absolute top-0 right-0 -mt-1 -mr-1 flex h-3 w-3">
-                        <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    <span class="absolute top-1 right-1 flex h-2.5 w-2.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
                     </span>
                     {% endif %}
+                </a>
+
+                <a href="/dashboard" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold shadow-xs transition-all">
+                    <i class="fa-solid fa-chart-pie text-[#668054]"></i>
+                    <span class="hidden md:inline">Dashboard</span>
                 </a>
             </div>
         </header>
 
-        <div class="px-4 sm:px-6 lg:px-8 py-6">
+        <div class="px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6">
             <!-- Tabs -->
             <div class="border-b border-gray-200 mb-6">
                 <nav class="-mb-px flex space-x-8" aria-label="Tabs">
@@ -171,9 +190,10 @@
 
             <!-- Tab 1: Absence Report -->
             <div id="absence-tab" class="tab-content block">
-                <div class="bg-white shadow-sm rounded-xl border border-gray-200 p-6 mb-6">
+                <div class="bg-white shadow-xs rounded-2xl border border-gray-200 p-6 mb-6">
                     <div class="flex flex-col sm:flex-row gap-4 items-end justify-between">
-                        <form action="/reports" method="GET" class="flex gap-4 items-end flex-grow">
+                        <form action="/reports" method="GET" class="flex flex-wrap gap-4 items-end flex-grow">
+                            <input type="hidden" name="tab" value="absence-tab">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">From Date</label>
                                 <input type="date" name="from" value="{{ date_from|default('') }}" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
@@ -183,6 +203,9 @@
                                 <input type="date" name="to" value="{{ date_to|default('') }}" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
                             </div>
                             <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[#668054] hover:bg-[#829c74]">Filter</button>
+                            {% if date_from or date_to %}
+                            <a href="/reports?tab=absence-tab" class="inline-flex justify-center py-2 px-3 border border-gray-300 text-sm font-medium rounded-md text-gray-600 bg-white hover:bg-gray-50">Clear</a>
+                            {% endif %}
                         </form>
                         
                         <div class="flex gap-2">
@@ -204,7 +227,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden mb-8">
+                <div class="bg-white shadow-xs rounded-2xl border border-gray-200 overflow-hidden mb-8">
                     <!-- OFFICIAL CCA REPORT HEADER -->
                     <div class="p-6 border-b border-gray-200 bg-white">
                         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -241,15 +264,15 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
+                    <div class="overflow-x-auto overflow-y-auto max-h-[550px] table-scroll-container">
                         <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
+                            <thead class="bg-gray-50 sticky top-0 z-10 shadow-2xs">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Instructor</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exam Subject</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exam Date</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reported At</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">Instructor</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">Exam Subject</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">Exam Date</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">Reason</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">Reported At</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
@@ -313,7 +336,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden mb-8">
+                <div class="bg-white shadow-xs rounded-2xl border border-gray-200 overflow-hidden mb-8">
                     <!-- OFFICIAL CCA REPORT HEADER -->
                     <div class="p-6 border-b border-gray-200 bg-white">
                         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -350,14 +373,14 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
+                    <div class="overflow-x-auto overflow-y-auto max-h-[550px] table-scroll-container">
                         <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
+                            <thead class="bg-gray-50 sticky top-0 z-10 shadow-2xs">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Instructor Name</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Institute</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Exams Assigned</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Hours</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">Instructor Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">Institute</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">Total Exams Assigned</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">Total Hours</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
@@ -397,8 +420,29 @@
 
             <!-- Tab 3: Scheduling Report -->
             <div id="scheduling-tab" class="tab-content hidden">
+                <!-- Date Filter Bar for Scheduling Report -->
+                <div class="bg-white shadow-xs rounded-2xl border border-gray-200 p-6 mb-6 no-print">
+                    <form action="/reports" method="GET" class="flex flex-wrap gap-4 items-end">
+                        <input type="hidden" name="tab" value="scheduling-tab">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">From Date</label>
+                            <input type="date" name="from" value="{{ date_from|default('') }}" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">To Date</label>
+                            <input type="date" name="to" value="{{ date_to|default('') }}" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                        </div>
+                        <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[#668054] hover:bg-[#829c74]">Filter</button>
+                        {% if date_from or date_to %}
+                        <a href="/reports?tab=scheduling-tab" class="inline-flex justify-center py-2 px-3 border border-gray-300 text-sm font-medium rounded-md text-gray-600 bg-white hover:bg-gray-50">Clear Filter</a>
+                        <span class="text-xs text-[#668054] font-medium self-center">
+                            <i class="fa-solid fa-filter mr-1"></i> Filtering exams from {{ date_from }} to {{ date_to }}
+                        </span>
+                        {% endif %}
+                    </form>
+                </div>
                 <!-- OFFICIAL CCA REPORT HEADER -->
-                <div class="bg-white shadow-sm rounded-xl border border-gray-200 p-6 mb-6">
+                <div class="bg-white shadow-xs rounded-2xl border border-gray-200 p-6 mb-6">
                     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div class="flex items-center gap-3.5">
                             <div class="w-12 h-12 rounded-xl bg-[#eef3ec] border border-[#d9e6d4] flex items-center justify-center text-[#3d5c2e] text-2xl flex-shrink-0 shadow-2xs">
@@ -458,36 +502,41 @@
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- By Institute -->
-                    <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
-                        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <div class="bg-white shadow-xs rounded-2xl border border-gray-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
                             <h3 class="font-semibold text-gray-800">Breakdown by Institute</h3>
+                            {% if date_from or date_to %}
+                            <span class="text-[11px] font-semibold text-[#668054] bg-[#668054]/10 px-2.5 py-0.5 rounded-full">Date Filtered</span>
+                            {% endif %}
                         </div>
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-white">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Institute</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Exams</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Scheduled</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200 bg-white">
-                                {% if scheduling_report and scheduling_report.by_institute %}
-                                    {% for item in scheduling_report.by_institute %}
+                        <div class="overflow-x-auto overflow-y-auto max-h-[400px] table-scroll-container">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50 sticky top-0 z-10 shadow-2xs">
                                     <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.name }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ item.total }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold text-right">{{ item.scheduled }}</td>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase bg-gray-50">Institute</th>
+                                        <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase bg-gray-50">Total Exams</th>
+                                        <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase bg-gray-50">Scheduled</th>
                                     </tr>
-                                    {% endfor %}
-                                {% else %}
-                                    <tr><td colspan="3" class="px-6 py-8 text-center text-gray-500">No data available</td></tr>
-                                {% endif %}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200 bg-white">
+                                    {% if scheduling_report and scheduling_report.by_institute %}
+                                        {% for item in scheduling_report.by_institute %}
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.name }}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ item.total }}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold text-right">{{ item.scheduled }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr><td colspan="3" class="px-6 py-8 text-center text-gray-500">No data available</td></tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
                     <!-- By Type -->
-                    <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                    <div class="bg-white shadow-xs rounded-2xl border border-gray-200 overflow-hidden">
                         <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                             <h3 class="font-semibold text-gray-800">Breakdown by Exam Type</h3>
                         </div>
@@ -518,8 +567,11 @@
                 tab.classList.add('hidden');
                 tab.classList.remove('block');
             });
-            document.getElementById(tabId).classList.remove('hidden');
-            document.getElementById(tabId).classList.add('block');
+            const activeContent = document.getElementById(tabId);
+            if (activeContent) {
+                activeContent.classList.remove('hidden');
+                activeContent.classList.add('block');
+            }
             
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.classList.remove('border-[#668054]', 'text-[#668054]');
@@ -527,9 +579,24 @@
             });
             
             const activeBtn = document.getElementById('nav-' + tabId);
-            activeBtn.classList.remove('border-transparent', 'text-gray-500');
-            activeBtn.classList.add('border-[#668054]', 'text-[#668054]');
+            if (activeBtn) {
+                activeBtn.classList.remove('border-transparent', 'text-gray-500');
+                activeBtn.classList.add('border-[#668054]', 'text-[#668054]');
+            }
+
+            if (history.replaceState) {
+                history.replaceState(null, null, '#' + tabId);
+            }
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const serverTab = "{{ active_tab|default('') }}";
+            const hashTab = window.location.hash.replace('#', '');
+            const targetTab = serverTab || hashTab;
+            if (targetTab && document.getElementById(targetTab)) {
+                switchTab(targetTab);
+            }
+        });
 
         function confirmClearAbsenceReports() {
             showConfirmModal({

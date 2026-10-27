@@ -34,6 +34,10 @@
         .overflow-x-auto::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
         .overflow-x-auto::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .overflow-x-auto::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .table-scroll-container::-webkit-scrollbar { width: 6px; height: 6px; }
+        .table-scroll-container::-webkit-scrollbar-track { background: #f8fafc; border-radius: 4px; }
+        .table-scroll-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .table-scroll-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 
     <style>
@@ -176,29 +180,41 @@
         });
     </script>
 </head>
-<body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
+<body class="bg-[#f8faf9] text-gray-800 min-h-screen flex">
 
     <!-- Sidebar -->
     {% set active_page = 'faculty' %}
     {% include 'admin_sidebar.html' %}
 
-    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen">
-        <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
-            <h1 class="text-xl font-semibold text-gray-800">Faculty Management</h1>
-            <div class="flex items-center gap-4">
-                <a href="/notifications" class="text-gray-500 hover:text-[#668054] relative">
-                    <i class="fa-regular fa-bell text-xl"></i>
+    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen pb-16">
+        <!-- Top Sticky Header -->
+        <header class="no-print bg-white/90 backdrop-blur-md border-b border-gray-200/80 h-16 flex items-center justify-between px-6 sm:px-8 z-20 sticky top-0 transition-all">
+            <div class="flex items-center gap-3">
+                <span class="w-8 h-8 rounded-lg bg-[#668054]/10 text-[#668054] flex items-center justify-center text-sm font-bold shadow-xs">
+                    <i class="fa-solid fa-chalkboard-user"></i>
+                </span>
+                <div>
+                    <h1 class="text-base sm:text-lg font-bold text-gray-900 leading-tight">Faculty &amp; Proctor Management</h1>
+                    <p class="text-[11px] text-gray-500 hidden sm:block">Instructor records, proctor allocations &amp; examination duty rosters</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <a href="/notifications" class="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:text-[#668054] hover:border-[#668054]/40 hover:bg-[#668054]/5 transition-all relative" title="Notifications">
+                    <i class="fa-regular fa-bell text-base"></i>
                     {% if unread_count and unread_count > 0 %}
-                    <span class="absolute top-0 right-0 -mt-1 -mr-1 flex h-3 w-3">
+                    <span class="absolute top-1 right-1 flex h-2.5 w-2.5">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
                     </span>
                     {% endif %}
                 </a>
+
+
             </div>
         </header>
 
-        <div class="px-4 sm:px-6 lg:px-8 py-6">
+        <div class="px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     <div class="mb-6">
@@ -213,13 +229,13 @@
             {% endwith %}
 
             <!-- Stats Row -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 no-print">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 no-print">
                 {% set total_fac = instructors|length if instructors else 0 %}
                 {% set active_fac = instructors|selectattr("status", "equalto", "Active")|list|length if instructors else 0 %}
                 {% set inactive_fac = total_fac - active_fac %}
                 {% set total_hrs = period_summary|map(attribute='total_hours')|sum if period_summary else 0 %}
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center">
+                <div class="bg-white rounded-2xl shadow-xs border border-gray-200/90 p-6 flex items-center">
                     <div class="p-3 rounded-lg bg-blue-50 text-blue-600 mr-4">
                         <i class="fa-solid fa-users text-xl"></i>
                     </div>
@@ -228,7 +244,7 @@
                         <p class="text-2xl font-bold text-gray-900">{{ total_fac }}</p>
                     </div>
                 </div>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center">
+                <div class="bg-white rounded-2xl shadow-xs border border-gray-200/90 p-6 flex items-center">
                     <div class="p-3 rounded-lg bg-green-50 text-green-600 mr-4">
                         <i class="fa-solid fa-user-check text-xl"></i>
                     </div>
@@ -237,7 +253,7 @@
                         <p class="text-2xl font-bold text-gray-900">{{ active_fac }}</p>
                     </div>
                 </div>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center">
+                <div class="bg-white rounded-2xl shadow-xs border border-gray-200/90 p-6 flex items-center">
                     <div class="p-3 rounded-lg bg-gray-50 text-gray-600 mr-4">
                         <i class="fa-solid fa-user-minus text-xl"></i>
                     </div>
@@ -246,7 +262,7 @@
                         <p class="text-2xl font-bold text-gray-900">{{ inactive_fac }}</p>
                     </div>
                 </div>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center">
+                <div class="bg-white rounded-2xl shadow-xs border border-gray-200/90 p-6 flex items-center">
                     <div class="p-3 rounded-lg bg-purple-50 text-purple-600 mr-4">
                         <i class="fa-solid fa-clock text-xl"></i>
                     </div>
@@ -258,16 +274,25 @@
             </div>
 
             <!-- Faculty Table -->
-            <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden mb-8">
+            <div class="bg-white shadow-xs rounded-2xl border border-gray-200 overflow-hidden mb-8">
                 <div class="no-print px-6 py-4 border-b border-gray-200 bg-gray-50 flex flex-wrap gap-2 justify-between items-center">
-                    <div class="flex items-center gap-4 flex-wrap">
+                    <div class="flex items-center gap-3 flex-wrap">
                         <h2 class="font-semibold text-gray-800">Faculty Members</h2>
                         <div class="relative">
-                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <i class="fa-solid fa-search text-gray-400 text-sm"></i>
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                <i class="fa-solid fa-search text-sm"></i>
                             </div>
-                            <input type="text" id="searchFaculty" onkeyup="filterTable('searchFaculty', '#facultyBulkForm table tbody tr')" class="block w-64 pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm" placeholder="Search faculty...">
+                            <input type="text" id="searchFaculty" onkeyup="filterFacultyTable()" class="block w-64 pl-9 pr-8 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#668054] transition-colors" placeholder="Search faculty...">
+                            <button type="button" id="clearFacultySearch" onclick="clearFacultySearchInput()" class="hidden absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600">
+                                <i class="fa-solid fa-times-circle text-xs"></i>
+                            </button>
                         </div>
+                        <select id="filterInstitute" onchange="filterFacultyTable()" class="px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#668054]">
+                            <option value="">All Institutes</option>
+                            {% for inst in institutes %}
+                            <option value="{{ inst.name }}">{{ inst.code or inst.name }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <div class="flex flex-wrap gap-2 items-center">
                         <button type="button" onclick="window.print()" class="no-print inline-flex items-center px-3.5 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 shadow-xs cursor-pointer" title="Print table">
@@ -278,7 +303,7 @@
                             <i class="fa-solid fa-file-csv mr-2 text-[#668054]"></i> Import CSV
                         </button>
                         <button onclick="openModal('addInstructorModal')" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#668054] hover:bg-[#829c74]">
-                            <i class="fa-solid fa-plus mr-2"></i> Add Instructor
+                            <i class="fa-solid fa-plus mr-2"></i> Add Faculty
                         </button>
                     </div>
                 </div>
@@ -307,27 +332,27 @@
                     </div>
                 </div>
 
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto overflow-y-auto max-h-[600px] table-scroll-container">
                     <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+                        <thead class="bg-gray-50 sticky top-0 z-20 shadow-2xs">
                             <tr>
-                                <th class="pl-4 sm:pl-6 pr-2 py-3 w-10 no-print">
+                                <th class="pl-4 sm:pl-6 pr-2 py-3 w-10 no-print bg-gray-50">
                                     <input type="checkbox" id="facultySelectAll" onchange="toggleFacultyAll(this)"
                                         class="h-4 w-4 text-[#668054] border-gray-300 rounded cursor-pointer" title="Select all">
                                 </th>
-                                <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name &amp; Dept</th>
-                                <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Username (Email)</th>
-                                <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Location</th>
-                                <th class="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                                <th class="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Hours</th>
-                                <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Subjects Taught</th>
-                                <th class="px-3.5 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider sticky right-0 bg-gray-50 shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] z-10 no-print">Actions</th>
+                                <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">Name &amp; Dept</th>
+                                <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">Username (Email)</th>
+                                <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">Location</th>
+                                <th class="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">Status</th>
+                                <th class="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">Hours</th>
+                                <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">Subjects Taught</th>
+                                <th class="px-3.5 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider sticky right-0 top-0 bg-gray-50 shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] z-30 no-print">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             {% if instructors %}
                                 {% for ins in instructors %}
-                                <tr class="hover:bg-gray-50">
+                                <tr class="hover:bg-gray-50 group" data-institute="{{ ins.institute_name or '' }}">
                                     <td class="pl-4 sm:pl-6 pr-2 py-3 w-10 no-print">
                                         <input type="checkbox" name="instructor_ids" value="{{ ins.id }}" data-name="{{ ins.name }}"
                                             class="faculty-row-checkbox h-4 w-4 text-[#668054] border-gray-300 rounded cursor-pointer"
@@ -357,10 +382,10 @@
                                     <td class="px-3 py-3 whitespace-nowrap text-center text-xs font-medium text-gray-600">
                                         {{ (ins.total_hours|float)|int if (ins.total_hours|float) % 1 == 0 else (ins.total_hours|float)|round(1) }} hrs
                                     </td>
-                                    <td class="px-3.5 py-3 text-xs text-gray-600 max-w-[150px] truncate" title="{{ ins.subjects_taught }}">
+                                    <td class="px-3.5 py-3 text-xs text-gray-600 max-w-[240px] truncate" title="{{ ins.subjects_taught }}">
                                         {{ ins.subjects_taught|default('-') }}
                                     </td>
-                                    <td class="px-3.5 py-3 whitespace-nowrap text-right text-xs font-medium sticky right-0 bg-white shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] z-10 no-print">
+                                    <td class="px-3.5 py-3 whitespace-nowrap text-right text-xs font-medium sticky right-0 bg-white group-hover:bg-gray-50 shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] z-10 no-print">
                                         <div class="inline-flex items-center justify-end gap-2.5">
                                             <a href="/admin/proctor_availability/{{ ins.id }}" class="text-[#668054] hover:text-[#4d633d] transition-colors" title="Manage Availability"><i class="fa-solid fa-calendar-alt text-sm"></i></a>
                                             <button type="button" onclick="openEditInstructorModal('{{ ins.id }}', '{{ ins.name|escape }}', '{{ ins.institute_id }}', '{{ ins.building|escape }}', '{{ ins.is_pwd }}', '{{ ins.subjects_taught|escape|default('') }}')" class="text-blue-600 hover:text-blue-800 transition-colors cursor-pointer" title="Edit Instructor"><i class="fa-solid fa-edit text-sm"></i></button>
@@ -391,16 +416,16 @@
 
             <!-- Reliever Management -->
             {% if relievers is defined %}
-            <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden no-print">
+            <div class="bg-white shadow-xs rounded-2xl border border-gray-200 overflow-hidden no-print">
                 <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
                     <h2 class="font-semibold text-gray-800">Reliever Management</h2>
                     <button onclick="openModal('addRelieverModal')" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#829c74] hover:bg-[#668054]">
                         <i class="fa-solid fa-user-plus mr-2"></i> Assign Reliever
                     </button>
                 </div>
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto overflow-y-auto max-h-[550px] table-scroll-container">
                     <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+                        <thead class="bg-gray-50 sticky top-0 z-10 shadow-2xs">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exam Details</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reliever Assigned</th>
@@ -678,6 +703,7 @@
                 <!-- Column reference -->
                 <div class="mb-4">
                     <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Required Columns</p>
+                    <div class="overflow-x-auto w-full">
                     <table class="w-full text-xs border border-gray-200 rounded-lg overflow-hidden">
                         <thead class="bg-gray-50">
                             <tr>
@@ -696,6 +722,7 @@
                             <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded text-[#668054]">availability</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-[#668054] font-medium">e.g. <em>Mon 07:00-12:00, Wed</em></td></tr>
                         </tbody>
                     </table>
+                    </div>
                     <p class="text-xs text-gray-400 mt-2"><span class="font-medium text-gray-500">Sample row:</span> <code class="bg-gray-100 px-1 rounded">Juan Dela Cruz,juan@cca.edu.ph,ICSLIS,Main Building,0,IT 2|Database,"Mon 07:00-12:00"</code></p>
                 </div>
 
@@ -860,7 +887,39 @@
 const BULK_EXAM_START = "{{ exam_start or '' }}";
 const BULK_EXAM_END   = "{{ exam_end or '' }}";
 
+function filterFacultyTable() {
+    const q = (document.getElementById('searchFaculty')?.value || '').toLowerCase().trim();
+    const inst = (document.getElementById('filterInstitute')?.value || '').toLowerCase().trim();
+    const clearBtn = document.getElementById('clearFacultySearch');
+    if (clearBtn) clearBtn.classList.toggle('hidden', !q);
+
+    const rows = document.querySelectorAll('#facultyBulkForm table tbody tr');
+    rows.forEach(row => {
+        if (row.cells.length <= 1) return;
+        const text = row.innerText.toLowerCase();
+        const rowInst = (row.getAttribute('data-institute') || '').toLowerCase();
+        
+        const matchQ = !q || text.includes(q);
+        const matchInst = !inst || rowInst === inst || text.includes(inst);
+        
+        row.style.display = (matchQ && matchInst) ? '' : 'none';
+    });
+}
+
+function clearFacultySearchInput() {
+    const inp = document.getElementById('searchFaculty');
+    if (inp) {
+        inp.value = '';
+        filterFacultyTable();
+        inp.focus();
+    }
+}
+
 function filterTable(inputId, rowSelector) {
+    if (inputId === 'searchFaculty') {
+        filterFacultyTable();
+        return;
+    }
     const q = document.getElementById(inputId).value.toLowerCase();
     document.querySelectorAll(rowSelector).forEach(r => {
         r.style.display = r.innerText.toLowerCase().includes(q) ? "" : "none";

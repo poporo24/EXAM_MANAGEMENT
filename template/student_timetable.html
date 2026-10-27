@@ -54,20 +54,57 @@
         /* MAIN */
         .main-content { max-width:1100px; margin:0 auto; padding:32px 20px 60px; }
 
+        /* SCROLLABLE SCHEDULE CONTAINER */
+        .schedule-scroll-viewport {
+            max-height: 590px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 8px;
+            padding-bottom: 8px;
+            scroll-behavior: smooth;
+        }
+        @media (min-height: 850px) {
+            .schedule-scroll-viewport {
+                max-height: calc(100vh - 270px);
+            }
+        }
+        .schedule-scroll-viewport::-webkit-scrollbar {
+            width: 7px;
+        }
+        .schedule-scroll-viewport::-webkit-scrollbar-track {
+            background: #e2ecd9;
+            border-radius: 8px;
+        }
+        .schedule-scroll-viewport::-webkit-scrollbar-thumb {
+            background: #829c74;
+            border-radius: 8px;
+        }
+        .schedule-scroll-viewport::-webkit-scrollbar-thumb:hover {
+            background: #4e7038;
+        }
+
         /* DATE GROUP */
-        .date-group { margin-bottom:32px; }
-        .date-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+        .date-group { margin-bottom:28px; }
+        .schedule-scroll-viewport .date-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: var(--green-bg);
+            padding: 8px 0;
+            margin-bottom: 14px;
+        }
+        .date-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
         .date-badge { display:inline-flex; align-items:center; gap:8px; background:var(--green-dark); color:#fff; font-size:13px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; padding:7px 16px; border-radius:8px; }
         .date-badge i { opacity:0.75; font-size:12px; }
         .date-count { font-size:12px; color:var(--gray-400); font-weight:500; }
 
         /* CARDS */
         .cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; }
-        .exam-card { background:var(--white); border:1px solid var(--gray-200); border-radius:12px; padding:20px 20px 18px; transition:box-shadow .2s,transform .15s; position:relative; }
+        .exam-card { background:var(--white); border:1px solid var(--gray-200); border-radius:12px; padding:20px 20px 18px; transition:box-shadow .2s,transform .15s; position:relative; display:flex; flex-direction:column; justify-content:space-between; }
         .exam-card:hover { box-shadow:0 6px 24px rgba(62,90,46,0.12); transform:translateY(-1px); }
-        .confirmed-badge { position:absolute; top:16px; right:16px; display:flex; align-items:center; gap:4px; font-size:10px; font-weight:700; color:var(--confirmed); letter-spacing:0.04em; }
+        .confirmed-badge { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; color:var(--confirmed); letter-spacing:0.04em; }
         .confirmed-badge i { font-size:10px; }
-        .card-subject { font-size:16px; font-weight:800; color:var(--gray-900); letter-spacing:-0.01em; margin-bottom:10px; padding-right:100px; }
+        .card-subject { font-size:16px; font-weight:800; color:var(--gray-900); letter-spacing:-0.01em; line-height:1.3; }
         .badges-row { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
         .badge { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:4px; font-size:10.5px; font-weight:700; letter-spacing:0.02em; text-transform:uppercase; }
         .badge-section { background:#dbeafe; color:#1e40af; }
@@ -334,12 +371,28 @@
         }
 
         /* RESPONSIVE */
-        @media (max-width:600px) {
-            .hero { padding:36px 16px 32px; }
-            .info-strip { padding:10px 16px; }
-            .main-content { padding:20px 12px 48px; }
-            .cards-grid { grid-template-columns:1fr; }
-            .info-strip .student-info { margin-left:0; }
+        @media (max-width: 768px) {
+            .hero { padding: 40px 18px 30px; }
+            .controls-bar { gap: 8px; margin-top: 20px; }
+            .ctrl-search { flex: 1 1 100%; max-width: 480px; }
+            .info-strip { padding: 10px 20px; gap: 12px; }
+            .cards-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+        }
+        @media (max-width: 640px) {
+            .hero { padding: 32px 16px 24px; }
+            .hero h1 { font-size: 26px; }
+            .hero-sub { font-size: 12px; }
+            .controls-bar { gap: 6px; }
+            .ctrl-search { flex: 1 1 100%; max-width: 100%; min-width: 0; }
+            .ctrl-btn { padding: 8px 12px; font-size: 12px; }
+            .info-strip { padding: 10px 16px; font-size: 12px; flex-direction: column; align-items: flex-start; gap: 6px; }
+            .info-strip .student-info { margin-left: 0; }
+            .main-content { padding: 16px 12px 48px; }
+            .cards-grid { grid-template-columns: 1fr; }
+            .exam-card { padding: 16px 16px 14px; }
+            .card-subject { font-size: 15px; }
+            .student-hero-card { padding: 16px 14px !important; }
+            .quick-tips-grid { grid-template-columns: 1fr !important; }
         }
     </style>
 
@@ -574,6 +627,7 @@
 {% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
 {% include 'change_password_modal.html' %}
 {% include 'notifications_modal.html' %}
+{% include 'account_guidelines_modal.html' %}
 {% endif %}
 
 <div class="info-strip">
@@ -589,29 +643,160 @@
     </span>
     {% endif %}
     <span class="readonly">View-only &mdash; contact admin for changes</span>
-    {% if section %}
-    <span class="student-info" {% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}onclick="openMyAccountModal()" style="cursor:pointer; padding:4px 10px; border-radius:8px; transition:background 0.15s;" onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background='transparent'" title="Click to update your account"{% endif %}>
-        <i class="fa-solid fa-user-graduate"></i>
-        <span>{{ full_name }}</span>
-        {% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
-        <i class="fa-solid fa-pen-to-square" style="font-size:11px; color:#668054; opacity:0.85;"></i>
-        <span style="background:#e0ecd7; color:#2e4520; padding:2px 8px; border-radius:6px; font-weight:700; display:inline-flex; align-items:center; gap:4px;" title="Official Enrolled Section (Managed by Department Administrator)">
-            <i class="fa-solid fa-lock" style="font-size:10px; opacity:0.65;"></i> {{ section }}
-        </span>
-        {% elif full_name == "Irregular Student Viewer" %}
+    {% if section and full_name == "Irregular Student Viewer" %}
+    <span class="student-info">
         <a href="/public/timetable" style="text-decoration:none; background:#e0ecd7; color:#2e4520; padding:2px 8px; border-radius:6px; font-weight:700; transition:background .15s; display:inline-flex; align-items:center; gap:4px;" title="Click to change section">
             {{ section }} <i class="fa-solid fa-arrow-right-arrow-left" style="font-size:10px; opacity:0.75;"></i>
         </a>
-        {% else %}
-        {{ section }}
-        {% endif %}
     </span>
     {% endif %}
 </div>
 
 <main class="main-content" id="examContainer">
 
+    {% if full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
+    <!-- Student Welcome & Exam Motivation Hero Card -->
+    <div class="no-print student-hero-card" style="background: linear-gradient(135deg, #ffffff 0%, #f9fbf8 100%); border: 1px solid #dbe6d6; border-radius: 16px; box-shadow: 0 4px 20px rgba(61,92,46,0.06); padding: 22px 24px; margin-bottom: 28px; position: relative; overflow: hidden;">
+        <!-- Top decorative accent line -->
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #3d5c2e 0%, #668054 50%, #829c74 100%);"></div>
+        
+        <!-- Header Row: Greeting + Section + Account Guide -->
+        <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid #edf3ea;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 44px; height: 44px; border-radius: 12px; background: #eef3ec; color: #3d5c2e; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; border: 1px solid #d9e6d4;">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                </div>
+                <div>
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <h2 style="font-size: 19px; font-weight: 800; color: #1e293b; letter-spacing: -0.01em; margin: 0;">
+                            Welcome back, <span style="color: #4e7038;">{{ full_name }}</span>!
+                        </h2>
+                        {% if section %}
+                        <span style="background: #eef3ec; color: #2e4520; border: 1px solid #cce0c4; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="fa-solid fa-layer-group" style="color: #668054; font-size: 10px;"></i> {{ section }}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <p style="font-size: 12px; color: #64748b; margin-top: 2px;">
+                        Here is your official schedule for the upcoming examinations. Stay focused and give it your best!
+                    </p>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button type="button" onclick="openAccountGuidelinesModal('student')" style="background: #eef3ec; color: #2e4520; border: 1px solid #cce0c4; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; text-decoration: none;" onmouseover="this.style.background='#dcebd4'" onmouseout="this.style.background='#eef3ec'" title="View Student Account Guidelines">
+                    <i class="fa-solid fa-circle-info" style="color: #4e7038;"></i> Account Guide
+                </button>
+            </div>
+        </div>
+
+        <!-- Short Motivational Message Banner -->
+        <div style="background: linear-gradient(135deg, #f0f7ec 0%, #e8f3e3 100%); border: 1px solid #cfe2c7; border-radius: 12px; padding: 14px 18px; margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px;">
+            <div style="display: flex; align-items: flex-start; gap: 12px; flex: 1;">
+                <div style="width: 32px; height: 32px; border-radius: 50%; background: #ffffff; color: #4e7038; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; box-shadow: 0 2px 5px rgba(78,112,56,0.15); margin-top: 2px;">
+                    <i class="fa-solid fa-quote-left"></i>
+                </div>
+                <div style="flex: 1;">
+                    <span style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #4e7038; display: block; margin-bottom: 2px;">
+                        Short Motivational Message
+                    </span>
+                    <p id="studentMotivationalQuote" style="font-size: 13px; font-weight: 600; color: #1e3a12; font-style: italic; line-height: 1.45; margin: 0; transition: opacity 0.25s ease;">
+                        "You’ve prepared well and you’re ready for this. Take a deep breath and trust yourself."
+                    </p>
+                </div>
+            </div>
+            <button type="button" onclick="shuffleMotivationalQuote()" style="background: #ffffff; border: 1px solid #cfe2c7; color: #4e7038; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; flex-shrink: 0;" title="Get another motivational message" onmouseover="this.style.transform='rotate(90deg)'; this.style.background='#f0f7ec';" onmouseout="this.style.transform='none'; this.style.background='#ffffff';">
+                <i class="fa-solid fa-arrows-rotate" style="font-size: 11px;"></i>
+            </button>
+        </div>
+
+        <!-- Quick Tips for Exam Day -->
+        <div>
+            <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 10px;">
+                <i class="fa-solid fa-lightbulb" style="color: #eab308; font-size: 13px;"></i>
+                <h4 style="font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #374151; margin: 0;">
+                    Quick Tips for Exam Day
+                </h4>
+            </div>
+            <div class="quick-tips-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px;">
+                <!-- Tip 1: Stay calm -->
+                <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 11px 13px; display: flex; align-items: flex-start; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                    <div style="width: 26px; height: 26px; border-radius: 7px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; margin-top: 1px;">
+                        <i class="fa-solid fa-heart-pulse"></i>
+                    </div>
+                    <div>
+                        <h5 style="font-size: 11.5px; font-weight: 700; color: #0f172a; margin: 0 0 2px;">Stay calm</h5>
+                        <p style="font-size: 11px; color: #475569; line-height: 1.4; margin: 0;">Panic blocks your memory; a slow, deep breath brings your focus back.</p>
+                    </div>
+                </div>
+                <!-- Tip 2: Read carefully -->
+                <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 11px 13px; display: flex; align-items: flex-start; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                    <div style="width: 26px; height: 26px; border-radius: 7px; background: #fef3c7; color: #d97706; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; margin-top: 1px;">
+                        <i class="fa-solid fa-glasses"></i>
+                    </div>
+                    <div>
+                        <h5 style="font-size: 11.5px; font-weight: 700; color: #0f172a; margin: 0 0 2px;">Read carefully</h5>
+                        <p style="font-size: 11px; color: #475569; line-height: 1.4; margin: 0;">Look closely at what each question asks before writing down an answer.</p>
+                    </div>
+                </div>
+                <!-- Tip 3: Pace yourself -->
+                <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 11px 13px; display: flex; align-items: flex-start; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                    <div style="width: 26px; height: 26px; border-radius: 7px; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; margin-top: 1px;">
+                        <i class="fa-solid fa-stopwatch"></i>
+                    </div>
+                    <div>
+                        <h5 style="font-size: 11.5px; font-weight: 700; color: #0f172a; margin: 0 0 2px;">Pace yourself</h5>
+                        <p style="font-size: 11px; color: #475569; line-height: 1.4; margin: 0;">Do not spend too much time on a single hard question; move on and come back to it.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const studentQuotes = [
+                "You’ve prepared well and you’re ready for this. Take a deep breath and trust yourself.",
+                "Exams may be tough, but you are tougher. Go show what you are made of!",
+                "Success is the sum of small efforts repeated day in and day out. Today is your time to let it shine.",
+                "Don't stress over what you cannot control. Just do your best—that is always enough.",
+                "Remember: this test is just one step on your journey. You've got this!"
+            ];
+            let currentQuoteIdx = Math.floor(Math.random() * studentQuotes.length);
+
+            function displayStudentQuote(idx) {
+                const el = document.getElementById('studentMotivationalQuote');
+                if (!el) return;
+                el.style.opacity = '0';
+                setTimeout(function() {
+                    el.textContent = '"' + studentQuotes[idx] + '"';
+                    el.style.opacity = '1';
+                }, 160);
+            }
+
+            window.shuffleMotivationalQuote = function() {
+                let nextIdx;
+                do {
+                    nextIdx = Math.floor(Math.random() * studentQuotes.length);
+                } while (studentQuotes.length > 1 && nextIdx === currentQuoteIdx);
+                currentQuoteIdx = nextIdx;
+                displayStudentQuote(currentQuoteIdx);
+            };
+
+            // Initialize quote
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    displayStudentQuote(currentQuoteIdx);
+                });
+            } else {
+                displayStudentQuote(currentQuoteIdx);
+            }
+        })();
+    </script>
+    {% endif %}
+
     {% if grouped %}
+    <!-- Scrollable Exam Schedule Container -->
+    <div class="schedule-scroll-viewport" id="scheduleScrollViewport">
         {% for date_str, exams in grouped %}
         <div class="date-group" data-date="{{ date_str }}">
             <div class="date-header">
@@ -629,11 +814,12 @@
                      data-room="{{ (exam.room_name or '') | lower }}"
                      data-proctor="{{ (exam.proctor_name or '') | lower }}">
 
-                    <span class="confirmed-badge">
-                        <i class="fa-solid fa-check-circle"></i> CONFIRMED
-                    </span>
-
-                    <div class="card-subject">{{ exam.subject_name }}</div>
+                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px;">
+                        <div class="card-subject" style="flex: 1; min-width: 0;">{{ exam.subject_name }}</div>
+                        <span class="confirmed-badge" style="flex-shrink: 0; margin-top: 2px;">
+                            <i class="fa-solid fa-check-circle"></i> CONFIRMED
+                        </span>
+                    </div>
 
                     <div class="badges-row">
                         {% if exam.section %}
@@ -667,6 +853,7 @@
             </div>
         </div>
         {% endfor %}
+    </div>
     {% else %}
         {% if not is_published %}
         <div class="empty-state" style="border: 2px dashed #f59e0b; background: #fffbeb; padding: 60px 24px;">

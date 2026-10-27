@@ -7,7 +7,8 @@
     <title>Schedule - Admin</title>
     
 
-    <script src="https://cdn.tailwindcss.com">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
         function showSaveConfirmation() {
             // Check if Sync All is checked to give a stronger warning
             const syncChecked = document.getElementById('sync_all_sections') && document.getElementById('sync_all_sections').checked;
@@ -23,8 +24,7 @@
             
             document.getElementById('saveConfirmModal').classList.remove('hidden');
         }
-
-</script>
+    </script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -39,6 +39,11 @@
             border: 1px solid #e5e7eb;
             box-shadow: 0 1px 4px rgba(0,0,0,.06);
         }
+        .table-scroll-container::-webkit-scrollbar { width: 6px; height: 6px; }
+        .table-scroll-container::-webkit-scrollbar-track { background: #f8fafc; border-radius: 4px; }
+        .table-scroll-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .table-scroll-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
         .timetable {
             width: 100%;
             border-collapse: collapse;
@@ -47,7 +52,7 @@
         .timetable thead th {
             position: sticky;
             top: 0;
-            z-index: 5;
+            z-index: 20;
             background: #668054;
             color: #fff;
             font-weight: 600;
@@ -57,8 +62,13 @@
             padding: 12px 14px;
             text-align: center;
             white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(0,0,0,.06);
         }
         .timetable thead th.time-col {
+            position: sticky;
+            top: 0;
+            left: 0;
+            z-index: 30;
             background: #4b5e3d;
             width: 80px;
         }
@@ -71,6 +81,9 @@
             min-width: 160px;
         }
         .timetable tbody td.time-cell {
+            position: sticky;
+            left: 0;
+            z-index: 10;
             background: #f0f5ee !important;
             text-align: center;
             font-weight: 700;
@@ -78,6 +91,7 @@
             font-size: .78rem;
             white-space: nowrap;
             padding: 10px 8px;
+            box-shadow: 2px 0 4px rgba(0,0,0,.04);
         }
 
         /* Exam card inside timetable */
@@ -169,8 +183,9 @@
                 break-before: auto !important;
             }
 
-            .overflow-x-auto {
+            .overflow-x-auto, .table-scroll-container {
                 overflow: visible !important;
+                max-height: none !important;
                 display: block !important;
                 width: 100% !important;
             }
@@ -427,6 +442,10 @@
                     wrapper.appendChild(table);
                 }
             });
+            // Initialize progress bars from data-width attribute
+            document.querySelectorAll('[data-width]').forEach(function(el) {
+                el.style.width = el.getAttribute('data-width');
+            });
         });
     
         function showSaveConfirmation() {
@@ -447,136 +466,62 @@
 
 </script>
 </head>
-<body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
+<body class="bg-[#f8faf9] text-gray-800 min-h-screen flex">
 
     <!-- Sidebar -->
     {% set active_page = 'schedule' %}
     {% include 'admin_sidebar.html' %}
 
     <!-- Main Content -->
-    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen">
+    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen pb-16">
 
-        <!-- Top header -->
-        <header class="no-print bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
-            <h1 class="text-xl font-semibold text-gray-800">Master Schedule &mdash; Timetable</h1>
-            <div class="flex items-center gap-4">
-                <a href="/notifications" class="text-gray-500 hover:text-[#668054] relative">
-                    <i class="fa-regular fa-bell text-xl"></i>
+        <!-- Top Sticky Header -->
+        <header class="no-print bg-white/90 backdrop-blur-md border-b border-gray-200/80 h-16 flex items-center justify-between px-6 sm:px-8 z-20 sticky top-0 transition-all">
+            <div class="flex items-center gap-3">
+                <span class="w-8 h-8 rounded-lg bg-[#668054]/10 text-[#668054] flex items-center justify-center text-sm font-bold shadow-xs">
+                    <i class="fa-solid fa-calendar-days"></i>
+                </span>
+                <div>
+                    <h1 class="text-base sm:text-lg font-bold text-gray-900 leading-tight">Master Schedule &mdash; Timetable</h1>
+                    <p class="text-[11px] text-gray-500 hidden sm:block">Automated timetable generator, conflict detector &amp; interactive calendar grid</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <a href="/notifications" class="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:text-[#668054] hover:border-[#668054]/40 hover:bg-[#668054]/5 transition-all relative" title="Notifications">
+                    <i class="fa-regular fa-bell text-base"></i>
                     {% if unread_count and unread_count > 0 %}
-                    <span class="absolute top-0 right-0 -mt-1 -mr-1 flex h-3 w-3">
-                        <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    <span class="absolute top-1 right-1 flex h-2.5 w-2.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
                     </span>
                     {% endif %}
                 </a>
             </div>
         </header>
 
-        <div class="px-4 sm:px-6 lg:px-8 py-6">
-
-            <!-- Live Automated Conflict Verification Card (TOP OF PAGE) -->
-            <div id="conflictsSection" class="scroll-mt-20">
-            {% if conflict_audit %}
-                {% if conflict_audit.is_clean and conflict_audit.total_exams > 0 %}
-                <div class="no-print bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-xl flex-shrink-0">
-                            <i class="fa-solid fa-circle-check"></i>
-                        </div>
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <h3 class="font-bold text-emerald-900 text-sm">No Conflicts at the moment &mdash; Schedule is 100% Conflict-Free</h3>
-                                <span class="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Verified Clean</span>
-                            </div>
-                            <p class="text-xs text-emerald-700 mt-0.5">
-                                Automated Validation Check: <strong>0 Room Collisions</strong> &bull; <strong>0 Proctor Double-Bookings</strong> &bull; <strong>0 Section Clashes</strong> &bull; <strong>0 Subject Desyncs</strong> &bull; <strong>0 Daily Overloads</strong> ({{ conflict_audit.total_exams }} scheduled sessions verified)
-                            </p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-emerald-700 border border-emerald-200 shadow-2xs">
-                            <i class="fa-solid fa-shield-check text-emerald-500 mr-1.5"></i> Ready for Examination
-                        </span>
-                    </div>
-                </div>
-                {% elif conflict_audit.total_conflicts_count > 0 %}
-                <div class="no-print bg-red-50 border border-red-200 rounded-xl p-4 mb-6 shadow-xs">
-                    <div class="flex items-center justify-between mb-3">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold text-xl flex-shrink-0">
-                                <i class="fa-solid fa-triangle-exclamation"></i>
-                            </div>
-                            <div>
-                                <h3 class="font-bold text-red-900 text-sm">Attention: {{ conflict_audit.total_conflicts_count }} Scheduling Conflict(s) Detected</h3>
-                                <p class="text-xs text-red-700 mt-0.5">
-                                    {{ conflict_audit.room_conflicts|length }} room double-bookings, {{ conflict_audit.proctor_conflicts|length }} proctor overlaps, {{ conflict_audit.section_conflicts|length }} section collisions{% if conflict_audit.subject_conflicts %}, {{ conflict_audit.subject_conflicts|length }} subject timing desyncs{% endif %}{% if conflict_audit.break_conflicts %}, {{ conflict_audit.break_conflicts|length }} break buffer violations{% endif %}{% if conflict_audit.integrity_conflicts %}, {{ conflict_audit.integrity_conflicts|length }} academic integrity violations{% endif %}{% if conflict_audit.section_overloads %}, {{ conflict_audit.section_overloads|length }} daily overloads{% endif %}{% if conflict_audit.proctor_overloads %}, {{ conflict_audit.proctor_overloads|length }} proctor overloads{% endif %}.
-                                </p>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <button type="button" onclick="openInspectorModal('conflictsInspectorModal')" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors cursor-pointer">
-                                <i class="fa-solid fa-up-right-from-square mr-1"></i> Inspect &amp; Resolve Conflicts
-                            </button>
-                        </div>
-                    </div>
-                    <div id="conflictDetailsBoxTop" class="hidden mt-3 pt-3 border-t border-red-200 space-y-2 max-h-60 overflow-y-auto text-xs">
-                        {% for subc in conflict_audit.subject_conflicts %}
-                        <div class="p-2 bg-white rounded border border-red-200 text-red-800 flex justify-between items-center">
-                            <span><i class="fa-solid fa-book-bookmark mr-1 text-red-500"></i> <strong>Subject Desynchronization</strong>: {{ subc.reason }}</span>
-                        </div>
-                        {% endfor %}
-                        {% for bc in conflict_audit.break_conflicts %}
-                        <div class="p-2 bg-white rounded border border-red-200 text-red-800 flex justify-between items-center">
-                            <span><i class="fa-solid fa-hourglass-half mr-1 text-red-500"></i> <strong>Insufficient Break</strong> on {{ bc.date }}: {{ bc.reason }}</span>
-                        </div>
-                        {% endfor %}
-                        {% for rc in conflict_audit.room_conflicts %}
-                        <div class="p-2 bg-white rounded border border-red-200 text-red-800 flex justify-between items-center">
-                            <span><i class="fa-solid fa-door-open mr-1 text-red-500"></i> <strong>Room {{ rc.room }}</strong> double-booked on {{ rc.date }} at {{ rc.time }}: {{ rc.exam1 }} vs {{ rc.exam2 }}</span>
-                        </div>
-                        {% endfor %}
-                        {% for sc in conflict_audit.section_conflicts %}
-                        <div class="p-2 bg-white rounded border border-red-200 text-red-800 flex justify-between items-center">
-                            <span><i class="fa-solid fa-users mr-1 text-red-500"></i> <strong>Section {{ sc.section }}</strong> double-booked on {{ sc.date }} at {{ sc.time }}: {{ sc.exam1 }} vs {{ sc.exam2 }}</span>
-                        </div>
-                        {% endfor %}
-                        {% for pc in conflict_audit.proctor_conflicts %}
-                        <div class="p-2 bg-white rounded border border-red-200 text-red-800 flex justify-between items-center">
-                            <span><i class="fa-solid fa-user-tie mr-1 text-red-500"></i> <strong>Proctor {{ pc.proctor }}</strong> assigned to 2 rooms on {{ pc.date }} at {{ pc.time }}: {{ pc.room1 }} vs {{ pc.room2 }}</span>
-                        </div>
-                        {% endfor %}
-                        {% for ic in conflict_audit.integrity_conflicts %}
-                        <div class="p-2 bg-white rounded border border-red-200 text-red-800 flex justify-between items-center">
-                            <span><i class="fa-solid fa-graduation-cap mr-1 text-red-500"></i> <strong>Academic Integrity</strong> on {{ ic.date }} at {{ ic.time }}: {{ ic.reason }}</span>
-                        </div>
-                        {% endfor %}
-                        {% for so in conflict_audit.section_overloads %}
-                        <div class="p-2 bg-white rounded border border-red-200 text-red-800 flex justify-between items-center">
-                            <span><i class="fa-solid fa-clock mr-1 text-red-500"></i> <strong>Section {{ so.section }}</strong> on {{ so.date }}: {{ so.reason }}</span>
-                        </div>
-                        {% endfor %}
-                        {% for po in conflict_audit.proctor_overloads %}
-                        <div class="p-2 bg-white rounded border border-red-200 text-red-800 flex justify-between items-center">
-                            <span><i class="fa-solid fa-clock mr-1 text-red-500"></i> <strong>Proctor {{ po.proctor }}</strong> on {{ po.date }}: {{ po.reason }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-            {% endif %}
+        <div class="px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6">
 
             <!-- Flash messages -->
-            </div><!-- /#conflictsSection -->
-
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
-                <div class="no-print mb-5">
+                <div class="no-print space-y-2">
                     {% for category, message in messages %}
-                    <div class="p-4 rounded-lg shadow-sm mb-2 flex items-start gap-3
-                        {% if category == 'error' or category == 'danger' %}bg-red-50 text-red-700 border-l-4 border-red-500
-                        {% elif category == 'warning' %}bg-yellow-50 text-yellow-700 border-l-4 border-yellow-400
-                        {% else %}bg-green-50 text-green-700 border-l-4 border-[#668054]{% endif %}">
-                        <i class="fa-solid {% if category == 'error' or category == 'danger' %}fa-circle-xmark{% elif category == 'warning' %}fa-triangle-exclamation{% else %}fa-circle-check{% endif %} mt-0.5"></i>
-                        <span>{{ message }}</span>
+                    <div class="p-3.5 rounded-xl shadow-xs border text-xs sm:text-sm font-medium flex justify-between items-center transition-all animate-in fade-in duration-200
+                        {% if category in ['error', 'danger'] %}
+                            bg-red-50 text-red-800 border-red-200
+                        {% elif category == 'warning' %}
+                            bg-amber-50 text-amber-800 border-amber-200
+                        {% elif category == 'info' %}
+                            bg-blue-50 text-blue-800 border-blue-200
+                        {% else %}
+                            bg-emerald-50 text-emerald-800 border-emerald-200
+                        {% endif %}">
+                        <div class="flex items-center gap-2.5">
+                            <i class="fa-solid {% if category in ['error', 'danger'] %}fa-circle-xmark text-red-500{% elif category == 'warning' %}fa-triangle-exclamation text-amber-500{% elif category == 'info' %}fa-circle-info text-blue-500{% else %}fa-circle-check text-emerald-500{% endif %} text-base"></i>
+                            <span>{{ message }}</span>
+                        </div>
+                        <button onclick="this.parentElement.remove()" class="text-gray-400 hover:text-gray-600 p-1"><i class="fa-solid fa-times"></i></button>
                     </div>
                     {% endfor %}
                 </div>
@@ -585,183 +530,395 @@
 
             <!-- Failed scheduling notification -->
             {% if failed and failed|length > 0 %}
-            <div class="no-print mb-5 bg-orange-50 border-l-4 border-orange-400 rounded-lg p-4">
+            <div class="no-print bg-orange-50 border border-orange-200 rounded-2xl p-4 shadow-xs">
                 <div class="flex items-center justify-between cursor-pointer" onclick="toggleFailed()">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-triangle-exclamation text-orange-500"></i>
-                        <p class="font-semibold text-orange-800">{{ failed|length }} exam(s) could not be auto-scheduled</p>
+                    <div class="flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-xs">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        </span>
+                        <div>
+                            <p class="font-bold text-orange-900 text-xs sm:text-sm">{{ failed|length }} exam(s) could not be auto-scheduled</p>
+                            <p class="text-[11px] text-orange-700">Click to expand details or manually assign slots below.</p>
+                        </div>
                     </div>
                     <i id="failedChevron" class="fa-solid fa-chevron-down text-orange-500 transition-transform"></i>
                 </div>
-                <div id="failedList" class="hidden mt-3 space-y-1">
+                <div id="failedList" class="hidden mt-3 pt-3 border-t border-orange-200 space-y-1.5">
                     {% for f in failed %}
-                    <div class="text-sm text-orange-700 flex gap-2">
-                        <span class="font-medium">Exam #{{ f.exam_id }}:</span>
+                    <div class="text-xs text-orange-800 flex items-start gap-2">
+                        <span class="font-bold">Exam #{{ f.exam_id }}:</span>
                         <span>{{ f.reason }}</span>
                     </div>
                     {% endfor %}
-                    <p class="text-xs text-orange-600 mt-2">Use the "Manually Schedule" button on the unscheduled exams below to assign a time slot manually.</p>
                 </div>
             </div>
             {% endif %}
 
-            <!-- Generate / Controls row -->
-            <div class="no-print bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
-                <div class="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 flex items-start gap-2.5">
-                    <i class="fa-solid fa-circle-info text-emerald-600 text-sm mt-0.5 flex-shrink-0"></i>
-                    <div>
-                        <span class="font-bold">Exam Period Notice:</span>
-                        Scheduling ~1,000 exams requires an examination period of at least <strong>5 to 6 days</strong> (e.g., <strong>Oct 26 – Oct 31, 2026</strong> from <strong>07:00 to 20:00</strong>) to satisfy student load regulations (maximum 2 Major exams per day per section). <strong>Fresh Regeneration</strong> is enabled by default to wipe old partial attempts and place 100% of exams cleanly.
+            <!-- Hero Banner -->
+            <div class="no-print bg-gradient-to-r from-white via-white to-[#668054]/5 rounded-2xl border border-gray-200 shadow-xs p-5 sm:p-6 transition-all hover:shadow-sm">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+                    <div class="space-y-1.5">
+                        <h2 class="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
+                            Master Examination <span class="text-[#668054]">Timetable Engine</span>
+                        </h2>
+                        <p class="text-xs sm:text-sm text-gray-600 max-w-3xl leading-relaxed">
+                            Generate automated conflict-free schedules, optimize facility capacity, balance proctor duties, and publish official examination timetables.
+                        </p>
+                    </div>
+
+                    <!-- Quick Shortcuts Action Group -->
+                    <div class="flex flex-wrap items-center gap-2.5 self-start lg:self-center">
+                        {% if sched_count and sched_count > 0 %}
+                            {% if not is_published %}
+                            <button type="button" onclick="openPublishModal()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer active:scale-95">
+                                <i class="fa-solid fa-paper-plane"></i> Finalize &amp; Publish
+                            </button>
+                            {% else %}
+                            <button type="button" onclick="openUnpublishModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-semibold shadow-xs transition-all cursor-pointer">
+                                <i class="fa-solid fa-rotate-left text-amber-600"></i> Revert to Draft
+                            </button>
+                            {% endif %}
+                        {% endif %}
+
+                        <a href="/admin/batch_print_sections" target="_blank" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-gray-200 hover:border-gray-300 text-gray-800 text-xs font-semibold shadow-2xs hover:bg-gray-50 transition-all">
+                            <i class="fa-solid fa-layer-group text-blue-600"></i> Batch Grid
+                        </a>
+
+                        <a href="/export/schedule.pdf" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-gray-200 hover:border-gray-300 text-gray-800 text-xs font-semibold shadow-2xs hover:bg-gray-50 transition-all">
+                            <i class="fa-solid fa-file-pdf text-red-600"></i> Master PDF
+                        </a>
+
+                        <button type="button" onclick="openExamNoticeModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-gray-200 hover:border-gray-300 text-gray-800 text-xs font-semibold shadow-2xs hover:bg-gray-50 transition-all cursor-pointer">
+                            <i class="fa-solid fa-circle-info text-[#668054]"></i> Guidelines
+                        </button>
                     </div>
                 </div>
-                <div class="flex flex-wrap gap-4 items-end justify-between">
-                    <!-- Generate form -->
-                    <form method="POST" action="/generate_schedule" class="gen-row">
+            </div>
+
+            <!-- Key Metrics / Stats Row -->
+            <div class="no-print grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- 1. Placed Exams -->
+                {% set pct = ((sched_count / total) * 100)|round(1) if total > 0 else 100 %}
+                <div onclick="openInspectorModal('scheduledInspectorModal')"
+                     class="bg-white rounded-2xl border border-gray-200/90 shadow-xs p-4 sm:p-5 hover:shadow-md hover:border-[#668054]/40 transition-all cursor-pointer group">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider group-hover:text-[#668054] transition-colors">Placed Exams</span>
+                        <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-calendar-check"></i>
+                        </span>
+                    </div>
+                    <div class="mt-2 flex items-baseline gap-2">
+                        <span class="text-2xl sm:text-3xl font-extrabold text-[#668054] tracking-tight">{{ sched_count }}</span>
+                        <span class="text-xs text-gray-400 font-medium">/ {{ total }} total</span>
+                    </div>
+                    <div class="mt-2.5">
+                        <div class="flex justify-between text-[11px] text-gray-500 mb-1 font-medium">
+                            <span>Placed</span>
+                            <span class="font-bold text-[#668054]">{{ pct }}%</span>
+                        </div>
+                        <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="h-full bg-[#668054] rounded-full transition-all" data-width="{{ pct }}%" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Unscheduled Exams -->
+                <div onclick="openInspectorModal('unscheduledInspectorModal')"
+                     class="bg-white rounded-2xl border border-gray-200/90 shadow-xs p-4 sm:p-5 hover:shadow-md {% if unscheduled|length > 0 %}hover:border-red-300{% else %}hover:border-emerald-300{% endif %} transition-all cursor-pointer group">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider group-hover:text-gray-700 transition-colors">Unscheduled</span>
+                        <span class="w-8 h-8 rounded-lg {% if unscheduled|length > 0 %}bg-red-50 text-red-600{% else %}bg-emerald-50 text-emerald-600{% endif %} flex items-center justify-center text-xs group-hover:scale-110 transition-transform">
+                            <i class="fa-solid {% if unscheduled|length > 0 %}fa-circle-exclamation{% else %}fa-check-double{% endif %}"></i>
+                        </span>
+                    </div>
+                    <div class="mt-2 flex items-baseline gap-2">
+                        <span class="text-2xl sm:text-3xl font-extrabold {% if unscheduled|length > 0 %}text-red-500{% else %}text-emerald-600{% endif %} tracking-tight">{{ unscheduled|length }}</span>
+                        <span class="text-xs text-gray-400 font-medium">pending slots</span>
+                    </div>
+                    <div class="mt-3 flex items-center gap-1.5">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider
+                            {% if unscheduled|length > 0 %}bg-red-100 text-red-800{% else %}bg-emerald-100 text-emerald-800{% endif %}">
+                            {% if unscheduled|length > 0 %}
+                            <i class="fa-solid fa-triangle-exclamation"></i> Action Required
+                            {% else %}
+                            <i class="fa-solid fa-check"></i> 100% Placed
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 3. Conflict & Integrity Health -->
+                <div onclick="openInspectorModal('conflictsInspectorModal')"
+                     class="bg-white rounded-2xl border shadow-xs p-4 sm:p-5 hover:shadow-md transition-all cursor-pointer group {% if conflict_audit.total_conflicts_count > 0 %}border-red-200 bg-red-50/20 hover:border-red-400{% else %}border-gray-200/90 hover:border-emerald-300{% endif %}">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider group-hover:text-gray-700 transition-colors">Audit &amp; Conflicts</span>
+                        <span class="w-8 h-8 rounded-lg {% if conflict_audit.total_conflicts_count > 0 %}bg-red-100 text-red-600{% else %}bg-emerald-50 text-emerald-600{% endif %} flex items-center justify-center text-xs group-hover:scale-110 transition-transform">
+                            <i class="fa-solid {% if conflict_audit.total_conflicts_count > 0 %}fa-triangle-exclamation{% else %}fa-shield-halved{% endif %}"></i>
+                        </span>
+                    </div>
+                    <div class="mt-2 flex items-baseline gap-2">
+                        <span class="text-2xl sm:text-3xl font-extrabold {% if conflict_audit.total_conflicts_count > 0 %}text-red-500{% else %}text-emerald-600{% endif %} tracking-tight">
+                            {{ conflict_audit.total_conflicts_count }}
+                        </span>
+                        <span class="text-xs text-gray-400 font-medium">rule violations</span>
+                    </div>
+                    <div class="mt-3 flex items-center gap-1.5">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider
+                            {% if conflict_audit.total_conflicts_count > 0 %}bg-red-100 text-red-800{% else %}bg-emerald-100 text-emerald-800{% endif %}">
+                            {% if conflict_audit.total_conflicts_count > 0 %}
+                            <i class="fa-solid fa-wrench"></i> {{ conflict_audit.total_conflicts_count }} Conflicts
+                            {% else %}
+                            <i class="fa-solid fa-shield-check"></i> Zero Collisions
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 4. Schedule Scope & Operating Days -->
+                <div onclick="scrollToScheduled()"
+                     class="bg-white rounded-2xl border border-gray-200/90 shadow-xs p-4 sm:p-5 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider group-hover:text-blue-600 transition-colors">Operating Days</span>
+                        <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-calendar-day"></i>
+                        </span>
+                    </div>
+                    <div class="mt-2 flex items-baseline gap-2">
+                        <span class="text-2xl sm:text-3xl font-extrabold text-blue-600 tracking-tight">{{ dates|length }}</span>
+                        <span class="text-xs text-gray-400 font-medium">exam days</span>
+                    </div>
+                    <div class="mt-3 flex items-center gap-1.5">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold uppercase tracking-wider">
+                            <i class="fa-solid fa-clock"></i> {{ times|length if times else 0 }} Time Slots
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Schedule Controls & Actions Master Card -->
+            <div class="no-print bg-white rounded-2xl border border-gray-200 shadow-xs p-5 sm:p-6 transition-all hover:shadow-sm">
+                <!-- TIER 1: GENERATION PARAMETERS -->
+                <form method="POST" action="/generate_schedule">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Period Start</label>
-                            <input type="date" name="period_start" value="{{ period_start.strftime('%Y-%m-%d') if period_start else '2026-10-26' }}" required
-                                   class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                    
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-md bg-[#668054]/10 text-[#668054] flex items-center justify-center text-xs">
+                                    <i class="fa-solid fa-gears"></i>
+                                </span>
+                                <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Schedule Generation Parameters</h3>
+                            </div>
+                            <!-- Clickable Exam Guidelines Modal Button -->
+                            <button type="button" onclick="openExamNoticeModal()"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-all cursor-pointer shadow-2xs active:scale-95"
+                                    title="View Exam Scheduling Guidelines">
+                                <i class="fa-solid fa-circle-info text-emerald-600"></i>
+                                <span>Exam Guidelines</span>
+                            </button>
                         </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Period End</label>
-                            <input type="date" name="period_end" value="{{ period_end.strftime('%Y-%m-%d') if period_end else '2026-10-31' }}" required
-                                   class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1.5">Period Start</label>
+                                <input type="date" name="period_start" value="{{ period_start.strftime('%Y-%m-%d') if period_start else '2026-10-26' }}" required
+                                       class="w-full h-10 border border-gray-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-800 bg-white hover:border-gray-400 focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none transition-all shadow-xs">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1.5">Period End</label>
+                                <input type="date" name="period_end" value="{{ period_end.strftime('%Y-%m-%d') if period_end else '2026-10-31' }}" required
+                                       class="w-full h-10 border border-gray-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-800 bg-white hover:border-gray-400 focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none transition-all shadow-xs">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1.5">Daily Start (24h)</label>
+                                <select name="day_start" required
+                                        class="w-full h-10 border border-gray-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-800 bg-white hover:border-gray-400 focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none transition-all shadow-xs">
+                                    <option value="06:00">06:00 (06:00 AM)</option>
+                                    <option value="06:30">06:30 (06:30 AM)</option>
+                                    <option value="07:00" selected>07:00 (07:00 AM)</option>
+                                    <option value="07:30">07:30 (07:30 AM)</option>
+                                    <option value="08:00">08:00 (08:00 AM)</option>
+                                    <option value="08:30">08:30 (08:30 AM)</option>
+                                    <option value="09:00">09:00 (09:00 AM)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1.5">Daily End (24h)</label>
+                                <select name="day_end" required
+                                        class="w-full h-10 border border-gray-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-800 bg-white hover:border-gray-400 focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none transition-all shadow-xs">
+                                    <option value="17:00">17:00 (05:00 PM)</option>
+                                    <option value="17:30">17:30 (05:30 PM)</option>
+                                    <option value="18:00">18:00 (06:00 PM)</option>
+                                    <option value="18:30">18:30 (06:30 PM)</option>
+                                    <option value="19:00">19:00 (07:00 PM)</option>
+                                    <option value="19:30">19:30 (07:30 PM)</option>
+                                    <option value="20:00" selected>20:00 (08:00 PM)</option>
+                                    <option value="20:30">20:30 (08:30 PM)</option>
+                                    <option value="21:00">21:00 (09:00 PM)</option>
+                                    <option value="21:30">21:30 (09:30 PM)</option>
+                                    <option value="22:00">22:00 (10:00 PM)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1.5">Semester</label>
+                                <select name="exam_semester" required
+                                        class="w-full h-10 border border-gray-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-800 bg-white hover:border-gray-400 focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none transition-all shadow-xs">
+                                    <option value="1st Semester" {% if exam_semester == '1st Semester' %}selected{% endif %}>1st Semester</option>
+                                    <option value="2nd Semester" {% if exam_semester == '2nd Semester' %}selected{% endif %}>2nd Semester</option>
+                                    <option value="Summer" {% if exam_semester == 'Summer' %}selected{% endif %}>Summer</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1.5">Exam Term</label>
+                                <select name="exam_term" required
+                                        class="w-full h-10 border border-gray-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-800 bg-white hover:border-gray-400 focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none transition-all shadow-xs">
+                                    <option value="Midterm" {% if exam_term == 'Midterm' %}selected{% endif %}>Midterm</option>
+                                    <option value="Finals" {% if exam_term == 'Finals' %}selected{% endif %}>Finals</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1.5" title="Generate schedule specifically for an institute or for all">Filter Institute</label>
+                                <select id="instituteFilter" name="institute_id"
+                                        class="w-full h-10 border border-gray-300 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-800 bg-white hover:border-gray-400 focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none transition-all shadow-xs"
+                                        title="Select an institute to schedule only that department, or choose All Institutes for full campus generation">
+                                    <option value="">All Institutes</option>
+                                    {% for inst in institutes %}
+                                    <option value="{{ inst.id }}" {% if filter_inst_id and filter_inst_id|string == inst.id|string %}selected{% endif %}>{{ inst.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Daily Start (24h)</label>
-                            <select name="day_start" required
-                                    class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
-                                <option value="06:00">06:00 (06:00 AM)</option>
-                                <option value="06:30">06:30 (06:30 AM)</option>
-                                <option value="07:00" selected>07:00 (07:00 AM)</option>
-                                <option value="07:30">07:30 (07:30 AM)</option>
-                                <option value="08:00">08:00 (08:00 AM)</option>
-                                <option value="08:30">08:30 (08:30 AM)</option>
-                                <option value="09:00">09:00 (09:00 AM)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Daily End (24h)</label>
-                            <select name="day_end" required
-                                    class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
-                                <option value="17:00">17:00 (05:00 PM)</option>
-                                <option value="17:30">17:30 (05:30 PM)</option>
-                                <option value="18:00">18:00 (06:00 PM)</option>
-                                <option value="18:30">18:30 (06:30 PM)</option>
-                                <option value="19:00">19:00 (07:00 PM)</option>
-                                <option value="19:30">19:30 (07:30 PM)</option>
-                                <option value="20:00" selected>20:00 (08:00 PM)</option>
-                                <option value="20:30">20:30 (08:30 PM)</option>
-                                <option value="21:00">21:00 (09:00 PM)</option>
-                                <option value="21:30">21:30 (09:30 PM)</option>
-                                <option value="22:00">22:00 (10:00 PM)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Semester</label>
-                            <select name="exam_semester" required class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
-                                <option value="1st Semester" {% if exam_semester == '1st Semester' %}selected{% endif %}>1st Semester</option>
-                                <option value="2nd Semester" {% if exam_semester == '2nd Semester' %}selected{% endif %}>2nd Semester</option>
-                                <option value="Summer" {% if exam_semester == 'Summer' %}selected{% endif %}>Summer</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Exam Term</label>
-                            <select name="exam_term" required class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
-                                <option value="Midterm" {% if exam_term == 'Midterm' %}selected{% endif %}>Midterm</option>
-                                <option value="Finals" {% if exam_term == 'Finals' %}selected{% endif %}>Finals</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Filter Institute</label>
-                            <select id="instituteFilter" name="institute_id"
-                                    class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none">
+                    </div>
+
+                    <!-- Generation Bar (Checkbox + Action Button) -->
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-gray-100">
+                        <label class="inline-flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer select-none" title="Wipes existing timetable and generates a completely fresh schedule from scratch">
+                            <input type="checkbox" name="regenerate_all" value="1" checked class="rounded border-gray-300 text-[#668054] focus:ring-[#668054] w-4 h-4 cursor-pointer">
+                            <span class="font-semibold text-gray-800">Fresh Regeneration</span>
+                            <span class="text-gray-500 font-normal hidden sm:inline">(clears partial conflicts and places 100% of exams cleanly)</span>
+                        </label>
+                        <button type="submit"
+                                class="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-[#668054] hover:bg-[#526843] text-white text-xs sm:text-sm font-bold shadow-xs transition-all hover:shadow active:scale-[0.99] cursor-pointer">
+                            <i class="fa-solid fa-bolt text-yellow-300"></i> Generate Schedule
+                        </button>
+                    </div>
+                </form>
+
+                <!-- TIER 2: TIMETABLE TOOLS, FILTERS & EXPORTS -->
+                <div class="mt-5 pt-5 border-t border-gray-200">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <!-- Left: Table Filters (Institute & Section) -->
+                        <div class="flex items-center gap-2.5 flex-wrap">
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-7 h-7 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center text-xs">
+                                    <i class="fa-solid fa-filter"></i>
+                                </span>
+                                <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">Filter View:</span>
+                            </div>
+                            <!-- Institute Filter -->
+                            <select id="viewFilterInstitute" onchange="applyScheduleViewFilters()"
+                                    class="h-9 border border-gray-300 rounded-xl px-2.5 text-xs font-medium text-gray-800 bg-white hover:border-gray-400 focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none shadow-xs w-44 transition-all"
+                                    title="Filter active timetable display by institute">
                                 <option value="">All Institutes</option>
                                 {% for inst in institutes %}
-                                <option value="{{ inst.id }}">{{ inst.name }}</option>
+                                <option value="{{ inst.id }}" {% if filter_inst_id and filter_inst_id|string == inst.id|string %}selected{% endif %}>{{ inst.name }}</option>
                                 {% endfor %}
                             </select>
-                        </div>
-                        <div class="flex items-center self-end pb-2">
-                            <label class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer" title="Wipes existing timetable and generates a completely fresh schedule from scratch">
-                                <input type="checkbox" name="regenerate_all" value="1" checked class="rounded border-gray-300 text-[#668054] focus:ring-[#668054] w-4 h-4">
-                                <span>Fresh Regeneration</span>
-                            </label>
-                        </div>
-                        <button type="submit"
-                                class="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-[#668054] text-white text-sm font-semibold hover:bg-[#4b5e3d] transition-colors shadow-sm">
-                            <i class="fa-solid fa-bolt"></i> Generate Schedule
-                        </button>
-                    </form>
-
-
-
-
-                    <!-- Action buttons -->
-                    <div class="flex gap-2 flex-wrap items-center">
-                        <form action="/admin/print_section" method="GET" target="_blank" class="flex gap-2 items-center mr-2">
-                            <select name="section" required class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none shadow-sm w-48" title="Select Section to Print">
-                                <option value="">Select Section to Print...</option>
+                            <!-- Section Filter -->
+                            <select id="viewFilterSection" onchange="applyScheduleViewFilters()"
+                                    class="h-9 border border-gray-300 rounded-xl px-2.5 text-xs font-medium text-gray-800 bg-white hover:border-gray-400 focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none shadow-xs w-44 transition-all"
+                                    title="Filter active timetable display by section">
+                                <option value="">All Sections (Master)</option>
                                 {% for s in all_sections %}
-                                <option value="{{ s }}">{{ s }}</option>
+                                <option value="{{ s }}" {% if filter_section == s %}selected{% endif %}>{{ s }}</option>
                                 {% endfor %}
                             </select>
-                            <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-sm">
-                                <i class="fa-solid fa-list"></i> Print List
+                            <button id="viewFilterResetBtn" type="button" onclick="resetScheduleViewFilters()"
+                                    class="{% if not filter_inst_id and not filter_section %}hidden{% endif %} text-xs text-red-600 hover:text-red-800 font-semibold px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 transition-colors inline-flex items-center gap-1 border border-red-200 cursor-pointer"
+                                    title="Reset all view filters">
+                                <i class="fa-solid fa-times text-xs"></i> Reset
                             </button>
-                        </form>
-                        
-                        <a href="/admin/batch_print_sections" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm mr-2">
-                            <i class="fa-solid fa-layer-group"></i> Batch Print Grid (All Sections)
-                        </a>
+                        </div>
 
-                        <select onchange="window.location.href='/schedule?section=' + encodeURIComponent(this.value)" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#668054] focus:border-[#668054] outline-none shadow-sm w-40" title="Filter by Section">
-                            <option value="">All Sections</option>
-                            {% for s in all_sections %}
-                            <option value="{{ s }}" {% if filter_section == s %}selected{% endif %}>{{ s }}</option>
-                            {% endfor %}
-                        </select>
-                        <button onclick="window.print()"
-                                class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                            <i class="fa-solid fa-print"></i> Print
-                        </button>
-                        <a href="/export/schedule.pdf"
-                           class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm">
-                            <i class="fa-solid fa-file-pdf"></i> Export PDF
-                        </a>
-                        <a href="/admin/archives"
-                           class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-sm" title="View Historical Exam Archives">
-                            <i class="fa-solid fa-box-archive text-[#668054]"></i> Archives
-                        </a>
-                        <form id="resetScheduleForm" method="POST" action="/reset_schedule" class="inline">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                            <input type="hidden" name="archive_before_reset" value="1">
-                        {% if pending_reset_request %}
-                            <button type="button" class="inline-flex items-center gap-2 px-4 py-2 border border-amber-300 rounded-lg text-sm font-medium text-amber-800 bg-amber-50 cursor-not-allowed opacity-90 shadow-xs" title="A schedule reset request is currently pending Super Admin authorization" disabled>
-                                <i class="fa-solid fa-clock-rotate-left text-amber-600"></i> Reset Pending
+                        <!-- Right: Print, Export & Admin Actions -->
+                        <div class="flex flex-wrap items-center gap-2">
+                            <!-- Section Exam Slip Print Form -->
+                            <form action="/admin/print_section" method="GET" target="_blank" class="inline-flex items-center gap-1.5">
+                                <select name="section" required
+                                        class="h-9 border border-gray-300 rounded-xl px-3 text-xs font-medium text-gray-800 bg-white hover:border-gray-400 focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none shadow-xs w-44 transition-all"
+                                        title="Select section to print timetable slip">
+                                    <option value="">Select Section Slip...</option>
+                                    {% for s in all_sections %}
+                                    <option value="{{ s }}">{{ s }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="submit"
+                                        class="h-9 inline-flex items-center gap-1.5 px-3 rounded-xl border border-gray-300 text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-xs hover:border-gray-400 cursor-pointer"
+                                        title="Print selected section exam schedule list">
+                                    <i class="fa-solid fa-print text-gray-500"></i> Print Slip
+                                </button>
+                            </form>
+
+                            <span class="hidden xl:inline-block w-px h-5 bg-gray-200 my-auto mx-0.5"></span>
+
+                            <!-- Batch Print Grid -->
+                            <a href="/admin/batch_print_sections" target="_blank"
+                               class="h-9 inline-flex items-center gap-1.5 px-3 rounded-xl bg-blue-50 border border-blue-200 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors shadow-xs"
+                                title="Batch print multi-page grid timetable for all sections">
+                                <i class="fa-solid fa-layer-group text-blue-600"></i> Batch Grid
+                            </a>
+
+                            <!-- Export Master PDF -->
+                            <a href="/export/schedule.pdf"
+                               class="h-9 inline-flex items-center gap-1.5 px-3 rounded-xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700 hover:bg-red-100 transition-colors shadow-xs"
+                                title="Export official Master Schedule PDF">
+                                <i class="fa-solid fa-file-pdf text-red-600"></i> Export PDF
+                            </a>
+
+                            <!-- Quick Browser Print -->
+                            <button onclick="window.print()"
+                                    class="h-9 inline-flex items-center gap-1.5 px-3 rounded-xl border border-gray-300 text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-xs hover:border-gray-400 cursor-pointer"
+                                    title="Quick print active screen view">
+                                <i class="fa-solid fa-desktop text-gray-500"></i> Quick Print
                             </button>
-                        {% elif session.get('is_super_admin') %}
-                            <button type="button" onclick="confirmResetSchedule()"
-                                    class="inline-flex items-center gap-2 px-4 py-2 border border-red-300 rounded-lg text-sm font-medium text-red-600 bg-white hover:bg-red-50 transition-colors shadow-xs" title="Super Admin Direct Master Reset">
-                                <i class="fa-solid fa-rotate-left"></i> Reset Schedule
-                            </button>
-                        {% else %}
-                            <button type="button" onclick="openRequestResetModal()"
-                                    class="inline-flex items-center gap-2 px-4 py-2 border border-amber-300 rounded-lg text-sm font-medium text-amber-800 bg-white hover:bg-amber-50 transition-colors shadow-xs" title="Submit a schedule reset request for Super Admin authorization">
-                                <i class="fa-solid fa-rotate-left text-amber-600"></i> Request Reset
-                            </button>
-                        {% endif %}
-                        </form>
+
+                            <!-- Archives -->
+                            <a href="/admin/archives"
+                               class="h-9 inline-flex items-center gap-1.5 px-3 rounded-xl border border-gray-300 text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-xs hover:border-gray-400"
+                               title="View Historical Exam Archives">
+                                <i class="fa-solid fa-box-archive text-[#668054]"></i> Archives
+                            </a>
+
+                            <!-- Reset Schedule Form -->
+                            <form id="resetScheduleForm" method="POST" action="/reset_schedule" class="inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <input type="hidden" name="archive_before_reset" value="1">
+                                {% if pending_reset_request %}
+                                <button type="button" class="h-9 inline-flex items-center gap-1.5 px-3 rounded-xl border border-amber-300 text-xs font-semibold text-amber-800 bg-amber-50 cursor-not-allowed opacity-90 shadow-xs" title="A schedule reset request is currently pending Super Admin authorization" disabled>
+                                    <i class="fa-solid fa-clock-rotate-left text-amber-600"></i> Reset Pending
+                                </button>
+                                {% elif session.get('is_super_admin') %}
+                                <button type="button" onclick="confirmResetSchedule()"
+                                        class="h-9 inline-flex items-center gap-1.5 px-3 rounded-xl border border-red-200 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 transition-colors shadow-xs cursor-pointer" title="Super Admin Direct Master Reset">
+                                    <i class="fa-solid fa-rotate-left text-red-500"></i> Reset Schedule
+                                </button>
+                                {% else %}
+                                <button type="button" onclick="openRequestResetModal()"
+                                        class="h-9 inline-flex items-center gap-1.5 px-3 rounded-xl border border-amber-300 text-xs font-medium text-amber-800 bg-white hover:bg-amber-50 transition-colors shadow-xs cursor-pointer" title="Submit a schedule reset request for Super Admin authorization">
+                                    <i class="fa-solid fa-rotate-left text-amber-600"></i> Request Reset
+                                </button>
+                                {% endif %}
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Pending Schedule Reset Request Banner (Four-Eyes Approval Rule) -->
             {% if pending_reset_request %}
-            <div class="no-print mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-sm text-amber-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div class="no-print rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm text-amber-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div class="flex items-start sm:items-center gap-3.5">
-                    <div class="w-11 h-11 rounded-xl flex items-center justify-center text-xl shadow-xs flex-shrink-0 bg-amber-500 text-white">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-xs flex-shrink-0 bg-amber-500 text-white">
                         <i class="fa-solid fa-shield-halved"></i>
                     </div>
                     <div>
@@ -790,115 +947,6 @@
             </div>
             {% endif %}
 
-            <!-- Publication Status Banner & Controls -->
-            {% if sched_count and sched_count > 0 %}
-            <div class="no-print mb-6 rounded-xl border p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 {% if is_published %}bg-emerald-50 border-emerald-300 text-emerald-950{% else %}bg-amber-50 border-amber-300 text-amber-950{% endif %}">
-                <div class="flex items-center gap-3.5">
-                    <div class="w-11 h-11 rounded-xl flex items-center justify-center text-xl shadow-xs flex-shrink-0 {% if is_published %}bg-emerald-600 text-white{% else %}bg-amber-500 text-white{% endif %}">
-                        <i class="fa-solid {% if is_published %}fa-bullhorn{% else %}fa-lock{% endif %}"></i>
-                    </div>
-                    <div>
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <h3 class="text-sm font-bold">
-                                {% if is_published %}
-                                    Schedule Status: Official & Published
-                                {% else %}
-                                    Schedule Status: Draft (In-Review)
-                                {% endif %}
-                            </h3>
-                            <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full {% if is_published %}bg-emerald-200 text-emerald-800 border border-emerald-300{% else %}bg-amber-200 text-amber-800 border border-amber-300{% endif %}">
-                                {% if is_published %}
-                                    <i class="fa-solid fa-circle-check mr-1 text-[10px]"></i> Live for Students & Faculty
-                                {% else %}
-                                    <i class="fa-solid fa-eye-slash mr-1 text-[10px]"></i> Admin-Only Draft
-                                {% endif %}
-                            </span>
-                        </div>
-                        <p class="text-xs mt-0.5 {% if is_published %}text-emerald-800{% else %}text-amber-800{% endif %}">
-                            {% if is_published %}
-                                The timetable has been finalized and published. Students can view personal schedules, and proctoring assignments are officially dispatched.
-                            {% else %}
-                                This schedule is currently hidden from Students, Faculty Proctors, and Secretaries. Review and audit the timetable before publishing.
-                            {% endif %}
-                        </p>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2 self-end sm:self-auto flex-shrink-0">
-                    {% if not is_published %}
-                    <button type="button" onclick="openPublishModal()"
-                            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-sm cursor-pointer hover:shadow">
-                        <i class="fa-solid fa-paper-plane"></i> Finalize & Publish Timetable
-                    </button>
-                    {% else %}
-                    <button type="button" onclick="openUnpublishModal()"
-                            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-amber-300 text-amber-900 bg-white hover:bg-amber-100 text-xs font-semibold transition-colors shadow-xs cursor-pointer">
-                        <i class="fa-solid fa-rotate-left text-amber-600"></i> Revert to Draft
-                    </button>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Stats strip -->
-            <div class="no-print grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-                <!-- SCHEDULED CARD -->
-                <div onclick="openInspectorModal('scheduledInspectorModal')"
-                     class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-[#668054] transition-all group"
-                     title="Click to inspect scheduled exams summary">
-                    <div class="flex items-center justify-between">
-                        <p class="text-xs text-gray-500 uppercase tracking-wide font-medium group-hover:text-[#668054] transition-colors">Scheduled</p>
-                        <i class="fa-solid fa-calendar-check text-gray-400 group-hover:text-[#668054] text-xs transition-colors"></i>
-                    </div>
-                    <p class="text-2xl font-bold text-[#668054] mt-1">{{ sched_count }} <span class="text-lg text-gray-400 font-normal">/ {{ total }}</span></p>
-                    <span class="text-[11px] text-gray-400 group-hover:text-[#668054] transition-colors inline-flex items-center gap-1 mt-1">
-                        <i class="fa-solid fa-eye text-[10px]"></i> Click to inspect summary
-                    </span>
-                </div>
-
-                <!-- UNSCHEDULED CARD -->
-                <div onclick="openInspectorModal('unscheduledInspectorModal')"
-                     class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 cursor-pointer hover:shadow-md {% if unscheduled|length > 0 %}hover:border-red-400{% else %}hover:border-emerald-500{% endif %} transition-all group"
-                     title="Click to inspect unscheduled exams">
-                    <div class="flex items-center justify-between">
-                        <p class="text-xs text-gray-500 uppercase tracking-wide font-medium {% if unscheduled|length > 0 %}group-hover:text-red-500{% else %}group-hover:text-emerald-600{% endif %} transition-colors">Unscheduled</p>
-                        <i class="fa-solid {% if unscheduled|length > 0 %}fa-circle-exclamation text-red-500{% else %}fa-circle-check text-emerald-500{% endif %} text-xs transition-colors"></i>
-                    </div>
-                    <p class="text-2xl font-bold {% if unscheduled|length > 0 %}text-red-500{% else %}text-gray-400{% endif %} mt-1">{{ unscheduled|length }}</p>
-                    <span class="text-[11px] text-gray-400 {% if unscheduled|length > 0 %}group-hover:text-red-500{% else %}group-hover:text-emerald-600{% endif %} transition-colors inline-flex items-center gap-1 mt-1">
-                        {% if unscheduled|length > 0 %}
-                        <i class="fa-solid fa-up-right-from-square text-[10px] text-red-500"></i> View {{ unscheduled|length }} unscheduled
-                        {% else %}
-                        <i class="fa-solid fa-circle-check text-[10px] text-emerald-600"></i> 0 unscheduled &bull; click to view
-                        {% endif %}
-                    </span>
-                </div>
-
-                <!-- CONFLICTS CARD -->
-                <div onclick="openInspectorModal('conflictsInspectorModal')"
-                     class="bg-white rounded-xl border shadow-sm p-4 transition-all cursor-pointer hover:shadow-md group {% if conflict_audit.total_conflicts_count > 0 %}border-red-300 bg-red-50/20 hover:border-red-500{% else %}border-gray-200 hover:border-emerald-500{% endif %}"
-                     title="Click to inspect conflict report">
-                    <div class="flex items-center justify-between">
-                        <p class="text-xs text-gray-500 uppercase tracking-wide font-medium group-hover:text-gray-700 transition-colors">Conflicts</p>
-                        <i class="fa-solid fa-shield-halved {% if conflict_audit.total_conflicts_count > 0 %}text-red-500{% else %}text-emerald-500{% endif %} text-xs transition-colors"></i>
-                    </div>
-                    <p class="text-2xl font-bold {% if conflict_audit.total_conflicts_count > 0 %}text-red-500{% else %}text-emerald-600{% endif %} mt-1">
-                        {{ conflict_audit.total_conflicts_count }}
-                        {% if conflict_audit.total_conflicts_count > 0 %}
-                        <span class="text-xs font-normal text-red-500 ml-1"><i class="fa-solid fa-up-right-from-square mr-0.5"></i>inspect</span>
-                        {% else %}
-                        <span class="text-xs font-normal text-emerald-600 ml-1"><i class="fa-solid fa-check mr-0.5"></i>clean</span>
-                        {% endif %}
-                    </p>
-                    <span class="text-[11px] text-gray-400 group-hover:text-gray-600 transition-colors inline-flex items-center gap-1 mt-1">
-                        {% if conflict_audit.total_conflicts_count > 0 %}
-                        <span class="text-red-600"><i class="fa-solid fa-triangle-exclamation text-[10px] mr-1"></i>{{ conflict_audit.total_conflicts_count }} conflict(s) &bull; click to view</span>
-                        {% else %}
-                        <span class="text-emerald-600"><i class="fa-solid fa-circle-check text-[10px] mr-1"></i>0 conflicts &bull; click to view</span>
-                        {% endif %}
-                    </span>
-                </div>
-            </div>
-
             <!-- ══════ TIMETABLE GRID ══════ -->
             <div id="scheduledSection" class="scroll-mt-20">
             {% if dates and times %}
@@ -917,18 +965,36 @@
                         <h1>MASTER EXAM SCHEDULE</h1>
                         <p>{{ exam_term }} Examination</p>
                         <p>{{ exam_semester }}, School Year: 2025-2026</p>
-                        {% if filter_section %}
-                        <p style="margin-top:5px; font-size:16px; color:#111;"><strong>Section: {{ filter_section }}</strong></p>
-                        {% endif %}
+                        <p id="printSectionLabel" style="margin-top:5px; font-size:16px; color:#111; {% if not filter_section %}display:none;{% endif %}">
+                            <strong>Section: {{ filter_section }}</strong>
+                        </p>
                     </div>
                 </div>
             </div>
             
                         
 
-            <div class="timetable-wrapper mb-8">
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden mb-8">
+                <!-- Timetable Card Header -->
+                <div class="no-print px-5 py-3.5 bg-gray-50/80 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-7 h-7 rounded-lg bg-[#668054]/10 text-[#668054] flex items-center justify-center text-xs font-bold">
+                            <i class="fa-solid fa-table-cells"></i>
+                        </span>
+                        <div>
+                            <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Active Master Timetable</h3>
+                            <p id="activeTimetableSubtitle" class="text-[11px] text-gray-500">
+                                Full campus master view &bull; {{ dates|length }} days &bull; {{ sched_count }} scheduled sessions
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[11px] text-gray-500 hidden sm:inline"><i class="fa-solid fa-mouse-pointer mr-1"></i>Click any card to modify assignment</span>
+                    </div>
+                </div>
 
-                <div class="overflow-x-auto w-full"><table class="timetable">
+                <div class="timetable-wrapper border-0 rounded-none shadow-none overflow-hidden">
+                    <div class="overflow-x-auto overflow-y-auto max-h-[700px] w-full table-scroll-container"><table class="timetable">
                     <thead>
                         <tr>
                             <th class="time-col"><i class="fa-regular fa-clock mr-1"></i> Time</th>
@@ -939,7 +1005,7 @@
                     </thead>
                     <tbody>
                         {% for t in times %}
-                        <tr>
+                        <tr class="timetable-timeslot-row">
                             <td class="time-cell">{{ time_labels.get(t, t) if time_labels else t }}</td>
                             {% for d in dates %}
                             <td>
@@ -947,6 +1013,8 @@
                                 {% if cell_exams %}
                                     {% for exam in cell_exams %}
                                     <div class="exam-card {% if exam.id in conflict_ids %}conflict{% endif %}"
+                                         data-section="{{ exam.section|trim }}"
+                                         data-institute-id="{{ exam.institute_id or '' }}"
                                          onclick="openEditScheduleModal('{{ exam.id }}','{{ exam.datetime_raw }}','{{ exam.room_id }}','{{ exam.instructor_id }}','{{ (exam.duration_minutes / 60) | round(1) }}','{{ exam.subject_name | e }}','{{ exam.section | e }}')">
                                         <div class="subject">
                                             {{ exam.subject_name }}
@@ -1063,14 +1131,26 @@
                             {% endfor %}
                         </tr>
                         {% endfor %}
+                        <tr id="timetableNoMatchesRow" class="hidden">
+                            <td colspan="{{ dates|length + 1 }}" class="py-12 text-center text-gray-500">
+                                <div class="w-12 h-12 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center mx-auto mb-2 text-lg">
+                                    <i class="fa-solid fa-filter-circle-xmark"></i>
+                                </div>
+                                <p class="text-xs font-semibold text-gray-700">No scheduled examinations found matching the selected filter.</p>
+                                <button type="button" onclick="resetScheduleViewFilters()" class="mt-2 text-xs text-[#668054] hover:underline font-bold cursor-pointer">Clear Filter</button>
+                            </td>
+                        </tr>
                     </tbody>
                 </table></div>
+                </div>
             </div>
             {% else %}
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-16 text-center text-gray-400 mb-8">
-                <i class="fa-regular fa-calendar-xmark text-5xl mb-4 block text-gray-300"></i>
-                <p class="text-lg font-medium text-gray-500">No scheduled exams yet</p>
-                <p class="text-sm mt-1">Set an exam period above and click <strong>Generate Schedule</strong> to auto-assign exams to time slots.</p>
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-xs p-12 sm:p-16 text-center text-gray-400 mb-8">
+                <div class="w-16 h-16 rounded-full bg-gray-100 border border-gray-200 text-gray-400 flex items-center justify-center text-2xl mx-auto mb-3">
+                    <i class="fa-regular fa-calendar-xmark"></i>
+                </div>
+                <h4 class="text-base font-bold text-gray-800">No scheduled exams yet</h4>
+                <p class="text-xs text-gray-500 mt-1 max-w-sm mx-auto">Set an examination period above and click <strong>Generate Schedule</strong> to automatically assign dates, rooms, and proctors.</p>
             </div>
             {% endif %}
             </div><!-- /#scheduledSection -->
@@ -1081,15 +1161,15 @@
     <!-- ══════ Edit / Assign Schedule Modal ══════ -->
     <div id="editScheduleModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
         <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 bg-gray-900 bg-opacity-50 transition-opacity" onclick="closeModal('editScheduleModal')"></div>
+            <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-xs transition-opacity" onclick="closeModal('editScheduleModal')"></div>
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-            <div class="relative inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="relative inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-gray-100">
                 <!-- Header -->
-                <div class="bg-[#668054] px-6 py-4 flex items-center justify-between">
+                <div class="bg-gradient-to-r from-[#668054] to-[#4e6340] px-6 py-4 flex items-center justify-between">
                     <h3 class="text-base font-semibold text-white flex items-center gap-2">
                         <i class="fa-solid fa-calendar-pen"></i> Edit Exam Schedule
                     </h3>
-                    <button onclick="closeModal('editScheduleModal')" class="text-white/70 hover:text-white">
+                    <button onclick="closeModal('editScheduleModal')" class="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
                         <i class="fa-solid fa-xmark text-lg"></i>
                     </button>
                 </div>
@@ -1217,11 +1297,11 @@
     <!-- ══════ Availability & Schedule Inspector Modal ══════ -->
     <div id="availabilityModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
         <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 bg-gray-900 bg-opacity-50 transition-opacity" onclick="closeModal('availabilityModal')"></div>
+            <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-xs transition-opacity" onclick="closeModal('availabilityModal')"></div>
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-            <div class="relative inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+            <div class="relative inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-gray-100">
                 <!-- Header -->
-                <div class="bg-[#668054] px-6 py-4 flex items-center justify-between text-white">
+                <div class="bg-gradient-to-r from-[#668054] to-[#4e6340] px-6 py-4 flex items-center justify-between text-white">
                     <div class="flex items-center gap-3">
                         <div id="avail_icon_box" class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-lg">
                             <i id="avail_header_icon" class="fa-solid fa-clock"></i>
@@ -1525,6 +1605,17 @@
             list.classList.toggle('hidden');
             chevron.style.transform = list.classList.contains('hidden') ? '' : 'rotate(180deg)';
         }
+
+        /* ── Exam period guidelines modal ──────────────────────── */
+        function openExamNoticeModal() {
+            const modal = document.getElementById('examNoticeModal');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeExamNoticeModal() {
+            const modal = document.getElementById('examNoticeModal');
+            if (modal) modal.classList.add('hidden');
+        }
     
         function showSaveConfirmation() {
             // Check if Sync All is checked to give a stronger warning
@@ -1620,18 +1711,102 @@
 
 
 
+    <!-- EXAM SCHEDULING GUIDELINES MODAL -->
+    <div id="examNoticeModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs transition-opacity duration-200" onclick="closeExamNoticeModal()">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all border border-gray-100" onclick="event.stopPropagation()">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-[#668054] to-[#4b5e3d] px-6 py-4 flex items-center justify-between text-white">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white text-lg shadow-xs">
+                        <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold leading-tight">Exam Scheduling Guidelines</h3>
+                        <p class="text-xs text-white/80">Best practices for generating a 100% conflict-free timetable</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeExamNoticeModal()" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition-colors cursor-pointer" title="Close">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div class="p-6 space-y-3.5 text-xs text-gray-700 leading-relaxed">
+                <!-- Bullet 1: Exam Period Window -->
+                <div class="flex items-start gap-3 p-3 rounded-xl bg-gray-50/80 border border-gray-100">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <i class="fa-solid fa-calendar-days text-sm"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-900 text-xs mb-0.5">Exam Period Window</h4>
+                        <p class="text-gray-600">
+                            Set at least <strong>5 to 6 examination days</strong> (e.g., <strong>Oct 26 – Oct 31, 2026</strong> from <strong>07:00 to 20:00</strong>) to comfortably fit all ~1,000 exams without slot exhaustion.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Bullet 2: Student Workload Policy -->
+                <div class="flex items-start gap-3 p-3 rounded-xl bg-gray-50/80 border border-gray-100">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <i class="fa-solid fa-graduation-cap text-sm"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-900 text-xs mb-0.5">Student Workload Policy</h4>
+                        <p class="text-gray-600">
+                            Maximum <strong>2 Major exams per day</strong> per section (with fallback to 3), plus a <strong>mandatory 1-hour rest break</strong> between every exam.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Bullet 3: Proctor Duty & Welfare -->
+                <div class="flex items-start gap-3 p-3 rounded-xl bg-gray-50/80 border border-gray-100">
+                    <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <i class="fa-solid fa-user-tie text-sm"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-900 text-xs mb-0.5">Proctor Duty &amp; Welfare</h4>
+                        <p class="text-gray-600">
+                            Maximum <strong>3 consecutive duty hours</strong> without a break, a soft daily target of <strong>4.0 hours/day</strong>, with duties balanced equally across faculty.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Bullet 4: Fresh Regeneration -->
+                <div class="flex items-start gap-3 p-3 rounded-xl bg-gray-50/80 border border-gray-100">
+                    <div class="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <i class="fa-solid fa-bolt text-sm"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-900 text-xs mb-0.5">Fresh Regeneration (Recommended)</h4>
+                        <p class="text-gray-600">
+                            Keep checked when generating. It wipes previous partial drafts to guarantee <strong>100% placement with zero collisions</strong>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="px-6 py-3.5 bg-gray-50 border-t border-gray-100 flex items-center justify-end">
+                <button type="button" onclick="closeExamNoticeModal()" 
+                        class="px-5 py-2 rounded-lg bg-[#668054] hover:bg-[#526843] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer">
+                    <i class="fa-solid fa-check mr-1.5"></i> Got it
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- SAVE CONFIRMATION MODAL -->
-    <div id="saveConfirmModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all">
+    <div id="saveConfirmModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all border border-gray-100">
             <div class="p-6 text-center">
-                <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto mb-4">
+                <div class="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-4 border border-blue-100 shadow-2xs">
                     <i class="fa-solid fa-circle-question text-xl"></i>
                 </div>
-                <h3 class="text-lg font-bold text-gray-900 mb-2">Confirm Changes</h3>
-                <p id="saveConfirmText" class="text-sm text-gray-500 mb-6">Are you sure you want to save these schedule changes?</p>
-                <div class="flex gap-3 justify-center">
-                    <button type="button" onclick="document.getElementById('saveConfirmModal').classList.add('hidden')" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50">Cancel</button>
-                    <button type="button" onclick="document.getElementById('editScheduleForm').submit()" class="px-4 py-2 bg-[#668054] text-white rounded-lg text-sm font-medium hover:bg-[#526643]">Yes, Save</button>
+                <h3 class="text-base font-bold text-gray-900 mb-1.5">Confirm Changes</h3>
+                <p id="saveConfirmText" class="text-xs text-gray-500 mb-5 leading-relaxed">Are you sure you want to save these schedule changes?</p>
+                <div class="flex gap-2.5 justify-center">
+                    <button type="button" onclick="document.getElementById('saveConfirmModal').classList.add('hidden')" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 cursor-pointer transition-colors shadow-2xs">Cancel</button>
+                    <button type="button" onclick="document.getElementById('editScheduleForm').submit()" class="px-5 py-2 bg-[#668054] hover:bg-[#526843] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95">Yes, Save</button>
                 </div>
             </div>
         </div>
@@ -2197,7 +2372,7 @@
                         <span class="text-xs font-extrabold text-[#668054]">{{ pct }}% Scheduled</span>
                     </div>
                     <div class="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                        <div class="h-full bg-[#668054] rounded-full transition-all" style="width: {{ pct }}%"></div>
+                        <div class="h-full bg-[#668054] rounded-full transition-all" data-width="{{ pct }}%" style="width: 0%;"></div>
                     </div>
                     <div class="grid grid-cols-3 gap-3 mt-4 text-center">
                         <div class="bg-white rounded-lg border border-gray-200 p-2.5">
@@ -2299,7 +2474,7 @@
                 </div>
 
                 <!-- Scrollable Table -->
-                <div class="border border-red-200 rounded-xl overflow-hidden max-h-[55vh] overflow-y-auto">
+                <div class="border border-red-200 rounded-xl overflow-x-auto overflow-y-auto max-h-[55vh]">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-red-50 sticky top-0 z-10">
                             <tr>
@@ -2448,9 +2623,9 @@
                         <span>The following scheduled exams have conflicts. Click <strong>Edit</strong> to reassign the room, proctor, or time slot, or click <strong>Auto-Resolve Conflicts</strong> to fix them automatically.</span>
                         <span class="px-2 py-0.5 rounded-full bg-orange-200/80 text-orange-900 font-bold whitespace-nowrap">{{ conflict_ids|length }} Exam(s)</span>
                     </div>
-                    <div class="overflow-x-auto w-full">
+                    <div class="overflow-x-auto overflow-y-auto max-h-[500px] w-full">
                         <table class="min-w-full divide-y divide-gray-100 text-xs">
-                            <thead class="bg-gray-50">
+                            <thead class="bg-gray-50 sticky top-0 z-10 shadow-2xs">
                                 <tr>
                                     <th class="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wider">Subject &amp; Section</th>
                                     <th class="px-4 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wider">Date &amp; Time</th>
@@ -2640,6 +2815,120 @@
 
 
     <script>
+        function applyScheduleViewFilters() {
+            const instEl = document.getElementById('viewFilterInstitute');
+            const secEl  = document.getElementById('viewFilterSection');
+            const resetBtn = document.getElementById('viewFilterResetBtn');
+            const printSec = document.getElementById('printSectionLabel');
+            const inst = instEl ? instEl.value.trim() : '';
+            const sec  = secEl ? secEl.value.trim() : '';
+            const isFiltered = Boolean(inst || sec);
+
+            // Update URL without triggering a page reload
+            try {
+                const params = new URLSearchParams(window.location.search);
+                if (inst) params.set('institute_id', inst); else params.delete('institute_id');
+                if (sec)  params.set('section', sec); else params.delete('section');
+                const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+                window.history.replaceState({}, '', newUrl);
+            } catch (e) {}
+
+            // Filter individual exam cards
+            let visibleCount = 0;
+            const cards = document.querySelectorAll('.timetable .exam-card');
+            cards.forEach(card => {
+                const cardSec = (card.getAttribute('data-section') || '').trim();
+                const cardInst = (card.getAttribute('data-institute-id') || '').trim();
+
+                let match = true;
+                if (sec && cardSec !== sec) match = false;
+                if (inst && cardInst !== inst) match = false;
+
+                if (match) {
+                    card.style.display = '';
+                    visibleCount++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+
+            // Adjust timeslot rows: if a row has zero visible exam cards during an active filter, hide it
+            const rows = document.querySelectorAll('.timetable-timeslot-row');
+            rows.forEach(row => {
+                if (!isFiltered) {
+                    row.style.display = '';
+                } else {
+                    const rowCards = row.querySelectorAll('.exam-card');
+                    let hasVisible = false;
+                    for (let i = 0; i < rowCards.length; i++) {
+                        if (rowCards[i].style.display !== 'none') {
+                            hasVisible = true;
+                            break;
+                        }
+                    }
+                    row.style.display = hasVisible ? '' : 'none';
+                }
+            });
+
+            // Handle no matches empty state
+            const noMatchRow = document.getElementById('timetableNoMatchesRow');
+            if (noMatchRow) {
+                if (isFiltered && visibleCount === 0) {
+                    noMatchRow.classList.remove('hidden');
+                } else {
+                    noMatchRow.classList.add('hidden');
+                }
+            }
+
+            // Update reset button
+            if (resetBtn) {
+                if (isFiltered) resetBtn.classList.remove('hidden');
+                else resetBtn.classList.add('hidden');
+            }
+
+            // Update print section header
+            if (printSec) {
+                if (sec) {
+                    printSec.innerHTML = '<strong>Section: ' + sec + '</strong>';
+                    printSec.style.display = 'block';
+                } else {
+                    printSec.style.display = 'none';
+                }
+            }
+
+            // Update active timetable subtitle
+            const subEl = document.getElementById('activeTimetableSubtitle');
+            if (subEl) {
+                if (isFiltered) {
+                    const parts = [];
+                    if (sec) parts.push('Section: <strong class="text-gray-800">' + sec + '</strong>');
+                    if (inst && instEl.selectedIndex >= 0) {
+                        const instText = instEl.options[instEl.selectedIndex].text;
+                        parts.push('Institute: <strong class="text-gray-800">' + instText + '</strong>');
+                    }
+                    subEl.innerHTML = 'Showing ' + visibleCount + ' session(s) &bull; Filtering ' + parts.join(' &bull; ');
+                } else {
+                    subEl.innerHTML = 'Full campus master view &bull; {{ dates|length }} days &bull; {{ sched_count }} scheduled sessions';
+                }
+            }
+        }
+
+        function resetScheduleViewFilters() {
+            const instEl = document.getElementById('viewFilterInstitute');
+            const secEl  = document.getElementById('viewFilterSection');
+            if (instEl) instEl.value = '';
+            if (secEl)  secEl.value = '';
+            applyScheduleViewFilters();
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const instEl = document.getElementById('viewFilterInstitute');
+            const secEl  = document.getElementById('viewFilterSection');
+            if ((instEl && instEl.value) || (secEl && secEl.value)) {
+                applyScheduleViewFilters();
+            }
+        });
+
         function openInspectorModal(modalId) {
             const modal = document.getElementById(modalId);
             if (modal) {

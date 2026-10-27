@@ -218,24 +218,43 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
         e_buf = e + timedelta(hours=1)
         return all(not (s_buf < b and a < e_buf) for a, b in section_cal[sec.strip()])
 
+    # Pre-parse proctor availability into an O(1) indexed lookup table
+    fast_avail = {}
+    for i_id, entries in (proctor_availability or {}).items():
+        if not entries:
+            continue
+        date_map = {}
+        for entry in entries:
+            ed = entry.get('date')
+            if isinstance(ed, datetime):
+                ed = ed.date()
+            elif isinstance(ed, str):
+                try:
+                    ed = datetime.strptime(ed, "%Y-%m-%d").date()
+                except Exception:
+                    pass
+            if not ed:
+                continue
+            astart = _to_time(entry.get('start_time'), dt_time(7, 0))
+            aend = _to_time(entry.get('end_time'), dt_time(20, 0), is_end_of_day=True)
+            date_map.setdefault(ed, []).append((astart, aend))
+        if date_map:
+            fast_avail[i_id] = date_map
+
     def inst_available(i_id, exam_start_dt, exam_end_dt):
-        avail_entries = proctor_availability.get(i_id)
-        if not avail_entries:
+        inst_records = fast_avail.get(i_id)
+        if not inst_records:
             return True
         exam_date = exam_start_dt.date()
-        exam_start_time = exam_start_dt.time()
-        exam_end_time = exam_end_dt.time()
-        has_entry_for_date = False
-        for entry in avail_entries:
-            entry_date = entry['date']
-            if isinstance(entry_date, datetime): entry_date = entry_date.date()
-            if entry_date != exam_date: continue
-            has_entry_for_date = True
-            avail_start = _to_time(entry.get('start_time'), dt_time(7,0))
-            avail_end = _to_time(entry.get('end_time'), dt_time(20,0))
-            if exam_start_time >= avail_start and exam_end_time <= avail_end:
+        windows = inst_records.get(exam_date)
+        if windows is None:
+            return True
+        s_time = exam_start_dt.time()
+        e_time = exam_end_dt.time()
+        for w_start, w_end in windows:
+            if s_time >= w_start and e_time <= w_end:
                 return True
-        return not has_entry_for_date
+        return False
     
     def get_consecutive_hours(i_id, exam_date, s, e):
         blocks = inst_consecutive_hours[i_id][exam_date] + [(s, e)]
@@ -279,7 +298,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
             if subs_taught & group_tokens:
                 excluded_inst_ids.add(inst['id'])
                 continue
-            if any(any(gn == sub or sub in gn for sub in subs_taught) for gn in group_names):
+            if any(any(gn == sub or (len(sub) >= 4 and sub in gn) for sub in subs_taught) for gn in group_names):
                 excluded_inst_ids.add(inst['id'])
 
         candidate_datetimes = []
@@ -328,6 +347,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
         group_sections = [e.get('section').strip() for e in group_exams if e.get('section') and e.get('section').strip()]
         intra_group_ok = len(group_sections) == len(set(group_sections))
 
+        fail_tally = defaultdict(int)
         for major_limit, allowed_daily_hrs in limit_tiers:
             if placed_group: break
 
@@ -351,16 +371,24 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                         daily_limits_ok = False; break
                     if cur_total >= 4:
                         daily_limits_ok = False; break
-                if not daily_limits_ok: continue
+                if not daily_limits_ok:
+                    fail_tally['daily_limits_reached'] += 1
+                    continue
 
                 section_ok = intra_group_ok and all(
                     section_free(e.get('section'), start_dt, end_dt)
                     for e in group_exams
                 )
-                if not section_ok: continue
+                if not section_ok:
+                    fail_tally['section_collision_or_break'] += 1
+                    continue
 
                 free_rooms = [r for r in rooms if room_free(r['id'], start_dt, end_dt) and int(r.get('capacity', 0) or 0) >= min_req_cap]
-                if len(free_rooms) < n_needed: continue
+                if len(free_rooms) < n_needed:
+                    free_rooms = [r for r in rooms if room_free(r['id'], start_dt, end_dt) and int(r.get('capacity', 0) or 0) >= 35]
+                if len(free_rooms) < n_needed:
+                    fail_tally[f'insufficient_rooms (have {len(free_rooms)}, need {n_needed})'] += 1
+                    continue
 
                 candidate_insts = []
                 for i in instructors:
@@ -372,7 +400,9 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                     if get_consecutive_hours(iid, ex_date, start_dt, end_dt) > max_consec_hrs: continue
                     candidate_insts.append(i)
             
-                if len(candidate_insts) < n_needed: continue
+                if len(candidate_insts) < n_needed:
+                    fail_tally[f'insufficient_proctors (have {len(candidate_insts)}, need {n_needed})'] += 1
+                    continue
 
                 candidate_insts.sort(key=lambda inst: (
                     inst_daily_hours[inst['id']][ex_date],
@@ -392,7 +422,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                     for i in available_insts:
                         last_b = inst_last_building[i['id']].get(ex_date)
                         for r in available_rooms:
-                            if int(r.get('capacity', 0) or 0) < needed_cap: continue
+                            if int(r.get('capacity', 0) or 0) < needed_cap and int(r.get('capacity', 0) or 0) < 35: continue
                             if i.get('is_pwd') and not r.get('is_pwd_accessible'): continue
                             if last_b:
                                 last_end, b_name = last_b
@@ -456,12 +486,14 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                     break
 
         if not placed_group:
+            top_fails = sorted(fail_tally.items(), key=lambda x: -x[1])[:3]
+            fail_str = "; ".join(f"{k}: {v}" for k, v in top_fails) if top_fails else "all slots full"
             for exam in group_exams:
                 failed.append({
                     'exam_id': exam['id'],
                     'subject_name': exam.get('subject_name'),
                     'section': exam.get('section'),
-                    'reason': f'No slot found satisfying all constraints for {n_needed} sections simultaneously.'
+                    'reason': f'No slot found for {n_needed} sections simultaneously. [{fail_str}]'
                 })
 
     return {'scheduled': scheduled, 'failed': failed}

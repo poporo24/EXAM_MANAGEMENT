@@ -613,6 +613,11 @@ def dashboard():
     settings        = get_system_settings()
     unread          = _get_unread(session['user_id'])
     pending_count   = len(get_pending_users())
+    p_start, p_end  = get_exam_period()
+    term_tuple      = get_exam_term()
+    exam_term       = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
+    exam_semester   = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
+    is_published    = is_schedule_published()
     return render_template("dashboard.html",
                            stats=stats, exams=exams,
                            rooms=rooms, instructors=instructors,
@@ -620,7 +625,12 @@ def dashboard():
                            upcoming_exams=upcoming_exams,
                            settings=settings,
                            unread_count=unread,
-                           pending_count=pending_count)
+                           pending_count=pending_count,
+                           period_start=p_start,
+                           period_end=p_end,
+                           exam_term=exam_term,
+                           exam_semester=exam_semester,
+                           is_published=is_published)
 
 # â”€â”€ ADD ROUTES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -707,7 +717,7 @@ def delete_room_route(id):
     if guard: return guard
     err = delete_room(id)
     if err:
-        flash(f"Could not delete room: {err}", "danger")
+        flash("Could not delete room. Please verify it is not in use.", "danger")
     else:
         flash("Room deleted successfully.", "success")
     return redirect(url_for('dashboard') + '#rooms')
@@ -769,7 +779,7 @@ def remove_instructor(id):
     if guard: return guard
     err = delete_instructor(id)
     if err:
-        flash(f"Could not delete instructor: {err}", "danger")
+        flash("Could not delete instructor. Please verify they are not assigned to active exams.", "danger")
     else:
         flash("Instructor deleted successfully.", "success")
     return redirect(url_for('faculty_page'))
@@ -879,12 +889,15 @@ def generate_schedule():
     # Ensure all exams and subjects have consistent CCA institute assignments before scheduling
     sync_exam_and_subject_institutes()
 
+    raw_institute_id = request.form.get("institute_id", "").strip()
+    target_institute_id = int(raw_institute_id) if raw_institute_id and raw_institute_id.isdigit() else None
+
     if request.form.get("regenerate_all"):
-        reset_schedule()
-        booked = []
-        pending = get_pending_exams()
+        reset_schedule(institute_id=target_institute_id)
+        booked = get_already_scheduled_slots() if target_institute_id else []
+        pending = get_pending_exams(institute_id=target_institute_id)
     else:
-        pending     = get_pending_exams()
+        pending     = get_pending_exams(institute_id=target_institute_id)
         booked      = get_already_scheduled_slots()
 
     rooms       = get_all_rooms()
@@ -899,8 +912,11 @@ def generate_schedule():
         flash(" No active instructors found.", "warning")
         return redirect(url_for('schedule_view'))
     if not pending:
-        flash("All exams are already scheduled. Check 'Fresh Regeneration' to wipe and recreate a fresh schedule from scratch.", "info")
-        return redirect(url_for('schedule_view'))
+        if target_institute_id:
+            flash("All exams for the selected institute are already scheduled. Check 'Fresh Regeneration' to wipe and reschedule them.", "info")
+        else:
+            flash("All exams are already scheduled. Check 'Fresh Regeneration' to wipe and recreate a fresh schedule from scratch.", "info")
+        return redirect(url_for('schedule_view', institute_id=target_institute_id) if target_institute_id else url_for('schedule_view'))
 
     result = run_scheduler(
         pending_exams=pending,
@@ -931,9 +947,19 @@ def generate_schedule():
     # to prevent spamming proctors with tentative assignments. Official notifications
     # are dispatched in a single batch only when 'Finalize & Publish Timetable' is executed.
 
-    flash(f" Scheduled {len(result['scheduled'])} exam(s). "
+    inst_label = ""
+    if target_institute_id:
+        try:
+            for inst in get_all_institutes():
+                if inst.get('id') == target_institute_id:
+                    inst_label = f" for {inst.get('name')}"
+                    break
+        except Exception:
+            pass
+
+    flash(f" Scheduled {len(result['scheduled'])} exam(s){inst_label}. "
           f"{len(result['failed'])} could not be placed.", "success")
-    return redirect(url_for('schedule_view'))
+    return redirect(url_for('schedule_view', institute_id=target_institute_id) if target_institute_id else url_for('schedule_view'))
 
 @app.route("/reset_schedule", methods=["POST"])
 def reset_schedule_route():
@@ -1398,6 +1424,184 @@ def resolve_conflicts_route():
         
     return redirect(url_for('schedule_view'))
 
+@app.route("/api/audit_scheduler_live", methods=["GET"])
+def api_audit_scheduler_live():
+    guard = require_super_admin()
+    if guard: return guard
+    # Diagnostic endpoint for live server verification
+    from system.scheduler import run_scheduler, _to_time
+    from datetime import date, time as dt_time, timedelta
+    settings = get_system_settings()
+    rooms = get_all_rooms()
+    instructors = get_active_instructors()
+    proctor_av = get_proctor_availability()
+    
+    test_all = request.args.get('test_all', '0') == '1'
+    if test_all:
+        db = open_db()
+        cur = db.cursor(dictionary=True)
+        cur.execute("""
+            SELECT e.*, s.content_group_id, s.code AS subject_code, s.name AS subject_catalog_name,
+                   COALESCE(inst.capacity_default, 40) AS institute_capacity_default,
+                   COALESCE(u_cnt.stu_cnt, 0) AS section_student_count
+            FROM exams e
+            LEFT JOIN subjects s ON e.subject_id = s.id
+            LEFT JOIN institutes inst ON e.institute_id = inst.id
+            LEFT JOIN (
+                SELECT section, COUNT(*) AS stu_cnt
+                FROM users
+                WHERE role = 'student' AND section IS NOT NULL
+                GROUP BY section
+            ) u_cnt ON u_cnt.section = e.section
+        """)
+        pending = cur.fetchall()
+        db.close()
+    else:
+        pending = get_pending_exams()
+        if not pending:
+            db = open_db()
+            cur = db.cursor(dictionary=True)
+            cur.execute("""
+                SELECT e.*, s.content_group_id, s.code AS subject_code, s.name AS subject_catalog_name,
+                       COALESCE(inst.capacity_default, 40) AS institute_capacity_default,
+                       COALESCE(u_cnt.stu_cnt, 0) AS section_student_count
+                FROM exams e
+                LEFT JOIN subjects s ON e.subject_id = s.id
+                LEFT JOIN institutes inst ON e.institute_id = inst.id
+                LEFT JOIN (
+                    SELECT section, COUNT(*) AS stu_cnt
+                    FROM users
+                    WHERE role = 'student' AND section IS NOT NULL
+                    GROUP BY section
+                ) u_cnt ON u_cnt.section = e.section
+            """)
+            pending = cur.fetchall()
+            db.close()
+    
+    p_start, p_end = get_exam_period()
+    if not p_start or not p_end:
+        p_start = date(2026, 11, 2)
+        p_end = date(2026, 11, 7)
+    
+    # Custom dates from query params if given
+    if request.args.get('start'):
+        try: p_start = date.fromisoformat(request.args.get('start'))
+        except Exception: pass
+    if request.args.get('end'):
+        try: p_end = date.fromisoformat(request.args.get('end'))
+        except Exception: pass
+
+    # Diagnose XOBLICO group specifically
+    x_exams = [e for e in pending if 'XOBLICO' in (e.get('subject_name') or '')]
+
+    res = run_scheduler(
+        pending_exams=list(pending),
+        rooms=rooms,
+        instructors=instructors,
+        booked_slots=[],
+        period_start=p_start,
+        period_end=p_end,
+        proctor_availability=proctor_av,
+        settings=settings
+    )
+
+    from collections import Counter
+    sched_times = Counter(s['exam_date_time'].strftime('%H:%M') for s in res.get('scheduled', []))
+    
+    # Check proctor availability sample
+    sample_av = {}
+    for iid, entries in list(proctor_av.items())[:3]:
+        sample_av[iid] = [{'date': str(e.get('date')), 'start': str(e.get('start_time')), 'end': str(e.get('end_time'))} for e in entries[:2]]
+
+    return jsonify({
+        'code_version': 'audit-diagnostic-v6',
+        'status': 'success',
+        'test_all': test_all,
+        'period_start': str(p_start),
+        'period_end': str(p_end),
+        'day_start_raw': str(settings.get('day_start')),
+        'day_end_raw': str(settings.get('day_end')),
+        'parsed_day_start': str(_to_time(settings.get('day_start'), dt_time(7,0))),
+        'parsed_day_end': str(_to_time(settings.get('day_end'), dt_time(20,0), is_end_of_day=True)),
+        'total_exams_input': len(pending),
+        'active_rooms': len(rooms),
+        'active_instructors': len(instructors),
+        'proctor_availability_count': len(proctor_av),
+        'sample_proctor_availability': sample_av,
+        'xoblico_count': len(x_exams),
+        'xoblico_sample': [{k: str(v) for k, v in e.items() if k in ('id', 'subject_name', 'section', 'duration_minutes', 'subject_type', 'content_group_id', 'subject_id')} for e in x_exams[:3]],
+        'scheduled_count': len(res.get('scheduled', [])),
+        'failed_count': len(res.get('failed', [])),
+        'scheduled_start_times': dict(sorted(sched_times.items())),
+        'first_3_failures': res.get('failed', [])[:3]
+    })
+
+@app.route("/api/db_diagnostic", methods=["GET"])
+def api_db_diagnostic():
+    guard = require_super_admin()
+    if guard: return guard
+    from system.database import audit_schedule_conflicts
+    db = open_db()
+    cur = db.cursor(dictionary=True)
+    cur.execute('SELECT subject_type, duration_minutes, COUNT(*) as cnt FROM exams GROUP BY subject_type, duration_minutes')
+    exam_groups = cur.fetchall()
+    cur.execute('SELECT COUNT(*) as cnt FROM rooms')
+    rooms_cnt = cur.fetchone()['cnt']
+    cur.execute('SELECT MIN(capacity) as min_c, MAX(capacity) as max_c, COUNT(*) as zero_cap FROM rooms WHERE capacity IS NULL OR capacity <= 0')
+    rooms_cap = cur.fetchone()
+    cur.execute('SELECT COUNT(*) as cnt FROM instructors')
+    inst_cnt = cur.fetchone()['cnt']
+    cur.execute('SELECT COUNT(*) as cnt FROM proctor_availability')
+    avail_cnt = cur.fetchone()['cnt']
+    cur.execute('SELECT MIN(available_date) as min_d, MAX(available_date) as max_d, MIN(start_time) as min_s, MAX(end_time) as max_e FROM proctor_availability')
+    avail_stats = {k: str(v) for k, v in cur.fetchone().items()}
+    cur.execute('SELECT COUNT(*) as cnt, COUNT(DISTINCT section) as sections_cnt FROM users WHERE role="student"')
+    stu_stats = cur.fetchone()
+    cur.execute('SELECT * FROM system_settings WHERE id=1')
+    raw_settings = cur.fetchone() or {}
+    settings = {}
+    for k, v in raw_settings.items():
+        if k in ('smtp_password', 'smtp_user'):
+            settings[k] = '********' if v else ''
+        else:
+            settings[k] = str(v) if v is not None else ''
+    cur.execute('SELECT status, COUNT(*) as cnt FROM exams GROUP BY status')
+    exam_statuses = cur.fetchall()
+    cur.execute('SELECT COUNT(*) as null_rooms FROM exams WHERE room_id IS NULL AND status="Scheduled"')
+    null_rooms = cur.fetchone()['null_rooms']
+    cur.execute('SELECT COUNT(*) as null_insts FROM exams WHERE instructor_id IS NULL AND status="Scheduled"')
+    null_insts = cur.fetchone()['null_insts']
+    db.close()
+    
+    audit = audit_schedule_conflicts()
+    
+    return jsonify({
+        'exam_groups': exam_groups,
+        'exam_statuses': exam_statuses,
+        'null_rooms': null_rooms,
+        'null_insts': null_insts,
+        'rooms_cnt': rooms_cnt,
+        'rooms_cap': rooms_cap,
+        'inst_cnt': inst_cnt,
+        'avail_cnt': avail_cnt,
+        'avail_stats': avail_stats,
+        'stu_stats': stu_stats,
+        'settings': settings,
+        'audit_summary': {
+            'is_clean': audit.get('is_clean'),
+            'total_exams': audit.get('total_exams'),
+            'total_conflicts_count': audit.get('total_conflicts_count'),
+            'room_conflicts': len(audit.get('room_conflicts', [])),
+            'proctor_conflicts': len(audit.get('proctor_conflicts', [])),
+            'section_conflicts': len(audit.get('section_conflicts', [])),
+            'break_conflicts': len(audit.get('break_conflicts', [])),
+            'subject_conflicts': len(audit.get('subject_conflicts', [])),
+            'integrity_conflicts': len(audit.get('integrity_conflicts', [])),
+            'sample_room_conflict': audit.get('room_conflicts', [])[:2],
+            'sample_section_conflict': audit.get('section_conflicts', [])[:2]
+        }
+    })
+
 @app.route("/schedule")
 def schedule_view():
     guard = require_role('admin')
@@ -1447,9 +1651,7 @@ def schedule_view():
     # Unique sections for dropdown filter
     all_sections = sorted(list(set(e.get('section', '').strip() for e in all_exams if e.get('section', '').strip())))
     filter_section = request.args.get('section', '').strip()
-
-    if filter_section:
-        scheduled_exams = [e for e in scheduled_exams if e.get('section', '').strip() == filter_section]
+    filter_inst_id = request.args.get('institute_id', '').strip()
 
     # Build timetable grid: unique sorted dates (columns) and time slots (rows)
     dates_set = sorted(set(e['_date_str'] for e in scheduled_exams))
@@ -1492,6 +1694,7 @@ def schedule_view():
                            unread_count=unread,
                            all_sections=all_sections,
                            filter_section=filter_section,
+                           filter_inst_id=filter_inst_id,
                            exam_term=get_exam_term()[0],
                            exam_semester=get_exam_term()[1],
                            period_start=p_start,
@@ -1687,7 +1890,7 @@ def add_institute_route():
         request.form.get("capacity_default", 50)
     )
     if err:
-        flash(f"Error: {err}", "danger")
+        flash("An error occurred while adding the institute.", "danger")
     else:
         flash("Institute added.", "success")
     return redirect(url_for('institutes_page'))
@@ -1710,7 +1913,7 @@ def delete_institute_route(id):
     if guard: return guard
     err = delete_institute(id)
     if err:
-        flash(f"Cannot delete: {err}", "danger")
+        flash("Cannot delete institute. Please verify no courses or faculty are assigned to it.", "danger")
     else:
         flash("Institute deleted.", "success")
     return redirect(url_for('institutes_page'))
@@ -1811,7 +2014,7 @@ def delete_subject_route(id):
     if guard: return guard
     err = delete_subject(id)
     if err:
-        flash(f"Cannot delete: {err}", "danger")
+        flash("Cannot delete subject. Please verify no active exams are assigned to it.", "danger")
     else:
         flash("Subject deleted.", "success")
     return redirect(url_for('subjects_page'))
@@ -2290,9 +2493,10 @@ def reports_page():
     if guard: return guard
     date_from = request.args.get('from', '')
     date_to   = request.args.get('to', '')
+    active_tab = request.args.get('tab', '')
     absence   = get_proctor_absence_report(date_from or None, date_to or None)
     assignment = get_assignment_report()
-    scheduling = get_scheduling_report()
+    scheduling = get_scheduling_report(date_from or None, date_to or None)
     unread     = _get_unread(session['user_id'])
 
     term_tuple = get_exam_term()
@@ -2308,6 +2512,7 @@ def reports_page():
                            assignment_report=assignment,
                            scheduling_report=scheduling,
                            date_from=date_from, date_to=date_to,
+                           active_tab=active_tab,
                            exam_term=exam_term,
                            exam_semester=exam_semester,
                            prepared_by=prepared_by,
@@ -2644,7 +2849,7 @@ def admin_change_password(user_id):
             db.commit()
             flash(f" Password changed for {user['full_name']}.", "success")
         except Exception as e:
-            flash(f"Error: {e}", "danger")
+            flash("An error occurred while updating the password.", "danger")
         finally:
             db.close()
     return redirect(url_for(redirect_to))
@@ -2683,7 +2888,7 @@ def admin_reset_password(user_id):
             log_audit_event('USER_PASSWORD_RESET', f"Admin reset password for user ID {user_id} ({user['full_name']})", user_id=session.get('user_id'), user_name=session.get('full_name'), user_role=session.get('role'), ip_address=request.remote_addr)
             flash(f"Password for {user['full_name']} has been reset to temporary password: '{default_pw}'. Please provide this to the user.", "success")
         except Exception as e:
-            flash(f"Error resetting password: {e}", "danger")
+            flash("An error occurred while resetting password.", "danger")
         finally:
             db.close()
     return redirect(url_for(redirect_to))
@@ -2756,7 +2961,7 @@ def admin_edit_student(user_id):
             )
             flash(f"Student '{student['full_name']}' updated successfully. Section is now '{new_section or 'None'}'.", "success")
         except Exception as e:
-            flash(f"Error updating student: {e}", "danger")
+            flash("An error occurred while updating student record.", "danger")
         finally:
             db.close()
     return redirect(url_for(redirect_to))
@@ -2775,7 +2980,7 @@ def admin_reject_student(id):
     if guard: return guard
     err = delete_user(id)
     if err:
-        flash(f"Could not reject: {err}", "danger")
+        flash("Could not reject student record.", "danger")
     else:
         flash("Student registration rejected and removed.", "success")
     return redirect(url_for('students_page'))
@@ -2835,7 +3040,7 @@ def students_bulk_action():
                 db.commit()
                 flash(f"Secure randomized temporary passwords generated for {len(students)} student(s).", "success")
             except Exception as e:
-                flash(f"Error resetting passwords: {e}", "danger")
+                flash("An error occurred while resetting passwords.", "danger")
             finally:
                 db.close()
     else:
@@ -2884,7 +3089,7 @@ def reject_student_route(id):
     if guard: return guard
     err = delete_user(id)
     if err:
-        flash(f"Could not reject: {err}", "danger")
+        flash("Could not reject student record.", "danger")
     else:
         log_audit_event('STUDENT_REJECTED',
             f"Super Admin {session.get('full_name')} rejected student registration ID #{id}.",
@@ -2999,7 +3204,7 @@ def super_update_email():
                 db.commit()
                 flash("Superadmin email has been successfully updated! Password resets will now go to this new address.", "success")
         except Exception as e:
-            flash(f"Error: {e}", "danger")
+            flash("An error occurred while updating email.", "danger")
         finally:
             db.close()
     return redirect(url_for('super_admin_page'))
@@ -3196,6 +3401,103 @@ def proctor_dashboard():
                            unread_count=unread,
                            prepared_by=prepared_by,
                            is_published=is_pub)
+
+@app.route("/proctor/availability")
+def proctor_availability():
+    guard = require_role('proctor')
+    if guard: return guard
+    
+    instructor_id = session.get('instructor_id')
+    saved_dates = get_proctor_availability_for(instructor_id) if instructor_id else []
+    period_start, period_end = get_exam_period()
+    is_pub = is_schedule_published()
+    exams = get_proctor_exams(instructor_id) if (instructor_id and is_pub) else []
+    total_hours = get_proctor_total_hours(instructor_id) if (instructor_id and is_pub) else 0.0
+    
+    for exam in exams:
+        dt = exam.get('exam_date_time')
+        if not dt: continue
+        if isinstance(dt, str):
+            try:
+                dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+            except Exception:
+                pass
+        if isinstance(dt, datetime):
+            dur = int(exam.get('duration_minutes') or 60)
+            end_dt = dt + timedelta(minutes=dur)
+            exam['date_iso'] = dt.strftime("%Y-%m-%d")
+            exam['time'] = dt.strftime("%I:%M %p")
+            exam['time_end'] = end_dt.strftime("%I:%M %p")
+            exam['time_range'] = f"{exam['time']} - {exam['time_end']}"
+
+    term_tuple = get_exam_term()
+    exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
+    exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
+    
+    full_name = session.get('full_name', 'Faculty Proctor')
+    
+    proctor_institute_name = session.get('institute_name', '')
+    proctor_institute_code = session.get('institute_code', '')
+    if not proctor_institute_name or not proctor_institute_code:
+        db = open_db()
+        if db:
+            try:
+                c = db.cursor(dictionary=True)
+                c.execute("""
+                    SELECT inst.name AS institute_name, inst.code AS institute_code
+                    FROM users u
+                    LEFT JOIN instructors i ON u.instructor_id = i.id
+                    LEFT JOIN institutes inst ON COALESCE(i.institute_id, u.institute_id) = inst.id
+                    WHERE u.id = %s
+                """, (session['user_id'],))
+                inst_row = c.fetchone()
+                if inst_row:
+                    proctor_institute_name = inst_row.get('institute_name') or ''
+                    proctor_institute_code = inst_row.get('institute_code') or ''
+                    session['institute_name'] = proctor_institute_name
+                    session['institute_code'] = proctor_institute_code
+            finally:
+                db.close()
+                
+    unread = _get_unread(session['user_id'])
+    
+    formatted_saved_dates = []
+    for slot in saved_dates:
+        s_raw = slot.get('start_time', '07:00')
+        e_raw = slot.get('end_time', '20:00')
+        def _fmt_time(t_str):
+            try:
+                parts = str(t_str).split(':')
+                h = int(parts[0])
+                m = int(parts[1]) if len(parts) > 1 else 0
+                dt_tmp = datetime(2000, 1, 1, h, m)
+                return dt_tmp.strftime("%I:%M %p")
+            except Exception:
+                return str(t_str)
+        formatted_saved_dates.append({
+            'date': slot.get('date'),
+            'start_time': slot.get('start_time'),
+            'end_time': slot.get('end_time'),
+            'start_time_fmt': _fmt_time(s_raw),
+            'end_time_fmt': _fmt_time(e_raw),
+            'time_range_fmt': f"{_fmt_time(s_raw)} - {_fmt_time(e_raw)}"
+        })
+    
+    return render_template(
+        "proctor_availability.html",
+        full_name=full_name,
+        proctor_institute_name=proctor_institute_name,
+        proctor_institute_code=proctor_institute_code,
+        exam_term=exam_term,
+        exam_semester=exam_semester,
+        saved_dates=formatted_saved_dates,
+        period_start=str(period_start) if period_start else '',
+        period_end=str(period_end) if period_end else '',
+        exams=exams,
+        total_hours=total_hours,
+        unread_count=unread,
+        is_published=is_pub
+    )
 
 @app.route("/proctor/schedule.pdf")
 def export_proctor_schedule_pdf_route():
@@ -3902,7 +4204,7 @@ def update_my_profile():
             )
             flash("Your account profile has been updated successfully.", "success")
         except Exception as e:
-            flash(f"Error updating account: {e}", "danger")
+            flash("An error occurred while updating account profile.", "danger")
         finally:
             db.close()
     return get_redirect()

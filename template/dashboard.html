@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Admin Dashboard - CCA Exam Management System">
-    <title>Dashboard - Admin</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Admin Dashboard - CCA Exam Management</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
         (function() {
             try {
@@ -33,10 +34,13 @@
         .overflow-x-auto::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
         .overflow-x-auto::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .overflow-x-auto::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-    </style>
 
-    <style>
-                /* Mobile & Tablet Responsive Overrides */
+        .table-scroll-container::-webkit-scrollbar { width: 6px; height: 6px; }
+        .table-scroll-container::-webkit-scrollbar-track { background: #f8fafc; border-radius: 4px; }
+        .table-scroll-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .table-scroll-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Mobile & Tablet Responsive Overrides */
         @media screen and (max-width: 1023px) {
             #main-content {
                 margin-left: 0 !important;
@@ -57,631 +61,790 @@
                 font-size: 16px !important;
             }
         }
-    
-        /* Print Styles - Print ONLY the Table */
-        @media print {
-            @page {
-                size: auto;
-                margin: 10mm 12mm 10mm 12mm;
-            }
-
-            /* 1. Universal Screen UI suppression */
-            #sidebar, header, nav, aside, .no-print,
-            button, input, select, textarea,
-            .search-bar, [id*="Toolbar"], [id*="toolbar"],
-            [id*="ActionBar"], [id*="actionBar"], [id*="action-bar"],
-            [id*="Modal"], [id*="modal"],
-            .stats-container, .stats-card, .stats-grid,
-            .tab-buttons, .tab-nav,
-            .bg-green-50, .bg-amber-50, .alert, .pagination,
-            th:has(input[type="checkbox"]), td:has(input[type="checkbox"]),
-            th.col-checkbox, td.col-checkbox,
-            th.w-10, td.w-10,
-            th.print-hide, td.print-hide,
-            th[class*="sticky right-0"], td[class*="sticky right-0"] {
-                display: none !important;
-            }
-
-            /* 2. Reset page dimensions for clean document printing */
-            html, body {
-                background: #ffffff !important;
-                color: #000000 !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                width: 100% !important;
-                overflow: visible !important;
-                font-size: 9pt !important;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
-            }
-            #main-content {
-                margin: 0 !important;
-                padding: 0 !important;
-                width: 100% !important;
-                max-width: 100% !important;
-            }
-            .overflow-x-auto {
-                overflow: visible !important;
-                display: block !important;
-            }
-            .bg-white, .shadow-sm, .rounded-xl, .border {
-                box-shadow: none !important;
-                border: none !important;
-                border-radius: 0 !important;
-                background: transparent !important;
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-
-            /* 3. Reveal official print-only header */
-            .print-header-block {
-                display: block !important;
-                margin-bottom: 12px !important;
-                padding-bottom: 8px !important;
-                border-bottom: 2px solid #0f172a !important;
-            }
-
-            /* 4. Clean, high-contrast printable table formatting */
-            table {
-                display: table !important;
-                width: 100% !important;
-                border-collapse: collapse !important;
-                border: 1px solid #334155 !important;
-                margin: 0 !important;
-            }
-            thead {
-                display: table-header-group !important;
-            }
-            tbody {
-                display: table-row-group !important;
-            }
-            tr {
-                display: table-row !important;
-                page-break-inside: avoid !important;
-            }
-            th {
-                display: table-cell !important;
-                background-color: #f1f5f9 !important;
-                color: #0f172a !important;
-                border: 1px solid #64748b !important;
-                padding: 6px 8px !important;
-                font-size: 8.5pt !important;
-                font-weight: 700 !important;
-                text-align: left !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-            td {
-                display: table-cell !important;
-                border: 1px solid #94a3b8 !important;
-                padding: 5px 8px !important;
-                font-size: 8pt !important;
-                color: #0f172a !important;
-                background: #ffffff !important;
-            }
-        }
     </style>
-
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            // Automatically wrap all tables to make them horizontally scrollable on small screens
-            document.querySelectorAll("table").forEach(function(table) {
-                if (!table.parentElement.classList.contains("overflow-x-auto")) {
-                    const wrapper = document.createElement("div");
-                    wrapper.className = "overflow-x-auto w-full";
-                    table.parentNode.insertBefore(wrapper, table);
-                    wrapper.appendChild(table);
-                }
-            });
-        });
-    </script>
 </head>
-<body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
+<body class="bg-[#f8faf9] text-gray-800 min-h-screen flex">
 
     <!-- Sidebar -->
     {% set active_page = 'dashboard' %}
     {% include 'admin_sidebar.html' %}
 
     <!-- Main Content -->
-    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen">
-        <!-- Top header -->
-        <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 z-10 sticky top-0">
-            <h1 class="text-xl font-semibold text-gray-800">Admin Dashboard</h1>
+    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen pb-16">
+        <!-- Top Sticky Header -->
+        <header class="bg-white/90 backdrop-blur-md border-b border-gray-200/80 h-16 flex items-center justify-between px-6 sm:px-8 z-20 sticky top-0 transition-all">
+            <div class="flex items-center gap-3">
+                <span class="w-8 h-8 rounded-lg bg-[#668054]/10 text-[#668054] flex items-center justify-center text-sm font-bold shadow-xs">
+                    <i class="fa-solid fa-chart-pie"></i>
+                </span>
+                <div>
+                    <h1 class="text-base sm:text-lg font-bold text-gray-900 leading-tight">Admin Operations Dashboard</h1>
+                    <p class="text-[11px] text-gray-500 hidden sm:block">Real-time scheduling metrics, curriculum load, and facility management</p>
+                </div>
+            </div>
             
-            <div class="flex items-center gap-4">
-                <a href="/notifications" class="text-gray-500 hover:text-[#668054] relative">
-                    <i class="fa-regular fa-bell text-xl"></i>
+            <div class="flex items-center gap-3">
+                <!-- Notifications Shortcut -->
+                <a href="/notifications" class="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:text-[#668054] hover:border-[#668054]/40 hover:bg-[#668054]/5 transition-all relative" title="Notifications">
+                    <i class="fa-regular fa-bell text-base"></i>
                     {% if unread_count and unread_count > 0 %}
-                    <span class="absolute top-0 right-0 -mt-1 -mr-1 flex h-3 w-3">
+                    <span class="absolute top-1 right-1 flex h-2.5 w-2.5">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
                     </span>
                     {% endif %}
                 </a>
             </div>
         </header>
 
-        <div class="px-4 sm:px-6 lg:px-8 py-6">
+        <div class="px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6">
+
+            <!-- Flash Messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
-                    <div class="mb-6">
+                    <div class="space-y-2">
                         {% for category, message in messages %}
-                            <div class="p-4 rounded-md shadow-sm mb-2 {% if category == 'error' %}bg-red-50 text-red-700 border-l-4 border-red-500{% else %}bg-green-50 text-green-700 border-l-4 border-[#668054]{% endif %} flex justify-between items-center">
-                                <span>{{ message }}</span>
-                                <button onclick="this.parentElement.remove()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-times"></i></button>
+                            <div class="p-3.5 rounded-xl shadow-xs border text-xs sm:text-sm font-medium flex justify-between items-center transition-all animate-in fade-in duration-200
+                                {% if category in ['error', 'danger'] %}
+                                    bg-red-50 text-red-800 border-red-200
+                                {% elif category == 'warning' %}
+                                    bg-amber-50 text-amber-800 border-amber-200
+                                {% elif category == 'info' %}
+                                    bg-blue-50 text-blue-800 border-blue-200
+                                {% else %}
+                                    bg-emerald-50 text-emerald-800 border-emerald-200
+                                {% endif %}">
+                                <div class="flex items-center gap-2.5">
+                                    <i class="fa-solid {% if category in ['error', 'danger'] %}fa-circle-xmark text-red-500{% elif category == 'warning' %}fa-triangle-exclamation text-amber-500{% elif category == 'info' %}fa-circle-info text-blue-500{% else %}fa-circle-check text-emerald-500{% endif %} text-base"></i>
+                                    <span>{{ message }}</span>
+                                </div>
+                                <button onclick="this.parentElement.remove()" class="text-gray-400 hover:text-gray-600 p-1"><i class="fa-solid fa-times"></i></button>
                             </div>
                         {% endfor %}
                     </div>
                 {% endif %}
             {% endwith %}
 
-            <!-- Stats Row -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center">
-                    <div class="p-3 rounded-lg bg-blue-50 text-blue-600 mr-4">
-                        <i class="fa-solid fa-file-alt text-xl"></i>
+            <!-- Hero Welcome Card -->
+            <div class="bg-gradient-to-r from-white via-white to-[#668054]/5 rounded-2xl border border-gray-200 shadow-xs p-5 sm:p-6 transition-all hover:shadow-sm">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+                    <div class="space-y-1.5">
+                        <div class="flex items-center gap-3 flex-wrap">
+                            <h2 class="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
+                                Welcome back, <span class="text-[#668054]">{{ session.get('full_name', 'Administrator') }}</span>
+                            </h2>
+                            <button type="button" onclick="openAccountGuidelinesModal()" class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-[#3d5c2e] bg-[#eef3ec] hover:bg-[#d9e6d4] border border-[#d9e6d4] rounded-full transition-all cursor-pointer shadow-2xs active:scale-95" title="View Account Guidelines">
+                                <i class="fa-solid fa-circle-info text-[#668054]"></i>
+                                <span>Account Guide</span>
+                            </button>
+                        </div>
+                        <p class="text-xs sm:text-sm text-gray-600 max-w-3xl leading-relaxed">
+                            Monitor campus exam placement, detect scheduling bottlenecks, manage institutional curriculum, and configure proctor assignments from this unified command center.
+                        </p>
                     </div>
-                    <div>
-                        <p class="text-sm font-medium text-gray-500">Total Exams</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ stats.total_exams if stats else 0 }}</p>
-                    </div>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center">
-                    <div class="p-3 rounded-lg bg-green-50 text-green-600 mr-4">
-                        <i class="fa-solid fa-calendar-check text-xl"></i>
-                    </div>
-                    <div>
-                        <p class="text-sm font-medium text-gray-500">Scheduled</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ stats.scheduled if stats else 0 }}</p>
-                    </div>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center">
-                    <div class="p-3 rounded-lg bg-yellow-50 text-yellow-600 mr-4">
-                        <i class="fa-solid fa-clock text-xl"></i>
-                    </div>
-                    <div>
-                        <p class="text-sm font-medium text-gray-500">Pending</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ stats.pending if stats else 0 }}</p>
-                    </div>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center">
-                    <div class="p-3 rounded-lg bg-purple-50 text-purple-600 mr-4">
-                        <i class="fa-solid fa-door-open text-xl"></i>
-                    </div>
-                    <div>
-                        <p class="text-sm font-medium text-gray-500">Rooms</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ stats.rooms if stats else 0 }}</p>
-                    </div>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center">
-                    <div class="p-3 rounded-lg bg-orange-50 text-orange-600 mr-4">
-                        <i class="fa-solid fa-chalkboard-teacher text-xl"></i>
-                    </div>
-                    <div>
-                        <p class="text-sm font-medium text-gray-500">Instructors</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ stats.instructors if stats else 0 }}</p>
+
+                    <!-- Quick Shortcuts Action Group -->
+                    <div class="flex flex-wrap items-center gap-2.5 self-start lg:self-center">
+                        <button type="button" onclick="openModal('addExamModal')" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-gray-200 hover:border-gray-300 text-gray-800 text-xs font-semibold shadow-2xs hover:bg-gray-50 transition-all cursor-pointer">
+                            <i class="fa-solid fa-plus text-[#668054]"></i> Add Exam
+                        </button>
+                        <button type="button" onclick="openModal('importExamsModal')" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-gray-200 hover:border-gray-300 text-gray-800 text-xs font-semibold shadow-2xs hover:bg-gray-50 transition-all cursor-pointer">
+                            <i class="fa-solid fa-file-arrow-up text-blue-600"></i> Import CSV
+                        </button>
+                        <a href="/reports" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-gray-200 hover:border-gray-300 text-gray-800 text-xs font-semibold shadow-2xs hover:bg-gray-50 transition-all">
+                            <i class="fa-solid fa-file-lines text-indigo-600"></i> Reports
+                        </a>
+                        <a href="/schedule" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#668054] hover:bg-[#526843] text-white text-xs font-bold shadow-xs hover:shadow transition-all active:scale-95">
+                            <i class="fa-solid fa-calendar-days text-yellow-300"></i> Master Timetable
+                        </a>
                     </div>
                 </div>
             </div>
 
-            <!-- Tab Navigation -->
-            <div class="border-b border-gray-200 mb-6">
-                <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                    <button onclick="switchTab('dashboard-tab')" id="nav-dashboard-tab" class="tab-btn border-[#668054] text-[#668054] whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">Dashboard</button>
-                    <button onclick="switchTab('exams-tab')" id="nav-exams-tab" class="tab-btn border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">Exams</button>
-                    <button onclick="switchTab('rooms-tab')" id="nav-rooms-tab" class="tab-btn border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">Rooms</button>
-                    <button onclick="switchTab('instructors-tab')" id="nav-instructors-tab" class="tab-btn border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">Instructors</button>
-                </nav>
+            <!-- Key Metrics / Stats Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <!-- Total Exams -->
+                <div class="bg-white rounded-2xl border border-gray-200/90 shadow-xs p-5 relative overflow-hidden hover:border-blue-300 hover:shadow-sm transition-all group">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Exams</span>
+                        <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-sm group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-book-bookmark"></i>
+                        </div>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">{{ stats.total_exams if stats else 0 }}</span>
+                        <span class="text-[11px] font-medium text-gray-500">records</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2 truncate">Academic curriculum load</p>
+                    <div class="absolute bottom-0 left-0 right-0 h-1 bg-blue-500/20 group-hover:bg-blue-500 transition-colors"></div>
+                </div>
+
+                <!-- Scheduled Exams (With Progress) -->
+                <div class="bg-white rounded-2xl border border-gray-200/90 shadow-xs p-5 relative overflow-hidden hover:border-emerald-300 hover:shadow-sm transition-all group">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Scheduled</span>
+                        <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-calendar-check"></i>
+                        </div>
+                    </div>
+                    <div class="flex items-baseline justify-between">
+                        <span class="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">{{ stats.scheduled if stats else 0 }}</span>
+                        {% set sched_pct = ((stats.scheduled / stats.total_exams * 100)|round(1)) if (stats and stats.total_exams and stats.total_exams > 0) else 0 %}
+                        <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">{{ sched_pct }}%</span>
+                    </div>
+                    <!-- Mini Progress Bar -->
+                    <div class="w-full bg-gray-100 rounded-full h-1.5 mt-3 overflow-hidden">
+                        <div class="bg-emerald-500 h-1.5 rounded-full transition-all duration-500" data-width="{{ sched_pct }}%" style="width: 0%;"></div>
+                    </div>
+                    <div class="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500/20 group-hover:bg-emerald-500 transition-colors"></div>
+                </div>
+
+                <!-- Pending Exams -->
+                <div class="bg-white rounded-2xl border border-gray-200/90 shadow-xs p-5 relative overflow-hidden hover:border-amber-300 hover:shadow-sm transition-all group">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Pending</span>
+                        <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-sm group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                        </div>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">{{ stats.pending if stats else 0 }}</span>
+                        {% if stats and stats.pending and stats.pending > 0 %}
+                        <span class="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse">Unscheduled</span>
+                        {% else %}
+                        <span class="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">All clear</span>
+                        {% endif %}
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">Awaiting slot generation</p>
+                    <div class="absolute bottom-0 left-0 right-0 h-1 bg-amber-500/20 group-hover:bg-amber-500 transition-colors"></div>
+                </div>
+
+                <!-- Examination Rooms -->
+                <div class="bg-white rounded-2xl border border-gray-200/90 shadow-xs p-5 relative overflow-hidden hover:border-purple-300 hover:shadow-sm transition-all group">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Rooms</span>
+                        <div class="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-sm group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-door-open"></i>
+                        </div>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">{{ stats.rooms if stats else 0 }}</span>
+                        <span class="text-[11px] font-medium text-gray-500">venues</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2 truncate">Registered test facilities</p>
+                    <div class="absolute bottom-0 left-0 right-0 h-1 bg-purple-500/20 group-hover:bg-purple-500 transition-colors"></div>
+                </div>
+
+                <!-- Active Instructors -->
+                <div class="bg-white rounded-2xl border border-gray-200/90 shadow-xs p-5 relative overflow-hidden hover:border-orange-300 hover:shadow-sm transition-all group">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Faculty &amp; Proctors</span>
+                        <div class="w-9 h-9 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center text-sm group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-chalkboard-user"></i>
+                        </div>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">{{ stats.instructors if stats else 0 }}</span>
+                        <span class="text-[11px] font-medium text-gray-500">invigilators</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2 truncate">Duty pool available</p>
+                    <div class="absolute bottom-0 left-0 right-0 h-1 bg-orange-500/20 group-hover:bg-orange-500 transition-colors"></div>
+                </div>
             </div>
 
-            <!-- Tab Content: Dashboard -->
-            <div id="dashboard-tab" class="tab-content block">
-                <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
-                    <div class="no-print px-6 py-4 border-b border-gray-200 flex flex-wrap gap-3 justify-between items-center bg-gray-50">
-                        <div class="flex items-center gap-4 flex-wrap">
-                            <h2 class="font-semibold text-gray-800 text-lg">Upcoming Exams</h2>
-                            <div class="relative">
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fa-solid fa-search text-gray-400 text-sm"></i>
+            <!-- Segmented Modern Tab Navigation -->
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-2xs p-1.5 flex flex-wrap sm:flex-nowrap items-center gap-1.5">
+                <button onclick="switchTab('dashboard-tab')" id="nav-dashboard-tab"
+                        class="tab-btn flex-1 min-w-[120px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm transition-all cursor-pointer bg-[#668054] text-white shadow-xs">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Overview</span>
+                </button>
+                <button onclick="switchTab('exams-tab')" id="nav-exams-tab"
+                        class="tab-btn flex-1 min-w-[120px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all cursor-pointer">
+                    <i class="fa-solid fa-file-lines"></i>
+                    <span>All Exams</span>
+                    <span class="ml-1 text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 font-bold tab-count">{{ exams|length if exams else 0 }}</span>
+                </button>
+                <button onclick="switchTab('rooms-tab')" id="nav-rooms-tab"
+                        class="tab-btn flex-1 min-w-[120px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all cursor-pointer">
+                    <i class="fa-solid fa-door-open"></i>
+                    <span>Rooms</span>
+                    <span class="ml-1 text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 font-bold tab-count">{{ rooms|length if rooms else 0 }}</span>
+                </button>
+                <button onclick="switchTab('instructors-tab')" id="nav-instructors-tab"
+                        class="tab-btn flex-1 min-w-[120px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all cursor-pointer">
+                    <i class="fa-solid fa-user-tie"></i>
+                    <span>Instructors</span>
+                    <span class="ml-1 text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 font-bold tab-count">{{ instructors|length if instructors else 0 }}</span>
+                </button>
+            </div>
+
+            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <!-- TAB 1: OVERVIEW DASHBOARD                                       -->
+            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <div id="dashboard-tab" class="tab-content block space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Left: Upcoming Exams Timetable (2 Columns) -->
+                    <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-100 flex flex-wrap gap-3 justify-between items-center bg-gray-50/50">
+                            <div>
+                                <h3 class="text-base font-bold text-gray-900">Upcoming Scheduled Examinations</h3>
+                                <p class="text-xs text-gray-500">Live placement order chronologically</p>
+                            </div>
+                            
+                            <!-- Search & Master Link -->
+                            <div class="flex items-center gap-3">
+                                <div class="relative">
+                                    <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                                    <input type="text" id="searchUpcomingExams" oninput="filterUpcomingExams()" placeholder="Search upcoming..."
+                                           class="w-48 sm:w-60 h-8 pl-8 pr-3 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none transition-all">
                                 </div>
-                                <input type="text" id="searchUpcomingExams" oninput="filterUpcomingExams()" onkeyup="filterUpcomingExams()" class="block w-64 pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#668054] focus:border-[#668054]" placeholder="Search upcoming exams...">
+                                <a href="/schedule" class="text-xs font-semibold text-[#668054] hover:text-[#526843] hover:underline inline-flex items-center gap-1">
+                                    Full Timetable &rarr;
+                                </a>
                             </div>
                         </div>
-                        <a href="/schedule" class="text-sm text-[#668054] font-medium hover:underline inline-flex items-center">View Full Schedule &rarr;</a>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table id="upcomingExamsTable" class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Subject</th>
-                                    <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date & Time</th>
-                                    <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Room</th>
-                                    <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                {% if upcoming_exams %}
-                                    {% for exam in upcoming_exams %}
-                                    <tr class="hover:bg-gray-50 upcoming-exam-row">
-                                        <td class="px-3.5 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">{{ exam.subject_name }} - {{ exam.section }}</td>
-                                        <td class="px-3.5 py-3 whitespace-nowrap text-xs text-gray-700">{{ exam.exam_date_time | exam_datetime_range(exam.duration_minutes) }}</td>
-                                        <td class="px-3.5 py-3 whitespace-nowrap text-xs text-gray-600">{{ exam.room_name }}</td>
-                                        <td class="px-3.5 py-3 whitespace-nowrap text-xs">
-                                            {% if exam.status == 'Scheduled' %}
-                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Scheduled</span>
-                                            {% elif exam.status == 'Failed' %}
-                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Failed</span>
-                                            {% else %}
-                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">Pending</span>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                    <tr id="noUpcomingMatchesRow" style="display: none;">
-                                        <td colspan="4" class="px-6 py-8 text-center text-gray-400 text-sm">
-                                            <i class="fa-solid fa-magnifying-glass mr-2"></i>No matching upcoming exams found.
-                                        </td>
-                                    </tr>
-                                {% else %}
+
+                        <div class="overflow-x-auto overflow-y-auto max-h-[540px] table-scroll-container">
+                            <table id="upcomingExamsTable" class="min-w-full divide-y divide-gray-100 text-left text-xs">
+                                <thead class="bg-gray-50/95 backdrop-blur-xs text-gray-600 font-bold uppercase tracking-wider text-[11px] sticky top-0 z-10 shadow-2xs">
                                     <tr>
-                                        <td colspan="4" class="px-6 py-10 text-center text-gray-500">No upcoming exams found.</td>
+                                        <th class="px-5 py-3 bg-gray-50/95">Subject &amp; Section</th>
+                                        <th class="px-4 py-3 bg-gray-50/95">Date &amp; Timeslot</th>
+                                        <th class="px-4 py-3 bg-gray-50/95">Room / Venue</th>
+                                        <th class="px-4 py-3 bg-gray-50/95">Proctor</th>
+                                        <th class="px-4 py-3 bg-gray-50/95 text-center">Status</th>
                                     </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 bg-white">
+                                    {% if upcoming_exams %}
+                                        {% for exam in upcoming_exams %}
+                                        <tr class="hover:bg-gray-50/80 transition-colors upcoming-exam-row">
+                                            <td class="px-5 py-3.5 whitespace-nowrap">
+                                                <div class="font-bold text-gray-900 text-xs sm:text-sm">{{ exam.subject_name }}</div>
+                                                <div class="text-[11px] font-medium text-gray-500 flex items-center gap-1.5 mt-0.5">
+                                                    <span class="px-1.5 py-0.2 bg-gray-100 text-gray-700 rounded font-semibold">{{ exam.section }}</span>
+                                                    {% if exam.subject_type %}
+                                                    <span class="text-gray-400">&bull;</span>
+                                                    <span class="{% if exam.subject_type == 'Major' %}text-indigo-600 font-semibold{% else %}text-emerald-600{% endif %}">{{ exam.subject_type }}</span>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-3.5 whitespace-nowrap">
+                                                <div class="font-medium text-gray-800">{{ exam.exam_date_time | exam_datetime_range(exam.duration_minutes) }}</div>
+                                                <div class="text-[11px] text-gray-400 mt-0.5">{{ exam.duration_minutes }} mins</div>
+                                            </td>
+                                            <td class="px-4 py-3.5 whitespace-nowrap">
+                                                <span class="inline-flex items-center gap-1.5 font-semibold text-gray-800">
+                                                    <i class="fa-solid fa-location-dot text-gray-400 text-[11px]"></i>
+                                                    {{ exam.room_name or 'Unassigned' }}
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3.5 whitespace-nowrap text-gray-700">
+                                                {{ exam.instructor_full_name or 'TBD' }}
+                                            </td>
+                                            <td class="px-4 py-3.5 whitespace-nowrap text-center">
+                                                {% if exam.status == 'Scheduled' %}
+                                                    <span class="px-2.5 py-1 inline-flex text-[11px] leading-4 font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">Scheduled</span>
+                                                {% elif exam.status == 'Failed' or exam.status == 'Unscheduled' %}
+                                                    <span class="px-2.5 py-1 inline-flex text-[11px] leading-4 font-bold rounded-full bg-rose-100 text-rose-800 border border-rose-200">Unplaced</span>
+                                                {% else %}
+                                                    <span class="px-2.5 py-1 inline-flex text-[11px] leading-4 font-bold rounded-full bg-amber-100 text-amber-800 border border-amber-200">Pending</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                        <tr id="noUpcomingMatchesRow" style="display: none;">
+                                            <td colspan="5" class="px-6 py-10 text-center text-gray-400 text-xs">
+                                                <i class="fa-solid fa-magnifying-glass text-lg mb-2 text-gray-300 block"></i>
+                                                No upcoming exams match your search.
+                                            </td>
+                                        </tr>
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                                                <div class="max-w-xs mx-auto text-center space-y-2">
+                                                    <span class="w-12 h-12 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center mx-auto text-xl">
+                                                        <i class="fa-solid fa-calendar-xmark"></i>
+                                                    </span>
+                                                    <p class="font-bold text-gray-700 text-sm">No scheduled upcoming exams</p>
+                                                    <p class="text-xs text-gray-400">Head over to the Schedule generator to run a fresh timetable creation.</p>
+                                                    <a href="/schedule" class="inline-flex items-center gap-1 text-xs font-semibold text-[#668054] hover:underline mt-2">
+                                                        Generate Schedule &rarr;
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Right: Department Distribution & Quick Hub -->
+                    <div class="space-y-6">
+                        <!-- Department Exam Load Distribution -->
+                        <div class="bg-white rounded-2xl border border-gray-200 shadow-xs p-5">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-sm font-bold text-gray-900">Department Exam Load</h3>
+                                <span class="text-[11px] font-semibold text-gray-500">{{ stats.total_exams if stats else 0 }} Total</span>
+                            </div>
+                            
+                            <div class="space-y-3.5">
+                                {% if stats and stats.by_institute %}
+                                    {% for bi in stats.by_institute %}
+                                        {% set dept_pct = ((bi.c / stats.total_exams * 100)|round(1)) if (stats.total_exams and stats.total_exams > 0) else 0 %}
+                                        <div>
+                                            <div class="flex items-center justify-between text-xs mb-1 gap-2">
+                                                <span class="font-semibold text-gray-700 truncate flex-1 min-w-0" title="{{ bi.name or 'General / GED' }}">{{ bi.name or 'General / GED' }}</span>
+                                                <span class="text-gray-500 font-bold flex-shrink-0">{{ bi.c }} ({{ dept_pct }}%)</span>
+                                            </div>
+                                            <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                                                <div class="bg-[#668054] h-2 rounded-full" data-width="{{ dept_pct }}%" style="width: 0%;"></div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <p class="text-xs text-gray-400 py-4 text-center">No departmental exam data available.</p>
                                 {% endif %}
-                            </tbody>
-                        </table>
+                            </div>
+                        </div>
+
+                        <!-- System Fast Shortcuts Widget -->
+                        <div class="bg-gradient-to-br from-[#668054]/5 to-transparent rounded-2xl border border-[#668054]/20 p-5 space-y-3">
+                            <div class="flex items-center gap-2 text-xs font-bold text-[#668054] uppercase tracking-wider">
+                                <i class="fa-solid fa-compass"></i> Fast Operations Hub
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <a href="/schedule" class="p-3 bg-white rounded-xl border border-gray-200 hover:border-[#668054] hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-1.5 group">
+                                    <i class="fa-solid fa-bolt text-yellow-500 text-lg group-hover:scale-110 transition-transform"></i>
+                                    <span class="font-semibold text-gray-800">Scheduler</span>
+                                </a>
+                                <a href="/faculty" class="p-3 bg-white rounded-xl border border-gray-200 hover:border-[#668054] hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-1.5 group">
+                                    <i class="fa-solid fa-user-clock text-blue-500 text-lg group-hover:scale-110 transition-transform"></i>
+                                    <span class="font-semibold text-gray-800">Faculty Shifts</span>
+                                </a>
+                                <a href="/reports" class="p-3 bg-white rounded-xl border border-gray-200 hover:border-[#668054] hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-1.5 group">
+                                    <i class="fa-solid fa-print text-indigo-500 text-lg group-hover:scale-110 transition-transform"></i>
+                                    <span class="font-semibold text-gray-800">Print Slips</span>
+                                </a>
+                                <a href="/settings" class="p-3 bg-white rounded-xl border border-gray-200 hover:border-[#668054] hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-1.5 group">
+                                    <i class="fa-solid fa-sliders text-gray-600 text-lg group-hover:scale-110 transition-transform"></i>
+                                    <span class="font-semibold text-gray-800">Parameters</span>
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-
-            <!-- Tab Content: Exams -->
-            <div id="exams-tab" class="tab-content hidden">
-                <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex flex-wrap gap-2 justify-between items-center">
-                        <div class="flex items-center gap-4 flex-wrap">
-                            <h2 class="font-semibold text-gray-800">All Exams</h2>
-                            <div class="relative">
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fa-solid fa-search text-gray-400 text-sm"></i>
-                                </div>
-                                <input type="text" id="searchAllExams" onkeyup="filterTable('searchAllExams', '#examBulkDeleteForm table tbody tr')" class="block w-64 pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm" placeholder="Search exams...">
+            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <!-- TAB 2: EXAMS MANAGEMENT                                         -->
+            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <div id="exams-tab" class="tab-content hidden space-y-4">
+                <div class="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+                    <!-- Toolbar & Filters -->
+                    <div class="p-4 sm:p-5 border-b border-gray-100 bg-gray-50/50 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div class="flex items-center gap-3 flex-wrap flex-1">
+                            <div class="relative flex-1 min-w-[220px] max-w-md">
+                                <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                                <input type="text" id="searchAllExams" onkeyup="filterExamsTable()" placeholder="Search subject, section, code..."
+                                       class="w-full h-9 pl-8 pr-3 text-xs border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                             </div>
+
+                            <!-- Institute Filter -->
+                            <select id="examFilterInstitute" onchange="filterExamsTable()" class="h-9 px-3 text-xs border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-[#668054]/20 outline-none">
+                                <option value="">All Institutes</option>
+                                {% for inst in institutes %}
+                                <option value="{{ inst.name|lower }}">{{ inst.name }}</option>
+                                {% endfor %}
+                            </select>
+
+                            <!-- Subject Type Filter -->
+                            <select id="examFilterType" onchange="filterExamsTable()" class="h-9 px-3 text-xs border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-[#668054]/20 outline-none">
+                                <option value="">All Types</option>
+                                <option value="major">Major (Lecture)</option>
+                                <option value="minor">Minor (Lab)</option>
+                            </select>
                         </div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <!-- Import CSV → opens modal -->
-                            <button type="button" onclick="openModal('importExamsModal')" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                                <i class="fa-solid fa-file-csv mr-2 text-[#668054]"></i> Import CSV
+
+                        <!-- Actions -->
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <button type="button" onclick="openModal('importExamsModal')" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer">
+                                <i class="fa-solid fa-file-csv text-[#668054]"></i> Import CSV
                             </button>
                             <form id="deleteAllExamsForm" action="/delete_all_exams" method="POST" class="inline">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                <button type="button" onclick="confirmDeleteAllExams()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700">
-                                    <i class="fa-solid fa-trash-can mr-2"></i> Delete All
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <button type="button" onclick="confirmDeleteAllExams()" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-semibold transition-colors cursor-pointer">
+                                    <i class="fa-solid fa-trash-can"></i> Delete All
                                 </button>
                             </form>
-                            <button onclick="openModal('addExamModal')" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#668054] hover:bg-[#829c74]">
-                                <i class="fa-solid fa-plus mr-2"></i> Add Exam
+                            <button onclick="openModal('addExamModal')" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#668054] hover:bg-[#526843] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer">
+                                <i class="fa-solid fa-plus"></i> Add Exam
                             </button>
                         </div>
                     </div>
 
-                    <!-- Bulk delete form wraps the table -->
+                    <!-- Bulk Delete Action Bar -->
                     <form id="examBulkDeleteForm" action="/exams/bulk_delete" method="POST">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
-                    <!-- Bulk action toolbar (hidden until rows selected) -->
-                    <div id="examBulkToolbar" class="hidden px-6 py-3 bg-red-50 border-b border-red-200 flex items-center justify-between">
-                        <span class="text-sm font-semibold text-red-700">
-                            <i class="fa-solid fa-circle-check mr-1"></i>
-                            <span id="examBulkCount">0</span> exam(s) selected
-                        </span>
-                        <button type="button" class="inline-flex items-center px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg"
-                            onclick="confirmBulkDeleteExams()">
-                            <i class="fa-solid fa-trash mr-1.5"></i> Delete Selected
-                        </button>
-                    </div>
+                        <div id="examBulkToolbar" class="hidden px-6 py-2.5 bg-rose-50 border-b border-rose-200 flex items-center justify-between text-xs transition-all">
+                            <span class="font-bold text-rose-800 flex items-center gap-2">
+                                <i class="fa-solid fa-circle-check text-rose-600"></i>
+                                <span id="examBulkCount">0</span> exam(s) selected
+                            </span>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="clearExamSelection()" class="px-2.5 py-1 bg-white border border-rose-300 rounded-md text-rose-700 hover:bg-rose-50 text-xs font-medium">Clear</button>
+                                <button type="button" onclick="confirmBulkDeleteExams()" class="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-md shadow-xs">
+                                    <i class="fa-solid fa-trash"></i> Delete Selected
+                                </button>
+                            </div>
+                        </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-3 text-left">
-                                        <input type="checkbox" id="examSelectAll" class="h-4 w-4 text-[#668054] border-gray-300 rounded" onchange="toggleAllExams(this)">
-                                    </th>
-                                    <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Subject &amp; Section</th>
-                                    <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
-                                    <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Institute</th>
-                                    <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Duration</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                {% if exams %}
-                                    {% for exam in exams %}
-                                    <tr class="hover:bg-gray-50 exam-row">
-                                        <td class="px-4 py-4">
-                                            <input type="checkbox" name="exam_ids" value="{{ exam.id }}" class="exam-row-checkbox h-4 w-4 text-[#668054] border-gray-300 rounded" onchange="updateExamBulkToolbar()">
-                                        </td>
-                                        <td class="px-3.5 py-3 whitespace-nowrap">
-                                            <div class="text-sm font-semibold text-gray-900">{{ exam.subject_name }}</div>
-                                            <div class="text-sm text-gray-500">{{ exam.section }}</div>
-                                        </td>
-                                        <td class="px-3 py-3 whitespace-nowrap text-xs text-gray-600">{{ exam.subject_type }}</td>
-                                        <td class="px-3.5 py-3 text-xs text-gray-700"><div class="max-w-[200px] leading-snug">{{ exam.institute_name }}</div></td>
-                                        <td class="px-3 py-3 whitespace-nowrap text-xs text-gray-600">{{ (exam.duration_minutes / 60) | round(1) }} hr{{ 's' if exam.duration_minutes != 60 }}</td>
-                                        <td class="px-3.5 py-3 whitespace-nowrap text-right text-sm font-medium sticky right-0 bg-white shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] z-10">
-                                            <a href="javascript:void(0)" onclick="confirmDeleteExam('/delete_exam/{{ exam.id }}')" class="text-red-600 hover:text-red-900"><i class="fa-solid fa-trash"></i></a>
-                                        </td>
+                        <div class="overflow-x-auto overflow-y-auto max-h-[600px] table-scroll-container">
+                            <table class="min-w-full divide-y divide-gray-100 text-left text-xs">
+                                <thead class="bg-gray-50/95 backdrop-blur-xs text-gray-600 font-bold uppercase tracking-wider text-[11px] sticky top-0 z-10 shadow-2xs">
+                                    <tr>
+                                        <th class="px-4 py-3 w-10 text-center bg-gray-50/95">
+                                            <input type="checkbox" id="examSelectAll" onchange="toggleAllExams(this)" class="rounded text-[#668054] border-gray-300 focus:ring-[#668054] w-4 h-4 cursor-pointer">
+                                        </th>
+                                        <th class="px-4 py-3 bg-gray-50/95">Subject &amp; Section</th>
+                                        <th class="px-4 py-3 bg-gray-50/95">Type</th>
+                                        <th class="px-4 py-3 bg-gray-50/95">Institute</th>
+                                        <th class="px-4 py-3 bg-gray-50/95">Duration</th>
+                                        <th class="px-6 py-3 text-right bg-gray-50/95">Actions</th>
                                     </tr>
-                                    {% endfor %}
-                                {% else %}
-                                    <tr><td colspan="6" class="px-6 py-10 text-center text-gray-500">No exams found.</td></tr>
-                                {% endif %}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 bg-white">
+                                    {% if exams %}
+                                        {% for exam in exams %}
+                                        <tr class="hover:bg-gray-50/80 transition-colors exam-row"
+                                            data-institute="{{ exam.institute_name|lower if exam.institute_name else '' }}"
+                                            data-type="{{ exam.subject_type|lower if exam.subject_type else '' }}">
+                                            <td class="px-4 py-3.5 text-center">
+                                                <input type="checkbox" name="exam_ids" value="{{ exam.id }}" class="exam-row-checkbox rounded text-[#668054] border-gray-300 focus:ring-[#668054] w-4 h-4 cursor-pointer" onchange="updateExamBulkToolbar()">
+                                            </td>
+                                            <td class="px-4 py-3.5 whitespace-nowrap">
+                                                <div class="font-bold text-gray-900 text-xs sm:text-sm">{{ exam.subject_name }}</div>
+                                                <div class="text-[11px] font-semibold text-gray-500 mt-0.5">Section: <span class="text-[#668054]">{{ exam.section }}</span></div>
+                                            </td>
+                                            <td class="px-4 py-3.5 whitespace-nowrap">
+                                                <span class="px-2 py-0.5 rounded text-[11px] font-semibold
+                                                    {% if exam.subject_type == 'Major' %}bg-indigo-50 text-indigo-700 border border-indigo-200{% else %}bg-emerald-50 text-emerald-700 border border-emerald-200{% endif %}">
+                                                    {{ exam.subject_type or 'General' }}
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3.5 text-gray-700 text-xs">
+                                                <span class="font-medium">{{ exam.institute_name or '-' }}</span>
+                                            </td>
+                                            <td class="px-4 py-3.5 whitespace-nowrap text-gray-600">
+                                                {{ (exam.duration_minutes / 60) | round(1) }} hr{{ 's' if exam.duration_minutes != 60 }}
+                                            </td>
+                                            <td class="px-6 py-3.5 whitespace-nowrap text-right">
+                                                <button type="button" onclick="confirmDeleteExam('/delete_exam/{{ exam.id }}')"
+                                                        class="w-7 h-7 rounded-lg bg-gray-50 hover:bg-rose-50 text-gray-400 hover:text-rose-600 inline-flex items-center justify-center transition-colors cursor-pointer"
+                                                        title="Delete Exam">
+                                                    <i class="fa-solid fa-trash text-xs"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="6" class="px-6 py-12 text-center text-gray-500">No exams registered in the system yet.</td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
                     </form>
                 </div>
             </div>
 
-
-            <!-- Tab Content: Rooms -->
-            <div id="rooms-tab" class="tab-content hidden">
-                <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex flex-wrap gap-2 justify-between items-center">
-                        <div class="flex items-center gap-4 flex-wrap">
-                            <h2 class="font-semibold text-gray-800">Rooms</h2>
-                            <div class="relative">
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fa-solid fa-search text-gray-400 text-sm"></i>
-                                </div>
-                                <input type="text" id="searchRooms" onkeyup="filterTable('searchRooms', '#roomBulkDeleteForm table tbody tr')" class="block w-64 pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm" placeholder="Search rooms...">
+            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <!-- TAB 3: ROOMS MANAGEMENT                                         -->
+            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <div id="rooms-tab" class="tab-content hidden space-y-4">
+                <div class="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+                    <div class="p-4 sm:p-5 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="flex items-center gap-3 flex-1 flex-wrap">
+                            <div class="relative flex-1 min-w-[200px] max-w-sm">
+                                <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                                <input type="text" id="searchRooms" onkeyup="filterTable('searchRooms', '#roomBulkDeleteForm table tbody tr')" placeholder="Search rooms, building..."
+                                       class="w-full h-9 pl-8 pr-3 text-xs border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-[#668054]/20 outline-none">
                             </div>
                         </div>
-                        <div class="flex flex-wrap gap-2 items-center">
-                            <!-- Import CSV → opens modal -->
-                            <button type="button" onclick="openModal('importRoomsModal')" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                                <i class="fa-solid fa-file-csv mr-2 text-[#668054]"></i> Import CSV
+
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="openModal('importRoomsModal')" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer">
+                                <i class="fa-solid fa-file-csv text-[#668054]"></i> Import CSV
                             </button>
-                            <button onclick="openModal('addRoomModal')" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#668054] hover:bg-[#829c74]">
-                                <i class="fa-solid fa-plus mr-2"></i> Add Room
+                            <button onclick="openModal('addRoomModal')" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#668054] hover:bg-[#526843] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer">
+                                <i class="fa-solid fa-plus"></i> Add Room
                             </button>
                         </div>
                     </div>
-                    <!-- Bulk delete form wraps the table -->
+
+                    <!-- Room Bulk Actions -->
                     <form id="roomBulkDeleteForm" action="/rooms/bulk_delete" method="POST">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
-                    <!-- Floating bulk-action toolbar (hidden until items checked) -->
-                    <div id="roomBulkToolbar" class="hidden px-6 py-3 bg-red-50 border-b border-red-200 flex items-center justify-between transition-all">
-                        <span class="text-sm font-semibold text-red-700">
-                            <i class="fa-solid fa-circle-check mr-1"></i>
-                            <span id="roomBulkCount">0</span> room(s) selected
-                        </span>
-                        <div class="flex items-center gap-2">
-                            <button type="button" onclick="clearRoomSelection()" class="text-sm text-gray-600 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-100">
-                                Clear
-                            </button>
-                            <button type="button"
-                                onclick="confirmBulkDeleteRooms()"
-                                class="inline-flex items-center gap-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md px-4 py-1.5 transition-colors">
-                                <i class="fa-solid fa-trash"></i> Delete Selected
-                            </button>
+                        <div id="roomBulkToolbar" class="hidden px-6 py-2.5 bg-rose-50 border-b border-rose-200 flex items-center justify-between text-xs transition-all">
+                            <span class="font-bold text-rose-800 flex items-center gap-2">
+                                <i class="fa-solid fa-circle-check text-rose-600"></i>
+                                <span id="roomBulkCount">0</span> room(s) selected
+                            </span>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="clearRoomSelection()" class="px-2.5 py-1 bg-white border border-rose-300 rounded-md text-rose-700 hover:bg-rose-50 text-xs font-medium">Clear</button>
+                                <button type="button" onclick="confirmBulkDeleteRooms()" class="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-md shadow-xs">
+                                    <i class="fa-solid fa-trash"></i> Delete Selected
+                                </button>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="pl-6 pr-2 py-3 w-10">
-                                        <input type="checkbox" id="roomSelectAll" onchange="toggleRoomSelectAll(this)"
-                                            class="h-4 w-4 text-[#668054] border-gray-300 rounded cursor-pointer"
-                                            title="Select all">
-                                    </th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Room Name</th>
-                                    <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Location</th>
-                                    <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Capacity</th>
-                                    <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Institute</th>
-                                    <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">PWD</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                {% if rooms %}
-                                    {% for room in rooms %}
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="pl-6 pr-2 py-4 w-10">
-                                            <input type="checkbox" name="room_ids" value="{{ room.id }}"
-                                                class="room-row-checkbox h-4 w-4 text-[#668054] border-gray-300 rounded cursor-pointer"
-                                                onchange="updateRoomBulkToolbar()">
-                                        </td>
-                                        <td class="px-3.5 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">{{ room.room_name }}</td>
-                                        <td class="px-3.5 py-3 whitespace-nowrap text-xs text-gray-600">Bldg: {{ room.building }}, Flr: {{ room.floor }}</td>
-                                        <td class="px-3 py-3 whitespace-nowrap text-center text-xs font-semibold text-gray-700">{{ room.capacity }}</td>
-                                        <td class="px-3.5 py-3 text-xs text-gray-700"><div class="max-w-[200px] leading-snug">{{ room.institute_name }}</div></td>
-                                        <td class="px-3 py-3 whitespace-nowrap text-center text-xs text-gray-500">
-                                            {% if room.is_pwd_accessible %}<i class="fa-solid fa-wheelchair text-blue-500"></i>{% else %}-{% endif %}
-                                        </td>
-                                        <td class="px-3.5 py-3 whitespace-nowrap text-right text-sm font-medium sticky right-0 bg-white shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] z-10">
-                                            <button type="button" onclick="openEditRoomModal('{{ room.id }}', '{{ room.room_name }}', '{{ room.capacity }}', '{{ room.building }}', '{{ room.floor }}', '{{ room.institute_id }}', '{{ room.is_pwd_accessible }}')" class="text-blue-600 hover:text-blue-900 mr-3"><i class="fa-solid fa-edit"></i></button>
-                                            <a href="javascript:void(0)" onclick="confirmDeleteRoom('/delete_room/{{ room.id }}')" class="text-red-600 hover:text-red-900"><i class="fa-solid fa-trash"></i></a>
-                                        </td>
+                        <div class="overflow-x-auto overflow-y-auto max-h-[600px] table-scroll-container">
+                            <table class="min-w-full divide-y divide-gray-100 text-left text-xs">
+                                <thead class="bg-gray-50/95 backdrop-blur-xs text-gray-600 font-bold uppercase tracking-wider text-[11px] sticky top-0 z-10 shadow-2xs">
+                                    <tr>
+                                        <th class="px-4 py-3 w-10 text-center bg-gray-50/95">
+                                            <input type="checkbox" id="roomSelectAll" onchange="toggleRoomSelectAll(this)" class="rounded text-[#668054] border-gray-300 focus:ring-[#668054] w-4 h-4 cursor-pointer">
+                                        </th>
+                                        <th class="px-4 py-3 bg-gray-50/95">Room Name</th>
+                                        <th class="px-4 py-3 bg-gray-50/95">Location &amp; Floor</th>
+                                        <th class="px-4 py-3 text-center bg-gray-50/95">Capacity</th>
+                                        <th class="px-4 py-3 bg-gray-50/95">Institute Tag</th>
+                                        <th class="px-4 py-3 text-center bg-gray-50/95">PWD Access</th>
+                                        <th class="px-6 py-3 text-right bg-gray-50/95">Actions</th>
                                     </tr>
-                                    {% endfor %}
-                                {% else %}
-                                    <tr><td colspan="7" class="px-6 py-10 text-center text-gray-500">No rooms found.</td></tr>
-                                {% endif %}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 bg-white">
+                                    {% if rooms %}
+                                        {% for room in rooms %}
+                                        <tr class="hover:bg-gray-50/80 transition-colors">
+                                            <td class="px-4 py-3.5 text-center">
+                                                <input type="checkbox" name="room_ids" value="{{ room.id }}" class="room-row-checkbox rounded text-[#668054] border-gray-300 focus:ring-[#668054] w-4 h-4 cursor-pointer" onchange="updateRoomBulkToolbar()">
+                                            </td>
+                                            <td class="px-4 py-3.5 whitespace-nowrap font-bold text-gray-900 text-sm">
+                                                {{ room.room_name }}
+                                            </td>
+                                            <td class="px-4 py-3.5 whitespace-nowrap text-gray-600">
+                                                Bldg: <span class="font-semibold text-gray-800">{{ room.building or '-' }}</span>, Flr: {{ room.floor or '-' }}
+                                            </td>
+                                            <td class="px-4 py-3.5 whitespace-nowrap text-center">
+                                                <span class="px-2 py-0.5 rounded-full font-bold bg-gray-100 text-gray-800 text-xs">{{ room.capacity }} seats</span>
+                                            </td>
+                                            <td class="px-4 py-3.5 text-gray-700">
+                                                {{ room.institute_name or 'Campus Shared' }}
+                                            </td>
+                                            <td class="px-4 py-3.5 whitespace-nowrap text-center">
+                                                {% if room.is_pwd_accessible %}
+                                                    <span class="text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 text-[11px] inline-flex items-center gap-1">
+                                                        <i class="fa-solid fa-wheelchair"></i> Accessible
+                                                    </span>
+                                                {% else %}
+                                                    <span class="text-gray-400">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="px-6 py-3.5 whitespace-nowrap text-right space-x-1">
+                                                <button type="button" onclick="openEditRoomModal('{{ room.id }}', '{{ room.room_name }}', '{{ room.capacity }}', '{{ room.building }}', '{{ room.floor }}', '{{ room.institute_id }}', '{{ room.is_pwd_accessible }}')"
+                                                        class="w-7 h-7 rounded-lg bg-gray-50 hover:bg-blue-50 text-gray-400 hover:text-blue-600 inline-flex items-center justify-center transition-colors cursor-pointer" title="Edit Room">
+                                                    <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                                </button>
+                                                <button type="button" onclick="confirmDeleteRoom('/delete_room/{{ room.id }}')"
+                                                        class="w-7 h-7 rounded-lg bg-gray-50 hover:bg-rose-50 text-gray-400 hover:text-rose-600 inline-flex items-center justify-center transition-colors cursor-pointer" title="Delete Room">
+                                                    <i class="fa-solid fa-trash text-xs"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr><td colspan="7" class="px-6 py-10 text-center text-gray-500">No rooms registered.</td></tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
                     </form>
                 </div>
             </div>
 
-            <!-- Tab Content: Instructors -->
-            <div id="instructors-tab" class="tab-content hidden">
-                <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex flex-wrap gap-2 justify-between items-center">
-                        <div class="flex items-center gap-4 flex-wrap">
-                            <h2 class="font-semibold text-gray-800">Instructors</h2>
-                            <div class="relative">
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fa-solid fa-search text-gray-400 text-sm"></i>
-                                </div>
-                                <input type="text" id="searchInstructors" onkeyup="filterTable('searchInstructors', '#instructorBulkForm table tbody tr')" class="block w-64 pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm" placeholder="Search instructors...">
+            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <!-- TAB 4: INSTRUCTORS MANAGEMENT                                   -->
+            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <div id="instructors-tab" class="tab-content hidden space-y-4">
+                <div class="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+                    <div class="p-4 sm:p-5 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="flex items-center gap-3 flex-1 flex-wrap">
+                            <div class="relative flex-1 min-w-[200px] max-w-sm">
+                                <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                                <input type="text" id="searchInstructors" onkeyup="filterTable('searchInstructors', '#instructorBulkForm table tbody tr')" placeholder="Search instructors..."
+                                       class="w-full h-9 pl-8 pr-3 text-xs border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-[#668054]/20 outline-none">
                             </div>
                         </div>
-                        <div class="flex flex-wrap gap-2 items-center">
-                            <!-- Import CSV → opens modal -->
-                            <button type="button" onclick="openModal('importInstructorsModal')" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                                <i class="fa-solid fa-file-csv mr-2 text-[#668054]"></i> Import CSV
-                            </button>
-                            <button onclick="openModal('addInstructorModal')" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#668054] hover:bg-[#829c74]">
-                                <i class="fa-solid fa-plus mr-2"></i> Add Instructor
-                            </button>
-                    </div>
-                    </div>
 
-                    <!-- Bulk delete form wraps table -->
-                    <form id="instructorBulkForm" action="/faculty/bulk_delete" method="POST">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-
-                    <!-- Bulk action toolbar -->
-                    <div id="instructorBulkToolbar" class="hidden px-6 py-3 bg-red-50 border-b border-red-200 flex items-center justify-between">
-                        <span class="text-sm font-semibold text-red-700">
-                            <i class="fa-solid fa-circle-check mr-1"></i>
-                            <span id="instructorBulkCount">0</span> instructor(s) selected
-                        </span>
                         <div class="flex items-center gap-2">
-                            <button type="button" onclick="clearInstructorSelection()" class="text-sm text-gray-600 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-100">Clear</button>
-                            <button type="button"
-                                onclick="confirmBulkDeleteInstructors()"
-                                class="inline-flex items-center gap-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md px-4 py-1.5 transition-colors">
-                                <i class="fa-solid fa-trash"></i> Delete Selected
+                            <button type="button" onclick="openModal('importInstructorsModal')" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer">
+                                <i class="fa-solid fa-file-csv text-[#668054]"></i> Import CSV
+                            </button>
+                            <button onclick="openModal('addInstructorModal')" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#668054] hover:bg-[#526843] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer">
+                                <i class="fa-solid fa-plus"></i> Add Instructor
                             </button>
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="pl-6 pr-2 py-3 w-10">
-                                        <input type="checkbox" id="instructorSelectAll" onchange="toggleInstructorSelectAll(this)"
-                                            class="h-4 w-4 text-[#668054] border-gray-300 rounded cursor-pointer" title="Select all">
-                                    </th>
-                                    <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
-                                    <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Institute</th>
-                                    <th class="px-3.5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                {% if instructors %}
-                                    {% for ins in instructors %}
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="pl-6 pr-2 py-4 w-10">
-                                            <input type="checkbox" name="instructor_ids" value="{{ ins.id }}"
-                                                class="instructor-row-checkbox h-4 w-4 text-[#668054] border-gray-300 rounded cursor-pointer"
-                                                onchange="updateInstructorBulkToolbar()">
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            {{ ins.name }} {% if ins.is_pwd %}<i class="fa-solid fa-wheelchair text-blue-500 text-xs ml-1" title="PWD"></i>{% endif %}
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ ins.institute_name }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                            {% if ins.status == 'Active' %}
-                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
-                                            {% else %}
-                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Inactive</span>
-                                            {% endif %}
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button onclick="openEditInstructorModal('{{ ins.id }}', '{{ ins.name }}', '{{ ins.institute_id }}', '{{ ins.building }}', '{{ ins.is_pwd }}')" class="text-blue-600 hover:text-blue-900 mr-3"><i class="fa-solid fa-edit"></i></button>
-                                            
-                                            {% if ins.status == 'Active' %}
-                                            <form action="/faculty/{{ ins.id }}/deactivate" method="POST" class="inline-block">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                                <button type="submit" class="text-yellow-600 hover:text-yellow-900 mr-3" title="Deactivate"><i class="fa-solid fa-ban"></i></button>
-                                            </form>
-                                            {% else %}
-                                            <form action="/faculty/{{ ins.id }}/activate" method="POST" class="inline-block">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                                <button type="submit" class="text-green-600 hover:text-green-900 mr-3" title="Activate"><i class="fa-solid fa-check-circle"></i></button>
-                                            </form>
-                                            {% endif %}
-                                            
-                                            <a href="javascript:void(0)" onclick="confirmDeleteInstructor('/delete_instructor/{{ ins.id }}')" class="text-red-600 hover:text-red-900"><i class="fa-solid fa-trash"></i></a>
-                                        </td>
+                    <form id="instructorBulkForm" action="/faculty/bulk_delete" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+                        <div id="instructorBulkToolbar" class="hidden px-6 py-2.5 bg-rose-50 border-b border-rose-200 flex items-center justify-between text-xs transition-all">
+                            <span class="font-bold text-rose-800 flex items-center gap-2">
+                                <i class="fa-solid fa-circle-check text-rose-600"></i>
+                                <span id="instructorBulkCount">0</span> instructor(s) selected
+                            </span>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="clearInstructorSelection()" class="px-2.5 py-1 bg-white border border-rose-300 rounded-md text-rose-700 hover:bg-rose-50 text-xs font-medium">Clear</button>
+                                <button type="button" onclick="confirmBulkDeleteInstructors()" class="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-md shadow-xs">
+                                    <i class="fa-solid fa-trash"></i> Delete Selected
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto overflow-y-auto max-h-[600px] table-scroll-container">
+                            <table class="min-w-full divide-y divide-gray-100 text-left text-xs">
+                                <thead class="bg-gray-50/95 backdrop-blur-xs text-gray-600 font-bold uppercase tracking-wider text-[11px] sticky top-0 z-10 shadow-2xs">
+                                    <tr>
+                                        <th class="px-4 py-3 w-10 text-center bg-gray-50/95">
+                                            <input type="checkbox" id="instructorSelectAll" onchange="toggleInstructorSelectAll(this)" class="rounded text-[#668054] border-gray-300 focus:ring-[#668054] w-4 h-4 cursor-pointer">
+                                        </th>
+                                        <th class="px-4 py-3 bg-gray-50/95">Instructor Name</th>
+                                        <th class="px-4 py-3 bg-gray-50/95">Department / Institute</th>
+                                        <th class="px-4 py-3 text-center bg-gray-50/95">Status</th>
+                                        <th class="px-6 py-3 text-right bg-gray-50/95">Actions</th>
                                     </tr>
-                                    {% endfor %}
-                                {% else %}
-                                    <tr><td colspan="5" class="px-6 py-10 text-center text-gray-500">No instructors found.</td></tr>
-                                {% endif %}
-                            </tbody>
-                        </table>
-                    </div>
-                    </form><!-- end instructorBulkForm -->
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 bg-white">
+                                    {% if instructors %}
+                                        {% for ins in instructors %}
+                                        <tr class="hover:bg-gray-50/80 transition-colors">
+                                            <td class="px-4 py-3.5 text-center">
+                                                <input type="checkbox" name="instructor_ids" value="{{ ins.id }}" class="instructor-row-checkbox rounded text-[#668054] border-gray-300 focus:ring-[#668054] w-4 h-4 cursor-pointer" onchange="updateInstructorBulkToolbar()">
+                                            </td>
+                                            <td class="px-4 py-3.5 whitespace-nowrap font-bold text-gray-900 text-sm">
+                                                {{ ins.name }}
+                                                {% if ins.is_pwd %}
+                                                <span class="text-blue-600 text-xs ml-1" title="PWD Friendly"><i class="fa-solid fa-wheelchair"></i></span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="px-4 py-3.5 text-gray-600">
+                                                {{ ins.institute_name or 'Unassigned' }}
+                                            </td>
+                                            <td class="px-4 py-3.5 whitespace-nowrap text-center">
+                                                {% if ins.status == 'Active' %}
+                                                    <span class="px-2.5 py-1 inline-flex text-[11px] leading-4 font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">Active</span>
+                                                {% else %}
+                                                    <span class="px-2.5 py-1 inline-flex text-[11px] leading-4 font-bold rounded-full bg-gray-100 text-gray-700 border border-gray-200">Inactive</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="px-6 py-3.5 whitespace-nowrap text-right space-x-1">
+                                                <button type="button" onclick="openEditInstructorModal('{{ ins.id }}', '{{ ins.name }}', '{{ ins.institute_id }}', '{{ ins.building }}', '{{ ins.is_pwd }}')"
+                                                        class="w-7 h-7 rounded-lg bg-gray-50 hover:bg-blue-50 text-gray-400 hover:text-blue-600 inline-flex items-center justify-center transition-colors cursor-pointer" title="Edit Instructor">
+                                                    <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                                </button>
+                                                {% if ins.status == 'Active' %}
+                                                <form action="/faculty/{{ ins.id }}/deactivate" method="POST" class="inline-block">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                    <button type="submit" class="w-7 h-7 rounded-lg bg-gray-50 hover:bg-amber-50 text-gray-400 hover:text-amber-600 inline-flex items-center justify-center transition-colors cursor-pointer" title="Deactivate">
+                                                        <i class="fa-solid fa-ban text-xs"></i>
+                                                    </button>
+                                                </form>
+                                                {% else %}
+                                                <form action="/faculty/{{ ins.id }}/activate" method="POST" class="inline-block">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                    <button type="submit" class="w-7 h-7 rounded-lg bg-gray-50 hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 inline-flex items-center justify-center transition-colors cursor-pointer" title="Activate">
+                                                        <i class="fa-solid fa-check-circle text-xs"></i>
+                                                    </button>
+                                                </form>
+                                                {% endif %}
+                                                <button type="button" onclick="confirmDeleteInstructor('/delete_instructor/{{ ins.id }}')"
+                                                        class="w-7 h-7 rounded-lg bg-gray-50 hover:bg-rose-50 text-gray-400 hover:text-rose-600 inline-flex items-center justify-center transition-colors cursor-pointer" title="Delete Instructor">
+                                                    <i class="fa-solid fa-trash text-xs"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr><td colspan="5" class="px-6 py-10 text-center text-gray-500">No instructors found.</td></tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </form>
                 </div>
             </div>
 
         </div>
     </main>
 
-    <!-- Modals -->
-    
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- MODALS SECTION                                                  -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+
     <!-- Add Exam Modal -->
     <div id="addExamModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeModal('addExamModal')"></div>
-            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                    <div class="sm:flex sm:items-start">
-                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                            <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Add New Exam</h3>
-                            <div class="mt-4">
-                                <form action="/add_exam" method="POST" id="addExamForm" class="space-y-4">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20">
+            <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-xs transition-opacity" onclick="closeModal('addExamModal')"></div>
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
+                <div class="px-6 py-4 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-8 h-8 rounded-lg bg-[#668054]/10 text-[#668054] flex items-center justify-center text-sm font-bold">
+                            <i class="fa-solid fa-file-circle-plus"></i>
+                        </span>
+                        <h3 class="text-base font-bold text-gray-900" id="modal-title">Add New Exam</h3>
+                    </div>
+                    <button onclick="closeModal('addExamModal')" class="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
+                </div>
+                <div class="p-6">
+                    <form action="/add_exam" method="POST" id="addExamForm" class="space-y-4">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
-                                    <div>
-                                        <label for="section" class="block text-sm font-medium text-gray-700">Section</label>
-                                        <input type="text" name="section" id="section" required class="mt-1 focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
-                                    </div>
-                                    <div>
-                                        <label for="subject_id" class="block text-sm font-medium text-gray-700">Subject</label>
-                                        <select name="subject_id" id="subject_id" required class="mt-1 focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
-                                            {% for sub in subjects %}
-                                            <option value="{{ sub.id }}">{{ sub.name }} ({{ sub.code }})</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label for="subject_type" class="block text-sm font-medium text-gray-700">Type</label>
-                                        <select name="subject_type" id="subject_type" required onchange="updateDurationDefault()" class="mt-1 focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
-                                            <option value="Major">Lecture (Major)</option>
-                                            <option value="Minor">Laboratory (Minor)</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label for="duration_hours" class="block text-sm font-medium text-gray-700">Duration (Hours)</label>
-                                        <input type="number" name="duration_hours" id="duration_hours" value="{{ settings.major_duration_hrs|default('2.0') }}" min="0.5" step="0.5" required class="mt-1 focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
-                                    </div>
-                                    <div>
-                                        <label for="institute_id" class="block text-sm font-medium text-gray-700">Institute</label>
-                                        <select name="institute_id" id="institute_id" required class="mt-1 focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
-                                            {% for inst in institutes %}
-                                            <option value="{{ inst.id }}">{{ inst.name }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                </form>
+                        <div>
+                            <label for="section" class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Section Code</label>
+                            <input type="text" name="section" id="section" required placeholder="e.g. GED1A, BSIT-3A" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                        </div>
+                        <div>
+                            <label for="subject_id" class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Subject</label>
+                            <select name="subject_id" id="subject_id" required class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                                {% for sub in subjects %}
+                                <option value="{{ sub.id }}">{{ sub.name }} ({{ sub.code }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label for="subject_type" class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Type</label>
+                                <select name="subject_type" id="subject_type" required onchange="updateDurationDefault()" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                                    <option value="Major">Lecture (Major)</option>
+                                    <option value="Minor">Laboratory (Minor)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="duration_hours" class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Duration (Hours)</label>
+                                <input type="number" name="duration_hours" id="duration_hours" value="{{ settings.major_duration_hrs|default('2.0') }}" min="0.5" step="0.5" required class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                             </div>
                         </div>
-                    </div>
+                        <div>
+                            <label for="institute_id" class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Institute</label>
+                            <select name="institute_id" id="institute_id" required class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                                {% for inst in institutes %}
+                                <option value="{{ inst.id }}">{{ inst.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </form>
                 </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                    <button type="submit" form="addExamForm" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-[#668054] text-base font-medium text-white hover:bg-[#829c74] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#668054] sm:ml-3 sm:w-auto sm:text-sm">Save</button>
-                    <button type="button" onclick="closeModal('addExamModal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#668054] sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                <div class="bg-gray-50 px-6 py-3.5 border-t border-gray-100 flex justify-end gap-2.5">
+                    <button type="button" onclick="closeModal('addExamModal')" class="px-4 py-2 border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors">Cancel</button>
+                    <button type="submit" form="addExamForm" class="px-5 py-2 rounded-xl bg-[#668054] hover:bg-[#526843] text-white text-xs font-bold shadow-xs transition-colors">Save Exam</button>
                 </div>
             </div>
         </div>
@@ -689,49 +852,56 @@
 
     <!-- Add Room Modal -->
     <div id="addRoomModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
-        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal('addRoomModal')"></div>
-            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Add New Room</h3>
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20">
+            <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-xs transition-opacity" onclick="closeModal('addRoomModal')"></div>
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
+                <div class="px-6 py-4 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-sm font-bold">
+                            <i class="fa-solid fa-door-open"></i>
+                        </span>
+                        <h3 class="text-base font-bold text-gray-900">Add New Room</h3>
+                    </div>
+                    <button onclick="closeModal('addRoomModal')" class="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
+                </div>
+                <div class="p-6">
                     <form action="/add_room" method="POST" id="addRoomForm" class="space-y-4">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Room Name</label>
-                            <input type="text" name="room_name" required class="mt-1 focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Room Name</label>
+                            <input type="text" name="room_name" required placeholder="e.g. Lab 1, Room 302" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                         </div>
-                        <div class="grid grid-cols-2 gap-4">
+                        <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Capacity</label>
-                                <input type="number" name="capacity" required class="mt-1 focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                                <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Capacity</label>
+                                <input type="number" name="capacity" required placeholder="Seats (e.g. 40)" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Floor</label>
-                                <input type="text" name="floor" class="mt-1 focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                                <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Floor</label>
+                                <input type="text" name="floor" placeholder="e.g. 2nd Floor" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                             </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Building</label>
-                            <input type="text" name="building" class="mt-1 focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Building</label>
+                            <input type="text" name="building" placeholder="e.g. Main Building" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Institute</label>
-                            <select name="institute_id" class="mt-1 focus:ring-[#668054] focus:border-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Institute Tag</label>
+                            <select name="institute_id" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                                 {% for inst in institutes %}
                                 <option value="{{ inst.id }}">{{ inst.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="flex items-center">
-                            <input type="checkbox" name="is_pwd_accessible" value="true" class="h-4 w-4 text-[#668054] focus:ring-[#668054] border-gray-300 rounded">
-                            <label class="ml-2 block text-sm text-gray-900">PWD Accessible</label>
+                        <div class="flex items-center gap-2 pt-1">
+                            <input type="checkbox" name="is_pwd_accessible" value="true" id="add_room_pwd" class="rounded text-[#668054] focus:ring-[#668054] border-gray-300 w-4 h-4 cursor-pointer">
+                            <label for="add_room_pwd" class="text-xs font-semibold text-gray-800 cursor-pointer">PWD Wheelchair Accessible</label>
                         </div>
                     </form>
                 </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                    <button type="submit" form="addRoomForm" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-[#668054] text-white hover:bg-[#829c74] sm:ml-3 sm:w-auto sm:text-sm">Save</button>
-                    <button type="button" onclick="closeModal('addRoomModal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                <div class="bg-gray-50 px-6 py-3.5 border-t border-gray-100 flex justify-end gap-2.5">
+                    <button type="button" onclick="closeModal('addRoomModal')" class="px-4 py-2 border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors">Cancel</button>
+                    <button type="submit" form="addRoomForm" class="px-5 py-2 rounded-xl bg-[#668054] hover:bg-[#526843] text-white text-xs font-bold shadow-xs transition-colors">Save Room</button>
                 </div>
             </div>
         </div>
@@ -739,49 +909,51 @@
 
     <!-- Edit Room Modal -->
     <div id="editRoomModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
-        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal('editRoomModal')"></div>
-            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Edit Room</h3>
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20">
+            <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-xs transition-opacity" onclick="closeModal('editRoomModal')"></div>
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
+                <div class="px-6 py-4 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between">
+                    <h3 class="text-base font-bold text-gray-900">Edit Examination Room</h3>
+                    <button onclick="closeModal('editRoomModal')" class="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
+                </div>
+                <div class="p-6">
                     <form id="editRoomForm" method="POST" class="space-y-4">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Room Name</label>
-                            <input type="text" name="room_name" id="edit_room_name" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Room Name</label>
+                            <input type="text" name="room_name" id="edit_room_name" required class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                         </div>
-                        <div class="grid grid-cols-2 gap-4">
+                        <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Capacity</label>
-                                <input type="number" name="capacity" id="edit_room_capacity" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                                <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Capacity</label>
+                                <input type="number" name="capacity" id="edit_room_capacity" required class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Floor</label>
-                                <input type="text" name="floor" id="edit_room_floor" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                                <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Floor</label>
+                                <input type="text" name="floor" id="edit_room_floor" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                             </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Building</label>
-                            <input type="text" name="building" id="edit_room_building" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Building</label>
+                            <input type="text" name="building" id="edit_room_building" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Institute</label>
-                            <select name="institute_id" id="edit_room_institute" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Institute Tag</label>
+                            <select name="institute_id" id="edit_room_institute" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                                 {% for inst in institutes %}
                                 <option value="{{ inst.id }}">{{ inst.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="flex items-center">
-                            <input type="checkbox" name="is_pwd_accessible" id="edit_room_pwd" value="true" class="h-4 w-4 text-[#668054] border-gray-300 rounded">
-                            <label class="ml-2 block text-sm text-gray-900">PWD Accessible</label>
+                        <div class="flex items-center gap-2 pt-1">
+                            <input type="checkbox" name="is_pwd_accessible" id="edit_room_pwd" value="true" class="rounded text-[#668054] border-gray-300 w-4 h-4 cursor-pointer">
+                            <label for="edit_room_pwd" class="text-xs font-semibold text-gray-800 cursor-pointer">PWD Wheelchair Accessible</label>
                         </div>
                     </form>
                 </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                    <button type="submit" form="editRoomForm" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-[#668054] text-white hover:bg-[#829c74] sm:ml-3 sm:w-auto sm:text-sm">Update</button>
-                    <button type="button" onclick="closeModal('editRoomModal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                <div class="bg-gray-50 px-6 py-3.5 border-t border-gray-100 flex justify-end gap-2.5">
+                    <button type="button" onclick="closeModal('editRoomModal')" class="px-4 py-2 border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors">Cancel</button>
+                    <button type="submit" form="editRoomForm" class="px-5 py-2 rounded-xl bg-[#668054] hover:bg-[#526843] text-white text-xs font-bold shadow-xs transition-colors">Update Room</button>
                 </div>
             </div>
         </div>
@@ -789,39 +961,46 @@
 
     <!-- Add Instructor Modal -->
     <div id="addInstructorModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
-        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal('addInstructorModal')"></div>
-            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Add New Instructor</h3>
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20">
+            <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-xs transition-opacity" onclick="closeModal('addInstructorModal')"></div>
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
+                <div class="px-6 py-4 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center text-sm font-bold">
+                            <i class="fa-solid fa-user-plus"></i>
+                        </span>
+                        <h3 class="text-base font-bold text-gray-900">Add New Instructor</h3>
+                    </div>
+                    <button onclick="closeModal('addInstructorModal')" class="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
+                </div>
+                <div class="p-6">
                     <form action="/add_instructor" method="POST" id="addInstructorForm" class="space-y-4">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Full Name</label>
-                            <input type="text" name="name" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Full Name</label>
+                            <input type="text" name="name" required placeholder="e.g. Dr. Maria Santos" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Building</label>
-                            <input type="text" name="building" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Building Location</label>
+                            <input type="text" name="building" placeholder="e.g. Main Building" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Institute</label>
-                            <select name="institute_id" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Institute Tag</label>
+                            <select name="institute_id" required class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                                 {% for inst in institutes %}
                                 <option value="{{ inst.id }}">{{ inst.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="flex items-center">
-                            <input type="checkbox" name="is_pwd" value="true" class="h-4 w-4 text-[#668054] border-gray-300 rounded">
-                            <label class="ml-2 block text-sm text-gray-900">Is PWD?</label>
+                        <div class="flex items-center gap-2 pt-1">
+                            <input type="checkbox" name="is_pwd" value="true" id="add_inst_pwd" class="rounded text-[#668054] border-gray-300 w-4 h-4 cursor-pointer">
+                            <label for="add_inst_pwd" class="text-xs font-semibold text-gray-800 cursor-pointer">PWD Friendly Placement Preference</label>
                         </div>
                     </form>
                 </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                    <button type="submit" form="addInstructorForm" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-[#668054] text-white hover:bg-[#829c74] sm:ml-3 sm:w-auto sm:text-sm">Save</button>
-                    <button type="button" onclick="closeModal('addInstructorModal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                <div class="bg-gray-50 px-6 py-3.5 border-t border-gray-100 flex justify-end gap-2.5">
+                    <button type="button" onclick="closeModal('addInstructorModal')" class="px-4 py-2 border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors">Cancel</button>
+                    <button type="submit" form="addInstructorForm" class="px-5 py-2 rounded-xl bg-[#668054] hover:bg-[#526843] text-white text-xs font-bold shadow-xs transition-colors">Save Instructor</button>
                 </div>
             </div>
         </div>
@@ -829,47 +1008,163 @@
 
     <!-- Edit Instructor Modal -->
     <div id="editInstructorModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
-        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal('editInstructorModal')"></div>
-            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Edit Instructor</h3>
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20">
+            <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-xs transition-opacity" onclick="closeModal('editInstructorModal')"></div>
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
+                <div class="px-6 py-4 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between">
+                    <h3 class="text-base font-bold text-gray-900">Edit Instructor Details</h3>
+                    <button onclick="closeModal('editInstructorModal')" class="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
+                </div>
+                <div class="p-6">
                     <form id="editInstructorForm" method="POST" class="space-y-4">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Full Name</label>
-                            <input type="text" name="name" id="edit_inst_name" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Full Name</label>
+                            <input type="text" name="name" id="edit_inst_name" required class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Building</label>
-                            <input type="text" name="building" id="edit_inst_building" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Building</label>
+                            <input type="text" name="building" id="edit_inst_building" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Institute</label>
-                            <select name="institute_id" id="edit_inst_institute" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Institute Tag</label>
+                            <select name="institute_id" id="edit_inst_institute" required class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
                                 {% for inst in institutes %}
                                 <option value="{{ inst.id }}">{{ inst.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="flex items-center">
-                            <input type="checkbox" name="is_pwd" id="edit_inst_pwd" value="true" class="h-4 w-4 text-[#668054] border-gray-300 rounded">
-                            <label class="ml-2 block text-sm text-gray-900">Is PWD?</label>
+                        <div class="flex items-center gap-2 pt-1">
+                            <input type="checkbox" name="is_pwd" id="edit_inst_pwd" value="true" class="rounded text-[#668054] border-gray-300 w-4 h-4 cursor-pointer">
+                            <label for="edit_inst_pwd" class="text-xs font-semibold text-gray-800 cursor-pointer">PWD Friendly Placement Preference</label>
                         </div>
                     </form>
                 </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                    <button type="submit" form="editInstructorForm" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-[#668054] text-white hover:bg-[#829c74] sm:ml-3 sm:w-auto sm:text-sm">Update</button>
-                    <button type="button" onclick="closeModal('editInstructorModal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                <div class="bg-gray-50 px-6 py-3.5 border-t border-gray-100 flex justify-end gap-2.5">
+                    <button type="button" onclick="closeModal('editInstructorModal')" class="px-4 py-2 border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors">Cancel</button>
+                    <button type="submit" form="editInstructorForm" class="px-5 py-2 rounded-xl bg-[#668054] hover:bg-[#526843] text-white text-xs font-bold shadow-xs transition-colors">Update Instructor</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Javascript -->
+    <!-- Import Exams CSV Modal -->
+    <div id="importExamsModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-xs" onclick="closeModal('importExamsModal')"></div>
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 z-10 animate-in fade-in zoom-in-95 duration-150">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-base font-bold text-gray-900">Bulk Import Exams (CSV)</h3>
+                    <button onclick="closeModal('importExamsModal')" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                </div>
+
+                <div class="mb-4">
+                    <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Required Spreadsheet Columns</p>
+                    <div class="overflow-x-auto w-full">
+                    <table class="w-full text-xs border border-gray-200 rounded-xl overflow-hidden">
+                        <thead class="bg-gray-50 text-gray-600 font-bold">
+                            <tr>
+                                <th class="px-3 py-2 text-left">Column</th>
+                                <th class="px-3 py-2 text-left">Type</th>
+                                <th class="px-3 py-2 text-left">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">subject_name</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">e.g. <em>Data Structures</em></td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">subject_code</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">e.g. <em>IT201</em></td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">section</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">e.g. <em>BSIT-3A</em></td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">subject_type</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400"><em>Major</em> or <em>Minor</em></td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">institute_code</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">e.g. <em>ICSLIS</em></td></tr>
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
+                <form action="/import/exams" method="POST" enctype="multipart/form-data" class="space-y-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="file" name="csv_file" accept=".csv" required
+                           class="block w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#668054]/10 file:text-[#668054] hover:file:bg-[#668054]/20 border border-gray-200 rounded-xl p-2 cursor-pointer">
+                    <button type="submit" class="w-full py-2.5 text-xs font-bold text-white bg-[#668054] hover:bg-[#526843] rounded-xl transition-all shadow-xs cursor-pointer">
+                        <i class="fa-solid fa-upload mr-1.5"></i> Upload &amp; Import
+                    </button>
+                </form>
+
+                <div class="mt-4 pt-4 border-t border-gray-100 flex justify-center gap-6 text-xs font-semibold">
+                    <a href="/static/template_exams.csv" class="text-[#668054] hover:underline"><i class="fa-solid fa-download mr-1"></i> Template CSV</a>
+                    <a href="/static/sample_exams.csv" class="text-blue-600 hover:underline"><i class="fa-solid fa-file-csv mr-1"></i> Sample CSV</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Rooms CSV Modal -->
+    <div id="importRoomsModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-xs" onclick="closeModal('importRoomsModal')"></div>
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 z-10 animate-in fade-in zoom-in-95 duration-150">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-base font-bold text-gray-900">Import Rooms via CSV</h3>
+                    <button onclick="closeModal('importRoomsModal')" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                </div>
+                <form action="/import/rooms" method="POST" enctype="multipart/form-data" class="space-y-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="file" name="csv_file" accept=".csv" required
+                           class="block w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-600 hover:file:bg-purple-100 border border-gray-200 rounded-xl p-2 cursor-pointer">
+                    <button type="submit" class="w-full py-2.5 text-xs font-bold text-white bg-[#668054] hover:bg-[#526843] rounded-xl transition-all shadow-xs cursor-pointer">
+                        <i class="fa-solid fa-upload mr-1.5"></i> Upload &amp; Import Rooms
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Instructors CSV Modal -->
+    <div id="importInstructorsModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-xs" onclick="closeModal('importInstructorsModal')"></div>
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 z-10 animate-in fade-in zoom-in-95 duration-150">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-base font-bold text-gray-900">Import Faculty via CSV</h3>
+                    <button onclick="closeModal('importInstructorsModal')" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                </div>
+                <form action="/import/instructors" method="POST" enctype="multipart/form-data" class="space-y-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="file" name="csv_file" accept=".csv" required
+                           class="block w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-orange-50 file:text-orange-600 hover:file:bg-orange-100 border border-gray-200 rounded-xl p-2 cursor-pointer">
+                    <button type="submit" class="w-full py-2.5 text-xs font-bold text-white bg-[#668054] hover:bg-[#526843] rounded-xl transition-all shadow-xs cursor-pointer">
+                        <i class="fa-solid fa-upload mr-1.5"></i> Upload &amp; Import Instructors
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reusable Warning / Confirmation Modal -->
+    <div id="warnModal" class="fixed inset-0 z-[999] hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-xs" onclick="closeWarnModal()"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
+                <div id="warnModalHeader" class="px-6 py-4 flex items-center gap-3">
+                    <i class="fa-solid fa-triangle-exclamation text-xl text-white"></i>
+                    <h3 id="warnModalTitle" class="text-base font-bold text-white"></h3>
+                </div>
+                <div class="p-6">
+                    <p id="warnModalMessage" class="text-sm font-semibold text-gray-800 leading-snug"></p>
+                    <p id="warnModalSub" class="text-xs text-gray-500 mt-2 hidden leading-relaxed"></p>
+                </div>
+                <div class="bg-gray-50 px-6 py-3.5 border-t border-gray-100 flex justify-end gap-2.5">
+                    <button onclick="closeWarnModal()" class="px-4 py-2 border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors">Cancel</button>
+                    <button id="warnModalConfirmBtn" class="px-5 py-2 rounded-xl text-xs font-bold text-white transition-all shadow-xs"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- SCRIPTS                                                         -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
     <script>
-        // Handle URL hash for tabs on DOMContentLoaded
+        // Tab switching and hash management
         document.addEventListener('DOMContentLoaded', () => {
             if (window.location.hash) {
                 const tabId = window.location.hash.substring(1) + '-tab';
@@ -879,60 +1174,44 @@
             }
         });
 
-        // Tab Switching
         function switchTab(tabId) {
-            // Hide all tab content
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.add('hidden');
                 tab.classList.remove('block');
             });
             
-            // Show selected tab content
-            document.getElementById(tabId).classList.remove('hidden');
-            document.getElementById(tabId).classList.add('block');
+            const target = document.getElementById(tabId);
+            if (target) {
+                target.classList.remove('hidden');
+                target.classList.add('block');
+            }
             
-            // Update tab button styles
             document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('border-[#668054]', 'text-[#668054]');
-                btn.classList.add('border-transparent', 'text-gray-500');
+                btn.classList.remove('bg-[#668054]', 'text-white', 'shadow-xs');
+                btn.classList.add('text-gray-600', 'hover:text-gray-900', 'hover:bg-gray-100');
             });
             
-            const btnId = 'nav-' + tabId;
-            const activeBtn = document.getElementById(btnId);
-            activeBtn.classList.remove('border-transparent', 'text-gray-500');
-            activeBtn.classList.add('border-[#668054]', 'text-[#668054]');
+            const activeBtn = document.getElementById('nav-' + tabId);
+            if (activeBtn) {
+                activeBtn.classList.remove('text-gray-600', 'hover:text-gray-900', 'hover:bg-gray-100');
+                activeBtn.classList.add('bg-[#668054]', 'text-white', 'shadow-xs');
+            }
 
-            // Update URL hash without jumping
             history.pushState(null, null, '#' + tabId.replace('-tab', ''));
         }
 
         // Modal Controls
         function openModal(id) {
-            document.getElementById(id).classList.remove('hidden');
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('hidden');
         }
         
         function closeModal(id) {
-            document.getElementById(id).classList.add('hidden');
-        }
-
-        function toggleEl(id) {
             const el = document.getElementById(id);
-            el.classList.toggle('hidden');
+            if (el) el.classList.add('hidden');
         }
 
-        // Close import dropdowns when clicking outside
-        document.addEventListener('click', function(e) {
-            ['roomImportBox', 'instrImportBox'].forEach(function(id) {
-                const box = document.getElementById(id);
-                if (box && !box.classList.contains('hidden')) {
-                    if (!box.parentElement.contains(e.target)) {
-                        box.classList.add('hidden');
-                    }
-                }
-            });
-        });
-
-        // Edit Modals Populate
+        // Edit Room Modal Populate
         function openEditRoomModal(id, name, capacity, building, floor, institute_id, is_pwd) {
             document.getElementById('editRoomForm').action = '/edit_room/' + id;
             document.getElementById('edit_room_name').value = name;
@@ -944,6 +1223,7 @@
             openModal('editRoomModal');
         }
 
+        // Edit Instructor Modal Populate
         function openEditInstructorModal(id, name, inst_id, building, is_pwd) {
             document.getElementById('editInstructorForm').action = '/faculty/' + id + '/edit';
             document.getElementById('edit_inst_name').value = name;
@@ -952,64 +1232,13 @@
             document.getElementById('edit_inst_pwd').checked = is_pwd === 'True' || is_pwd === 'true' || is_pwd === true;
             openModal('editInstructorModal');
         }
-        /* ── Instructor bulk-select helpers ─────────────────── */
-        function updateInstructorBulkToolbar() {
-            const checked = document.querySelectorAll('.instructor-row-checkbox:checked');
-            const toolbar = document.getElementById('instructorBulkToolbar');
-            const countEl = document.getElementById('instructorBulkCount');
-            const selectAll = document.getElementById('instructorSelectAll');
-            const total = document.querySelectorAll('.instructor-row-checkbox').length;
-            countEl.textContent = checked.length;
-            toolbar.classList.toggle('hidden', checked.length === 0);
-            selectAll.indeterminate = checked.length > 0 && checked.length < total;
-            selectAll.checked = total > 0 && checked.length === total;
-        }
 
-        function toggleInstructorSelectAll(masterCb) {
-            document.querySelectorAll('.instructor-row-checkbox').forEach(cb => {
-                cb.checked = masterCb.checked;
-            });
-            updateInstructorBulkToolbar();
-        }
-
-        function clearInstructorSelection() {
-            document.querySelectorAll('.instructor-row-checkbox').forEach(cb => { cb.checked = false; });
-            document.getElementById('instructorSelectAll').checked = false;
-            updateInstructorBulkToolbar();
-        }
-
-        /* ── Room bulk-select helpers ───────────────────────── */
-        function updateRoomBulkToolbar() {
-            const checked = document.querySelectorAll('.room-row-checkbox:checked');
-            const toolbar = document.getElementById('roomBulkToolbar');
-            const countEl = document.getElementById('roomBulkCount');
-            const selectAll = document.getElementById('roomSelectAll');
-            const total = document.querySelectorAll('.room-row-checkbox').length;
-            countEl.textContent = checked.length;
-            toolbar.classList.toggle('hidden', checked.length === 0);
-            selectAll.indeterminate = checked.length > 0 && checked.length < total;
-            selectAll.checked = total > 0 && checked.length === total;
-        }
-
-        function toggleRoomSelectAll(masterCb) {
-            document.querySelectorAll('.room-row-checkbox').forEach(cb => {
-                cb.checked = masterCb.checked;
-            });
-            updateRoomBulkToolbar();
-        }
-
-        function clearRoomSelection() {
-            document.querySelectorAll('.room-row-checkbox').forEach(cb => { cb.checked = false; });
-            document.getElementById('roomSelectAll').checked = false;
-            updateRoomBulkToolbar();
-        }
-
-        // ── Auto-fill duration based on subject type ─────────────────────────
+        // Duration defaults on subject type change
         const durationDefaults = {
-            'Major': {{ settings.major_duration_hrs|default('3.0') }},
-            'Lecture': {{ settings.major_duration_hrs|default('3.0') }},
-            'Minor': {{ settings.minor_duration_hrs|default('1.0') }},
-            'Laboratory': {{ settings.minor_duration_hrs|default('1.0') }}
+            'Major': parseFloat("{{ settings.major_duration_hrs|default('3.0') }}") || 3.0,
+            'Lecture': parseFloat("{{ settings.major_duration_hrs|default('3.0') }}") || 3.0,
+            'Minor': parseFloat("{{ settings.minor_duration_hrs|default('1.0') }}") || 1.0,
+            'Laboratory': parseFloat("{{ settings.minor_duration_hrs|default('1.0') }}") || 1.0
         };
         function updateDurationDefault() {
             const type = document.getElementById('subject_type').value;
@@ -1019,7 +1248,52 @@
             }
         }
 
-        // ── Exam bulk-select helpers ──────────────────────────────────────────
+        // Search & Filter Functions
+        function filterTable(inputId, rowSelector) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            const q = input.value.toLowerCase().trim();
+            document.querySelectorAll(rowSelector).forEach(r => {
+                r.style.display = r.innerText.toLowerCase().includes(q) ? "" : "none";
+            });
+        }
+
+        function filterUpcomingExams() {
+            const input = document.getElementById('searchUpcomingExams');
+            if (!input) return;
+            const q = input.value.toLowerCase().trim();
+            const rows = document.querySelectorAll('#upcomingExamsTable tbody tr.upcoming-exam-row');
+            const noMatch = document.getElementById('noUpcomingMatchesRow');
+            let visible = 0;
+            rows.forEach(r => {
+                const match = r.innerText.toLowerCase().includes(q);
+                r.style.display = match ? '' : 'none';
+                if (match) visible++;
+            });
+            if (noMatch) {
+                noMatch.style.display = (visible === 0 && rows.length > 0) ? '' : 'none';
+            }
+        }
+
+        function filterExamsTable() {
+            const q = (document.getElementById('searchAllExams')?.value || '').toLowerCase().trim();
+            const inst = (document.getElementById('examFilterInstitute')?.value || '').toLowerCase().trim();
+            const type = (document.getElementById('examFilterType')?.value || '').toLowerCase().trim();
+
+            document.querySelectorAll('.exam-row').forEach(row => {
+                const text = row.innerText.toLowerCase();
+                const rowInst = (row.dataset.institute || '').toLowerCase();
+                const rowType = (row.dataset.type || '').toLowerCase();
+
+                const matchesSearch = !q || text.includes(q);
+                const matchesInst = !inst || rowInst.includes(inst);
+                const matchesType = !type || rowType.includes(type);
+
+                row.style.display = (matchesSearch && matchesInst && matchesType) ? '' : 'none';
+            });
+        }
+
+        // Bulk Selection Helpers (Exams, Rooms, Instructors)
         function toggleAllExams(master) {
             document.querySelectorAll('.exam-row-checkbox').forEach(cb => { cb.checked = master.checked; });
             updateExamBulkToolbar();
@@ -1027,307 +1301,165 @@
         function updateExamBulkToolbar() {
             const checked = document.querySelectorAll('.exam-row-checkbox:checked');
             const toolbar = document.getElementById('examBulkToolbar');
-            document.getElementById('examBulkCount').textContent = checked.length;
-            toolbar.classList.toggle('hidden', checked.length === 0);
+            const countEl = document.getElementById('examBulkCount');
+            if (countEl) countEl.textContent = checked.length;
+            if (toolbar) toolbar.classList.toggle('hidden', checked.length === 0);
             const master = document.getElementById('examSelectAll');
             const all = document.querySelectorAll('.exam-row-checkbox');
-            if (master) master.indeterminate = checked.length > 0 && checked.length < all.length;
-            if (master) master.checked = all.length > 0 && checked.length === all.length;
+            if (master) {
+                master.indeterminate = checked.length > 0 && checked.length < all.length;
+                master.checked = all.length > 0 && checked.length === all.length;
+            }
         }
+        function clearExamSelection() {
+            document.querySelectorAll('.exam-row-checkbox').forEach(cb => { cb.checked = false; });
+            const master = document.getElementById('examSelectAll');
+            if (master) master.checked = false;
+            updateExamBulkToolbar();
+        }
+
+        function toggleRoomSelectAll(masterCb) {
+            document.querySelectorAll('.room-row-checkbox').forEach(cb => { cb.checked = masterCb.checked; });
+            updateRoomBulkToolbar();
+        }
+        function updateRoomBulkToolbar() {
+            const checked = document.querySelectorAll('.room-row-checkbox:checked');
+            const toolbar = document.getElementById('roomBulkToolbar');
+            const countEl = document.getElementById('roomBulkCount');
+            const selectAll = document.getElementById('roomSelectAll');
+            const total = document.querySelectorAll('.room-row-checkbox').length;
+            if (countEl) countEl.textContent = checked.length;
+            if (toolbar) toolbar.classList.toggle('hidden', checked.length === 0);
+            if (selectAll) {
+                selectAll.indeterminate = checked.length > 0 && checked.length < total;
+                selectAll.checked = total > 0 && checked.length === total;
+            }
+        }
+        function clearRoomSelection() {
+            document.querySelectorAll('.room-row-checkbox').forEach(cb => { cb.checked = false; });
+            const selectAll = document.getElementById('roomSelectAll');
+            if (selectAll) selectAll.checked = false;
+            updateRoomBulkToolbar();
+        }
+
+        function toggleInstructorSelectAll(masterCb) {
+            document.querySelectorAll('.instructor-row-checkbox').forEach(cb => { cb.checked = masterCb.checked; });
+            updateInstructorBulkToolbar();
+        }
+        function updateInstructorBulkToolbar() {
+            const checked = document.querySelectorAll('.instructor-row-checkbox:checked');
+            const toolbar = document.getElementById('instructorBulkToolbar');
+            const countEl = document.getElementById('instructorBulkCount');
+            const selectAll = document.getElementById('instructorSelectAll');
+            const total = document.querySelectorAll('.instructor-row-checkbox').length;
+            if (countEl) countEl.textContent = checked.length;
+            if (toolbar) toolbar.classList.toggle('hidden', checked.length === 0);
+            if (selectAll) {
+                selectAll.indeterminate = checked.length > 0 && checked.length < total;
+                selectAll.checked = total > 0 && checked.length === total;
+            }
+        }
+        function clearInstructorSelection() {
+            document.querySelectorAll('.instructor-row-checkbox').forEach(cb => { cb.checked = false; });
+            const selectAll = document.getElementById('instructorSelectAll');
+            if (selectAll) selectAll.checked = false;
+            updateInstructorBulkToolbar();
+        }
+
+        // Reusable Confirmation Dialog Logic
+        let _warnCallback = null;
+        function warnConfirm({ title, message, sub, type, confirmText, onConfirm }) {
+            const c = type === 'warning'
+                ? { header: 'bg-amber-600', btn: 'bg-amber-600 hover:bg-amber-700' }
+                : { header: 'bg-rose-600',  btn: 'bg-rose-600 hover:bg-rose-700' };
+            document.getElementById('warnModalHeader').className = `px-6 py-4 flex items-center gap-3 ${c.header}`;
+            document.getElementById('warnModalTitle').textContent = title;
+            document.getElementById('warnModalMessage').textContent = message;
+            const subEl = document.getElementById('warnModalSub');
+            if (sub) { subEl.textContent = sub; subEl.classList.remove('hidden'); }
+            else { subEl.classList.add('hidden'); }
+            const btn = document.getElementById('warnModalConfirmBtn');
+            btn.textContent = confirmText || 'Confirm';
+            btn.className = `px-5 py-2 rounded-xl text-xs font-bold text-white transition-all shadow-xs ${c.btn}`;
+            _warnCallback = onConfirm;
+            document.getElementById('warnModal').classList.remove('hidden');
+        }
+        function closeWarnModal() {
+            document.getElementById('warnModal').classList.add('hidden');
+            _warnCallback = null;
+        }
+        document.getElementById('warnModalConfirmBtn')?.addEventListener('click', function() {
+            const cb = _warnCallback;
+            closeWarnModal();
+            if (cb) cb();
+        });
+
+        function submitPostAction(url) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = url;
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            const token = meta ? meta.getAttribute('content') : '{{ csrf_token() }}';
+            if (token) {
+                const csrf = document.createElement('input');
+                csrf.type = 'hidden';
+                csrf.name = 'csrf_token';
+                csrf.value = token;
+                form.appendChild(csrf);
+            }
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        function confirmDeleteExam(url) {
+            warnConfirm({ title: 'Delete Exam', message: 'Are you sure you want to delete this exam?',
+                sub: 'This will also clear any placed schedule time, proctor duty, and records. This cannot be undone.',
+                type: 'danger', confirmText: 'Yes, Delete Exam', onConfirm: () => submitPostAction(url) });
+        }
+        function confirmDeleteRoom(url) {
+            warnConfirm({ title: 'Delete Room', message: 'Are you sure you want to delete this room?',
+                sub: 'Any exams scheduled in this room will lose their room assignment.',
+                type: 'danger', confirmText: 'Yes, Delete Room', onConfirm: () => submitPostAction(url) });
+        }
+        function confirmDeleteInstructor(url) {
+            warnConfirm({ title: 'Delete Instructor', message: 'Are you sure you want to delete this instructor?',
+                sub: 'Their proctoring account and exam assignments will be affected.',
+                type: 'danger', confirmText: 'Yes, Delete Instructor', onConfirm: () => submitPostAction(url) });
+        }
+        function confirmBulkDeleteExams() {
+            const count = document.querySelectorAll('.exam-row-checkbox:checked').length;
+            warnConfirm({ title: 'Bulk Delete Exams', message: `You are about to permanently delete ${count} exam(s).`,
+                sub: 'This will clear all associated schedules, proctor allocations, and test collection records.',
+                type: 'danger', confirmText: `Delete ${count} Exam(s)`,
+                onConfirm: () => document.getElementById('examBulkDeleteForm').submit() });
+        }
+        function confirmBulkDeleteRooms() {
+            const count = document.querySelectorAll('.room-row-checkbox:checked').length;
+            warnConfirm({ title: 'Bulk Delete Rooms', message: `You are about to permanently delete ${count} room(s).`,
+                sub: 'Exams scheduled in these venues will lose their room assignments.',
+                type: 'danger', confirmText: `Delete ${count} Room(s)`,
+                onConfirm: () => document.getElementById('roomBulkDeleteForm').submit() });
+        }
+        function confirmBulkDeleteInstructors() {
+            const count = document.querySelectorAll('.instructor-row-checkbox:checked').length;
+            warnConfirm({ title: 'Bulk Delete Instructors', message: `You are about to permanently delete ${count} instructor(s).`,
+                sub: 'Their proctor accounts and exam assignments will be affected.',
+                type: 'danger', confirmText: `Delete ${count} Instructor(s)`,
+                onConfirm: () => document.getElementById('instructorBulkForm').submit() });
+        }
+        function confirmDeleteAllExams() {
+            warnConfirm({ title: 'Delete ALL Exams', message: 'You are about to permanently delete EVERY exam in the system.',
+                sub: 'This removes all schedules, reliever assignments, collection records, and absence reports. This cannot be undone.',
+                type: 'danger', confirmText: 'Yes, Delete Everything',
+                onConfirm: () => document.getElementById('deleteAllExamsForm').submit() });
+        }
+
+        // Initialize progress bars from data-width attribute
+        document.addEventListener("DOMContentLoaded", function() {
+            document.querySelectorAll('[data-width]').forEach(function(el) {
+                el.style.width = el.getAttribute('data-width');
+            });
+        });
     </script>
-
-    <!-- ── Import Rooms Modal ────────────────────────────────────────────── -->
-    <div id="importRoomsModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
-        <div class="flex items-center justify-center min-h-screen px-4">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="closeModal('importRoomsModal')"></div>
-            <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg p-6 z-10">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-gray-900">Import Rooms via CSV</h3>
-                    <button onclick="closeModal('importRoomsModal')" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
-                </div>
-
-                <!-- Column reference -->
-                <div class="mb-4">
-                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Required Columns</p>
-                    <table class="w-full text-xs border border-gray-200 rounded-lg overflow-hidden">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-3 py-2 text-left font-semibold text-gray-600">Column</th>
-                                <th class="px-3 py-2 text-left font-semibold text-gray-600">Type</th>
-                                <th class="px-3 py-2 text-left font-semibold text-gray-600">Notes</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100">
-                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">room_name</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">Required. e.g. <em>R101</em></td></tr>
-                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">capacity</code></td><td class="px-3 py-1.5 text-gray-500">Number</td><td class="px-3 py-1.5 text-gray-400">Seat count</td></tr>
-                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">building</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">e.g. <em>Main Building</em></td></tr>
-                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">floor</code></td><td class="px-3 py-1.5 text-gray-500">Number</td><td class="px-3 py-1.5 text-gray-400">Floor number</td></tr>
-                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">institute_code</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">e.g. <em>ICSLIS</em>, <em>IBM</em> — leave blank for shared</td></tr>
-                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">pwd_accessible</code></td><td class="px-3 py-1.5 text-gray-500">0 / 1</td><td class="px-3 py-1.5 text-gray-400">1 = PWD accessible</td></tr>
-                        </tbody>
-                    </table>
-                    <p class="text-xs text-gray-400 mt-2"><span class="font-medium text-gray-500">Sample row:</span> <code class="bg-gray-100 px-1 rounded">R101,40,Main Building,1,ICSLIS,1</code></p>
-                </div>
-
-                <!-- Upload form -->
-                <form action="/import/rooms" method="POST" enctype="multipart/form-data" class="space-y-3">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <input type="file" name="csv_file" accept=".csv" required
-                        class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-[#668054] hover:file:bg-green-100 border border-gray-200 rounded-lg p-2">
-                    <button type="submit" class="w-full py-2.5 text-sm font-semibold text-white bg-[#668054] hover:bg-[#4e7038] rounded-lg transition-colors">
-                        <i class="fa-solid fa-upload mr-2"></i> Upload &amp; Import
-                    </button>
-                </form>
-
-                <!-- Download links -->
-                <div class="mt-4 pt-4 border-t border-gray-100 flex justify-center gap-6 text-xs">
-                    <a href="/static/template_rooms.csv" class="text-[#668054] hover:underline"><i class="fa-solid fa-download mr-1"></i> Template CSV</a>
-                    <a href="/static/sample_rooms.csv" class="text-blue-500 hover:underline"><i class="fa-solid fa-file-csv mr-1"></i> Sample Data CSV</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ── Import Instructors Modal ───────────────────────────────────────── -->
-    <div id="importInstructorsModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
-        <div class="flex items-center justify-center min-h-screen px-4">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="closeModal('importInstructorsModal')"></div>
-            <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg p-6 z-10">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-gray-900">Import Instructors via CSV</h3>
-                    <button onclick="closeModal('importInstructorsModal')" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
-                </div>
-
-                <!-- Column reference -->
-                <div class="mb-4">
-                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Required Columns</p>
-                    <table class="w-full text-xs border border-gray-200 rounded-lg overflow-hidden">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-3 py-2 text-left font-semibold text-gray-600">Column</th>
-                                <th class="px-3 py-2 text-left font-semibold text-gray-600">Type</th>
-                                <th class="px-3 py-2 text-left font-semibold text-gray-600">Notes</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100">
-                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">name</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">Required. Full name</td></tr>
-                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">institute_code</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">e.g. <em>IBM</em>, <em>IEAS</em></td></tr>
-                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">building</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">Home building</td></tr>
-                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">is_pwd</code></td><td class="px-3 py-1.5 text-gray-500">0 / 1</td><td class="px-3 py-1.5 text-gray-400">1 = PWD instructor</td></tr>
-                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">subjects_taught</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">Pipe-separated: <em>Math|Physics</em></td></tr>
-                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded text-[#668054]">availability</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-[#668054] font-medium">e.g. <em>Mon 07:00-12:00, Wed</em></td></tr>
-                        </tbody>
-                    </table>
-                    <p class="text-xs text-gray-400 mt-2"><span class="font-medium text-gray-500">Sample row:</span> <code class="bg-gray-100 px-1 rounded">Juan Dela Cruz,juan@cca.edu.ph,ICSLIS,Main Building,0,IT 2|Database,"Mon 07:00-12:00"</code></p>
-                </div>
-
-                <!-- Upload form -->
-                <form action="/import/instructors" method="POST" enctype="multipart/form-data" class="space-y-3">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <input type="file" name="csv_file" accept=".csv" required
-                        class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-[#668054] hover:file:bg-green-100 border border-gray-200 rounded-lg p-2">
-                    <button type="submit" class="w-full py-2.5 text-sm font-semibold text-white bg-[#668054] hover:bg-[#4e7038] rounded-lg transition-colors">
-                        <i class="fa-solid fa-upload mr-2"></i> Upload &amp; Import
-                    </button>
-                </form>
-
-                <!-- Download links -->
-                <div class="mt-4 pt-4 border-t border-gray-100 flex justify-center gap-6 text-xs">
-                    <a href="/static/template_instructors.csv" class="text-[#668054] hover:underline"><i class="fa-solid fa-download mr-1"></i> Template CSV</a>
-                    <a href="/static/sample_instructors.csv" class="text-blue-500 hover:underline"><i class="fa-solid fa-file-csv mr-1"></i> Sample Data CSV</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ── Import Exams Modal ─────────────────────────────────────────────── -->
-    <div id="importExamsModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
-        <div class="flex items-center justify-center min-h-screen px-4">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="closeModal('importExamsModal')"></div>
-            <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg p-6 z-10">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-gray-900">Import Exams via CSV</h3>
-                    <button onclick="closeModal('importExamsModal')" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
-                </div>
-
-                <!-- Column reference -->
-                <div class="mb-4">
-                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Required Columns</p>
-                    <table class="w-full text-xs border border-gray-200 rounded-lg overflow-hidden">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-3 py-2 text-left font-semibold text-gray-600">Column</th>
-                                <th class="px-3 py-2 text-left font-semibold text-gray-600">Type</th>
-                                <th class="px-3 py-2 text-left font-semibold text-gray-600">Notes</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100">
-                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">subject_name</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">e.g. <em>Filipino 1</em></td></tr>
-                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">subject_code</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">Required. e.g. <em>6ADPROG</em></td></tr>
-                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">section</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">e.g. <em>GED1A</em></td></tr>
-                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">subject_type</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400"><em>Major</em> or <em>Minor</em></td></tr>
-                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">institute_code</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">e.g. <em>ICSLIS</em>, leave blank for GED</td></tr>
-                        </tbody>
-                    </table>
-                    <p class="text-xs text-gray-400 mt-2"><span class="font-medium text-gray-500">Sample row:</span> <code class="bg-gray-100 px-1 rounded">Filipino 1,6ADPROG,GED1A,Minor,</code></p>
-                    <p class="text-xs text-blue-500 mt-1"><i class="fa-solid fa-info-circle mr-1"></i>Duration is auto-set from Settings based on subject type (Major/Minor).</p>
-                </div>
-
-                <!-- Upload form -->
-                <form action="/import/exams" method="POST" enctype="multipart/form-data" class="space-y-3">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <input type="file" name="csv_file" accept=".csv" required
-                        class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-[#668054] hover:file:bg-green-100 border border-gray-200 rounded-lg p-2">
-                    <button type="submit" class="w-full py-2.5 text-sm font-semibold text-white bg-[#668054] hover:bg-[#4e7038] rounded-lg transition-colors">
-                        <i class="fa-solid fa-upload mr-2"></i> Upload &amp; Import
-                    </button>
-                </form>
-
-                <!-- Download links -->
-                <div class="mt-4 pt-4 border-t border-gray-100 flex justify-center gap-6 text-xs">
-                    <a href="/static/template_exams.csv" class="text-[#668054] hover:underline"><i class="fa-solid fa-download mr-1"></i> Template CSV</a>
-                    <a href="/static/sample_exams.csv" class="text-blue-500 hover:underline"><i class="fa-solid fa-file-csv mr-1"></i> Sample Data CSV</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-<!-- ── Reusable Warning Confirmation Modal ────────────────────────────── -->
-<div id="warnModal" class="fixed inset-0 z-[999] hidden overflow-y-auto">
-    <div class="flex items-center justify-center min-h-screen px-4">
-        <div class="fixed inset-0 bg-gray-900 bg-opacity-60" onclick="closeWarnModal()"></div>
-        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden z-10">
-            <div id="warnModalHeader" class="px-6 py-4 flex items-center gap-3">
-                <i class="fa-solid fa-triangle-exclamation text-2xl text-white"></i>
-                <h3 id="warnModalTitle" class="text-lg font-bold text-white"></h3>
-            </div>
-            <div class="p-6">
-                <p id="warnModalMessage" class="text-sm font-medium text-gray-800"></p>
-                <p id="warnModalSub" class="text-xs text-gray-500 mt-2 hidden"></p>
-            </div>
-            <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
-                <button onclick="closeWarnModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100">Cancel</button>
-                <button id="warnModalConfirmBtn" class="px-5 py-2 rounded-lg text-sm font-semibold text-white transition-colors"></button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-    let _warnCallback = null;
-    function warnConfirm({ title, message, sub, type, confirmText, onConfirm }) {
-        const c = type === 'warning'
-            ? { header: 'bg-amber-500', btn: 'bg-amber-500 hover:bg-amber-600' }
-            : { header: 'bg-red-600',   btn: 'bg-red-600 hover:bg-red-700' };
-        document.getElementById('warnModalHeader').className = `px-6 py-4 flex items-center gap-3 ${c.header}`;
-        document.getElementById('warnModalTitle').textContent = title;
-        document.getElementById('warnModalMessage').textContent = message;
-        const subEl = document.getElementById('warnModalSub');
-        if (sub) { subEl.textContent = sub; subEl.classList.remove('hidden'); }
-        else { subEl.classList.add('hidden'); }
-        const btn = document.getElementById('warnModalConfirmBtn');
-        btn.textContent = confirmText || 'Confirm';
-        btn.className = `px-5 py-2 rounded-lg text-sm font-semibold text-white transition-colors ${c.btn}`;
-        _warnCallback = onConfirm;
-        document.getElementById('warnModal').classList.remove('hidden');
-    }
-    function closeWarnModal() {
-        document.getElementById('warnModal').classList.add('hidden');
-        _warnCallback = null;
-    }
-    document.getElementById('warnModalConfirmBtn').addEventListener('click', function() {
-        const cb = _warnCallback;
-        closeWarnModal();
-        if (cb) cb();
-    });
-
-    function submitPostAction(url) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = url;
-        const meta = document.querySelector('meta[name="csrf-token"]');
-        const token = meta ? meta.getAttribute('content') : (window.csrfToken || '{{ csrf_token() }}');
-        if (token) {
-            const csrf = document.createElement('input');
-            csrf.type = 'hidden';
-            csrf.name = 'csrf_token';
-            csrf.value = token;
-            form.appendChild(csrf);
-        }
-        document.body.appendChild(form);
-        form.submit();
-    }
-
-    function confirmDeleteExam(url) {
-        warnConfirm({ title: 'Delete Exam', message: 'Are you sure you want to delete this exam?',
-            sub: 'This will also remove any associated schedule and records. This cannot be undone.',
-            type: 'danger', confirmText: 'Yes, Delete Exam', onConfirm: () => submitPostAction(url) });
-    }
-    function confirmDeleteRoom(url) {
-        warnConfirm({ title: 'Delete Room', message: 'Are you sure you want to delete this room?',
-            sub: 'Any exams scheduled in this room will lose their room assignment. This cannot be undone.',
-            type: 'danger', confirmText: 'Yes, Delete Room', onConfirm: () => submitPostAction(url) });
-    }
-    function confirmDeleteInstructor(url) {
-        warnConfirm({ title: 'Delete Instructor / Proctor', message: 'Are you sure you want to delete this instructor?',
-            sub: 'Their proctor account and all exam assignments will be affected. This cannot be undone.',
-            type: 'danger', confirmText: 'Yes, Delete Instructor', onConfirm: () => submitPostAction(url) });
-    }
-    function confirmBulkDeleteExams() {
-        const count = document.querySelectorAll('.exam-row-checkbox:checked').length;
-        warnConfirm({ title: 'Bulk Delete Exams', message: `You are about to permanently delete ${count} exam(s).`,
-            sub: 'This will also remove all related schedules, reliever assignments, and records. This CANNOT be undone.',
-            type: 'danger', confirmText: `Delete ${count} Exam(s)`,
-            onConfirm: () => document.getElementById('examBulkDeleteForm').submit() });
-    }
-    function confirmBulkDeleteRooms() {
-        const count = document.querySelectorAll('.room-row-checkbox:checked').length;
-        warnConfirm({ title: 'Bulk Delete Rooms', message: `You are about to permanently delete ${count} room(s).`,
-            sub: 'Exams scheduled in these rooms will lose their room assignment. This CANNOT be undone.',
-            type: 'danger', confirmText: `Delete ${count} Room(s)`,
-            onConfirm: () => document.getElementById('roomBulkDeleteForm').submit() });
-    }
-    function confirmBulkDeleteInstructors() {
-        const count = document.querySelectorAll('.instructor-row-checkbox:checked').length;
-        warnConfirm({ title: 'Bulk Delete Instructors', message: `You are about to permanently delete ${count} instructor(s).`,
-            sub: 'Their proctor accounts and all exam assignments will be affected. This CANNOT be undone.',
-            type: 'danger', confirmText: `Delete ${count} Instructor(s)`,
-            onConfirm: () => document.getElementById('instructorBulkForm').submit() });
-    }
-    function confirmDeleteAllExams() {
-        warnConfirm({ title: '⚠ Delete ALL Exams', message: 'You are about to permanently delete EVERY exam in the system.',
-            sub: 'This will remove all schedules, reliever assignments, collection records, and absence reports. This CANNOT be undone.',
-            type: 'danger', confirmText: 'Yes, Delete Everything',
-            onConfirm: () => document.getElementById('deleteAllExamsForm').submit() });
-    }
-</script>
-
-
-<script>
-function filterTable(inputId, rowSelector) {
-    const q = document.getElementById(inputId).value.toLowerCase();
-    document.querySelectorAll(rowSelector).forEach(r => {
-        r.style.display = r.innerText.toLowerCase().includes(q) ? "" : "none";
-    });
-}
-
-function filterUpcomingExams() {
-    const input = document.getElementById('searchUpcomingExams');
-    if (!input) return;
-    const q = input.value.toLowerCase().trim();
-    const rows = document.querySelectorAll('#upcomingExamsTable tbody tr.upcoming-exam-row');
-    const noMatch = document.getElementById('noUpcomingMatchesRow');
-    let visible = 0;
-    rows.forEach(r => {
-        const match = r.innerText.toLowerCase().includes(q);
-        r.style.display = match ? '' : 'none';
-        if (match) visible++;
-    });
-    if (noMatch) {
-        noMatch.style.display = (visible === 0 && rows.length > 0) ? '' : 'none';
-    }
-}
-</script>
 </body>
-
 </html>

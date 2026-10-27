@@ -28,6 +28,12 @@
         html.sidebar-collapsed .nav-text { display: none !important; }
         html.sidebar-collapsed .sidebar-header-container { justify-content: center !important; }
         html.sidebar-collapsed .sidebar-header-container > div:first-child { display: none !important; }
+
+        /* Smooth table scrollbars */
+        .table-scroll-container::-webkit-scrollbar { width: 6px; height: 6px; }
+        .table-scroll-container::-webkit-scrollbar-track { background: #f8fafc; border-radius: 4px; }
+        .table-scroll-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .table-scroll-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 
     <style>
@@ -54,7 +60,7 @@
         }
     </style>
 </head>
-<body class="bg-[#f4f7f6] text-gray-800 min-h-screen flex">
+<body class="bg-[#f8faf9] text-gray-800 min-h-screen flex">
 
     <!-- Sidebar -->
     {% set active_page = 'archives' %}
@@ -64,29 +70,33 @@
         {% include 'admin_sidebar.html' %}
     {% endif %}
 
-    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen">
+    <main id="main-content" class="flex-1 min-w-0 ml-64 content-transition min-h-screen pb-16">
         <!-- Top Nav -->
-        <header class="bg-white shadow-xs h-16 flex items-center justify-between px-8 z-10 sticky top-0 border-b border-gray-200">
+        <!-- Top Sticky Header -->
+        <header class="no-print bg-white/90 backdrop-blur-md border-b border-gray-200/80 h-16 flex items-center justify-between px-6 sm:px-8 z-20 sticky top-0 transition-all">
             <div class="flex items-center gap-3">
-                <i class="fa-solid fa-box-archive text-[#668054] text-xl"></i>
-                <h1 class="text-xl font-bold text-gray-900">Exam Archives</h1>
-                <span class="text-xs bg-gray-100 text-gray-600 font-semibold px-2.5 py-1 rounded-full border border-gray-200">
-                    Historical Records
+                <span class="w-8 h-8 rounded-lg bg-[#668054]/10 text-[#668054] flex items-center justify-center text-sm font-bold shadow-xs">
+                    <i class="fa-solid fa-box-archive"></i>
                 </span>
+                <div>
+                    <h1 class="text-base sm:text-lg font-bold text-gray-900 leading-tight">Historical Examination Archives</h1>
+                    <p class="text-[11px] text-gray-500 hidden sm:block">Pre-reset timetable backups, archived terms &amp; semester records</p>
+                </div>
             </div>
+            
             <div class="flex items-center gap-3">
-                <a href="/schedule" class="text-xs font-semibold px-3.5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center gap-1.5 transition">
+                <a href="/schedule" class="text-xs font-semibold px-3.5 py-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 rounded-xl shadow-2xs flex items-center gap-1.5 transition">
                     <i class="fa-solid fa-calendar-alt text-[#668054]"></i> Live Schedule
                 </a>
                 {% if session.get('role') == 'admin' %}
-                <button onclick="openCreateArchiveModal()" class="text-xs font-bold px-4 py-2 bg-[#668054] hover:bg-[#526843] text-white rounded-lg shadow-xs flex items-center gap-2 transition">
+                <button onclick="openCreateArchiveModal()" class="text-xs font-bold px-4 py-2 bg-[#668054] hover:bg-[#526843] text-white rounded-xl shadow-xs flex items-center gap-2 transition active:scale-95 cursor-pointer">
                     <i class="fa-solid fa-plus"></i> Archive Current Schedule
                 </button>
                 {% endif %}
             </div>
         </header>
 
-        <div class="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div class="px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6">
 
             <!-- Flash Messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -196,17 +206,17 @@
                 </div>
 
                 {% if archives %}
-                <div class="overflow-x-auto w-full">
+                <div class="overflow-x-auto overflow-y-auto max-h-[600px] w-full table-scroll-container">
                     <table class="w-full text-left text-xs" id="archivesTable">
-                        <thead class="bg-gray-50 text-gray-600 font-bold uppercase tracking-wider text-[11px] border-b border-gray-200">
+                        <thead class="bg-gray-50 text-gray-600 font-bold uppercase tracking-wider text-[11px] border-b border-gray-200 sticky top-0 z-10 shadow-2xs">
                             <tr>
-                                <th class="py-3.5 px-6">Archive Title & Period</th>
-                                <th class="py-3.5 px-4 text-center">Exam Count</th>
-                                <th class="py-3.5 px-4 text-center">Proctors</th>
-                                <th class="py-3.5 px-4 text-center">Sections</th>
-                                <th class="py-3.5 px-4">Exam Date Range</th>
-                                <th class="py-3.5 px-4">Archived On</th>
-                                <th class="py-3.5 px-6 text-right">Actions</th>
+                                <th class="py-3.5 px-6 bg-gray-50">Archive Title & Period</th>
+                                <th class="py-3.5 px-4 text-center bg-gray-50">Exam Count</th>
+                                <th class="py-3.5 px-4 text-center bg-gray-50">Proctors</th>
+                                <th class="py-3.5 px-4 text-center bg-gray-50">Sections</th>
+                                <th class="py-3.5 px-4 bg-gray-50">Exam Date Range</th>
+                                <th class="py-3.5 px-4 bg-gray-50">Archived On</th>
+                                <th class="py-3.5 px-6 text-right bg-gray-50">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 text-gray-700">

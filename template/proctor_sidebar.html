@@ -91,6 +91,9 @@
         }
         header h1 {
             font-size: 1.15rem !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
         }
         /* Form inputs: prevent iOS auto-zoom */
         input, select, textarea {
@@ -130,6 +133,10 @@
         <a href="/proctor" class="flex items-center px-4 py-3 group {% if active_page == 'proctor' %}bg-green-50 text-[#668054] border-r-4 border-[#668054]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#668054]{% endif %}" title="My Exams">
             <i class="fa-solid fa-clipboard-list w-6 text-center text-lg"></i>
             <span class="ml-3 nav-text font-medium">My Exams</span>
+        </a>
+        <a href="/proctor/availability" class="flex items-center px-4 py-3 group {% if active_page == 'availability' %}bg-green-50 text-[#668054] border-r-4 border-[#668054]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#668054]{% endif %}" title="Availability">
+            <i class="fa-regular fa-calendar-check w-6 text-center text-lg"></i>
+            <span class="ml-3 nav-text font-medium">Availability</span>
         </a>
     </nav>
 
@@ -284,6 +291,7 @@
 
 {% include 'change_password_modal.html' %}
 {% include 'notifications_modal.html' %}
+{% include 'account_guidelines_modal.html' %}
 
 <!-- Live notification badge polling -->
 <script src="{{ url_for('static', filename='js/notif_poll.js') }}" defer></script>

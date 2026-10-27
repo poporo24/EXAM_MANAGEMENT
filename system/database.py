@@ -22,7 +22,10 @@ def get_connection_pool():
                     password=url.password,
                     database=url.path[1:],
                     port=url.port or 3306,
-                    time_zone='+08:00'
+                    time_zone='+08:00',
+                    charset='utf8mb4',
+                    collation='utf8mb4_general_ci',
+                    use_unicode=True
                 )
             else:
                 _db_pool = pooling.MySQLConnectionPool(
@@ -34,7 +37,10 @@ def get_connection_pool():
                     password=os.environ.get('DB_PASSWORD', ""),
                     database=os.environ.get('DB_NAME', "cca_exam_management_db"),
                     port=int(os.environ.get('DB_PORT', 3306)),
-                    time_zone='+08:00'
+                    time_zone='+08:00',
+                    charset='utf8mb4',
+                    collation='utf8mb4_general_ci',
+                    use_unicode=True
                 )
         except Exception as pool_err:
             print(f"[DB Pool Init Notice] {pool_err}")
@@ -63,7 +69,10 @@ def open_db():
                 password=url.password,
                 database=url.path[1:],
                 port=url.port or 3306,
-                time_zone='+08:00'
+                time_zone='+08:00',
+                    charset='utf8mb4',
+                    collation='utf8mb4_general_ci',
+                    use_unicode=True
             )
         else:
             return mysql.connector.connect(
@@ -72,7 +81,10 @@ def open_db():
                 password=os.environ.get('DB_PASSWORD', ""),
                 database=os.environ.get('DB_NAME', "cca_exam_management_db"),
                 port=int(os.environ.get('DB_PORT', 3306)),
-                time_zone='+08:00'
+                time_zone='+08:00',
+                    charset='utf8mb4',
+                    collation='utf8mb4_general_ci',
+                    use_unicode=True
             )
     except mysql.connector.Error as err:
         print(f"Database Connection Error: {err}")
@@ -1067,8 +1079,11 @@ def add_instructor(name, institute_id=None, building=None, is_pwd=0, subjects_ta
         proctor_email = provided_email.strip()
         
         def clean_email_name(n):
-            # Convert to lowercase, replace non-alphanumeric with dot, and remove multiple dots
-            cleaned = re.sub(r'[^a-z0-9]', '.', n.lower())
+            # Transliterate ñ/Ñ and common accented characters to ASCII equivalents for institutional emails
+            import unicodedata
+            n_trans = (n or '').replace('ñ', 'n').replace('Ñ', 'n')
+            n_trans = ''.join(c for c in unicodedata.normalize('NFKD', n_trans) if not unicodedata.combining(c))
+            cleaned = re.sub(r'[^a-z0-9]', '.', n_trans.lower())
             return re.sub(r'\.+', '.', cleaned).strip('.')
 
         if not proctor_email:
@@ -3182,7 +3197,9 @@ def get_user_by_email(email):
     if not db: return None
     try:
         cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+        raw_email = (email or '').strip().lower()
+        norm_email = raw_email.replace('ñ', 'n').replace('Ñ', 'n')
+        cursor.execute("SELECT * FROM users WHERE LOWER(email) = %s OR LOWER(email) = %s", (norm_email, raw_email))
         return cursor.fetchone()
     finally:
         db.close()

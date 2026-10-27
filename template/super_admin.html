@@ -560,10 +560,11 @@
             const roleSelect = document.getElementById('roleFilter');
             const role = roleSelect ? roleSelect.value.toLowerCase() : 'all';
             const searchInput = document.getElementById('userSearchInput');
-            const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
+            const rawQuery = (searchInput ? searchInput.value : '').trim().toLowerCase();
+            const query = rawQuery.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
             const clearBtn = document.getElementById('clearUserSearchBtn');
             if (clearBtn) {
-                if (query.length > 0) clearBtn.classList.remove('hidden');
+                if (rawQuery.length > 0) clearBtn.classList.remove('hidden');
                 else clearBtn.classList.add('hidden');
             }
 
@@ -573,10 +574,11 @@
 
             rows.forEach(row => {
                 const userRole = (row.dataset.role || '').toLowerCase();
-                const textContent = row.textContent.toLowerCase();
+                const rawText = row.textContent.toLowerCase();
+                const textContent = rawText.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
                 const roleMatch = (role === 'all' || userRole === role);
-                const queryMatch = (query === '' || textContent.includes(query));
+                const queryMatch = (rawQuery === '' || rawText.includes(rawQuery) || textContent.includes(query));
 
                 if (roleMatch && queryMatch) {
                     row.style.display = '';
@@ -873,6 +875,8 @@
                 var p = parts.split(/\s+/);
                 parts = p[p.length - 1];
             }
+            // Transliterate ñ / accents so Peña becomes pena123 rather than pea123
+            parts = parts.replace(/[ñÑ]/g, 'n').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
             var clean = parts.toLowerCase().replace(/[^a-z0-9]/g, '');
             return clean ? clean + '123' : 'password123';
         }

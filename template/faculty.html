@@ -888,19 +888,21 @@ const BULK_EXAM_START = "{{ exam_start or '' }}";
 const BULK_EXAM_END   = "{{ exam_end or '' }}";
 
 function filterFacultyTable() {
-    const q = (document.getElementById('searchFaculty')?.value || '').toLowerCase().trim();
+    const rawQ = (document.getElementById('searchFaculty')?.value || '').toLowerCase().trim();
+    const q = rawQ.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const inst = (document.getElementById('filterInstitute')?.value || '').toLowerCase().trim();
     const clearBtn = document.getElementById('clearFacultySearch');
-    if (clearBtn) clearBtn.classList.toggle('hidden', !q);
+    if (clearBtn) clearBtn.classList.toggle('hidden', !rawQ);
 
     const rows = document.querySelectorAll('#facultyBulkForm table tbody tr');
     rows.forEach(row => {
         if (row.cells.length <= 1) return;
-        const text = row.innerText.toLowerCase();
+        const rawText = row.innerText.toLowerCase();
+        const text = rawText.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         const rowInst = (row.getAttribute('data-institute') || '').toLowerCase();
         
-        const matchQ = !q || text.includes(q);
-        const matchInst = !inst || rowInst === inst || text.includes(inst);
+        const matchQ = !rawQ || rawText.includes(rawQ) || text.includes(q);
+        const matchInst = !inst || rowInst === inst || rawText.includes(inst);
         
         row.style.display = (matchQ && matchInst) ? '' : 'none';
     });

@@ -1,8 +1,45 @@
+"""
+================================================================================
+CCA EXAM MANAGEMENT SYSTEM - AUTOMATED SCHEDULING ENGINE
+================================================================================
+Module: system.scheduler
+Purpose:
+  Implements the core Constraint Satisfaction Problem (CSP) heuristic algorithm
+  to generate conflict-free examination timetables for City College of Angeles.
+
+Key Constraint Rules Enforced:
+  1. Room Collisions: No two exams can occupy the same room at the same time.
+  2. Room Capacity: Room capacity must accommodate section student count.
+  3. PWD Accessibility: PWD instructors are strictly assigned to ground-floor/accessible rooms.
+  4. Proctor Collisions: No proctor can be assigned to multiple rooms simultaneously.
+  5. Conflict of Interest: Instructors are barred from proctoring courses they teach.
+  6. Proctor Workload Limits: Enforces max consecutive and max daily proctoring hours.
+  7. Fair Proctor Rotation: Balances cumulative proctoring hours across faculty.
+  8. Inter-Building Travel Buffer: Ensures buffer time (e.g., 15 mins) when moving between buildings.
+  9. Student Section Collisions: Students cannot have multiple exams at the same time.
+  10. Student Rest Interval: Enforces a 1-hour rest buffer between exams for the same section.
+  11. Student Daily Exam Ceiling: Caps daily exams (max 2-3 majors, max 4 total exams per day).
+  12. Common Subject Synchronization: Sections taking common exams or content groups are
+      synchronized to sit for the exam at the exact same timeslot across separate rooms.
+================================================================================
+"""
+
 from datetime import datetime, timedelta, date, time as dt_time
 from collections import defaultdict, OrderedDict
 import re as _re
 
 def _generate_slots(duration_minutes: int, day_start: dt_time, day_end: dt_time, interval: int):
+    """
+    PURPOSE:
+        Generates candidate exam start times between day_start and day_end based on interval.
+    INPUTS:
+        duration_minutes (int): Length of the exam in minutes
+        day_start (time): Daily opening hour (e.g. 07:00 AM)
+        day_end (time): Daily closing hour (e.g. 08:00 PM)
+        interval (int): Minutes between consecutive candidate slot starts (e.g. 60 mins)
+    RETURNS:
+        list of datetime.time: Valid slot start times that fit within the operating window
+    """
     slots = []
     end_limit = datetime(2000, 1, 1, day_end.hour, day_end.minute) - timedelta(minutes=duration_minutes)
     cur = datetime(2000, 1, 1, day_start.hour, day_start.minute)
@@ -12,9 +49,27 @@ def _generate_slots(duration_minutes: int, day_start: dt_time, day_end: dt_time,
     return slots
 
 def _overlaps(s1, e1, s2, e2):
+    """
+    PURPOSE:
+        Checks whether two half-open time intervals [s1, e1) and [s2, e2) intersect.
+    RETURNS:
+        bool: True if intervals overlap, False otherwise
+    """
     return s1 < e2 and s2 < e1
 
 def _to_time(val, default, is_end_of_day=False):
+    """
+    PURPOSE:
+        Normalizes various time representations (timedelta, string, or time object)
+        into a standard Python datetime.time instance.
+    INPUTS:
+        val: Input time value (e.g. "08:00 AM", "17:30", timedelta, time)
+        default (time): Fallback time if parsing fails
+        is_end_of_day (bool): If True, converts ambiguous early-morning numbers (<=11)
+                              into PM equivalents (e.g. "08:00" -> 20:00 / 8:00 PM)
+    RETURNS:
+        datetime.time
+    """
     from datetime import timedelta as _td, time as _time
     import re
     if isinstance(val, _td):
@@ -56,7 +111,28 @@ def _to_time(val, default, is_end_of_day=False):
 def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                   period_start: date, period_end: date, proctor_availability: dict,
                   settings=None):
+    """
+    PURPOSE:
+        Executes the automated exam scheduling algorithm for all unscheduled exam requests.
+    INPUTS:
+        pending_exams (list of dict): Exams to be scheduled (subject, section, duration, etc.)
+        rooms (list of dict): Available examination rooms with capacities & PWD accessibility
+        instructors (list of dict): Eligible faculty invigilators with teaching assignments
+        booked_slots (list of dict): Pre-existing confirmed bookings to respect and lock
+        period_start (date): Examination period starting date
+        period_end (date): Examination period ending date
+        proctor_availability (dict): Instructor ID -> list of available date/time windows
+        settings (dict): Configuration overrides (day_start, day_end, max_consecutive_hours, etc.)
+    RETURNS:
+        dict: {
+            'scheduled': list of successfully placed exam assignments with room & proctor,
+            'failed': list of unplaced exams with detailed conflict diagnostic reasons
+        }
+    """
     
+    # --------------------------------------------------------------------------
+    # STEP 1: PARSE SCHEDULING SYSTEM SETTINGS & THRESHOLDS
+    # --------------------------------------------------------------------------
     if settings is None: settings = {}
     day_start = _to_time(settings.get('day_start'), dt_time(7, 0))
     day_end = _to_time(settings.get('day_end'), dt_time(20, 0), is_end_of_day=True)
@@ -65,24 +141,30 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
     max_daily_hrs = float(settings.get('max_daily_proctor_hrs') or 4.0)
     travel_buffer = int(settings.get('travel_buffer_min', 15))
 
-    room_cal = defaultdict(list)
-    inst_cal = defaultdict(list)
-    section_cal   = defaultdict(list)   # section -> [(start, end), ...]
-    maj_count     = defaultdict(lambda: defaultdict(int))  # section -> date -> int
-    min_count     = defaultdict(lambda: defaultdict(int))  # section -> date -> int (minor)
-    total_exam_count = defaultdict(lambda: defaultdict(int))  # section -> date -> int (all types)
-    subject_locked_slot = {}
-    inst_last_building = defaultdict(dict)
-    inst_consecutive_hours = defaultdict(lambda: defaultdict(list))
-    inst_daily_hours = defaultdict(lambda: defaultdict(float))  # inst_id -> date -> total hours
-    inst_total_hours = defaultdict(float)                       # inst_id -> cumulative hours across exam period
-    inst_last_assigned = defaultdict(lambda: -1)                # inst_id -> assignment order for fair rotation
+    # --------------------------------------------------------------------------
+    # STEP 2: INITIALIZE RESOURCE TIMETABLES & WORKLOAD CALENDARS
+    # --------------------------------------------------------------------------
+    room_cal = defaultdict(list)                              # room_id -> [(start, end), ...]
+    inst_cal = defaultdict(list)                              # instructor_id -> [(start, end), ...]
+    section_cal = defaultdict(list)                           # section -> [(start, end), ...]
+    maj_count = defaultdict(lambda: defaultdict(int))         # section -> date -> major exams count
+    min_count = defaultdict(lambda: defaultdict(int))         # section -> date -> minor exams count
+    total_exam_count = defaultdict(lambda: defaultdict(int))  # section -> date -> total exams count
+    subject_locked_slot = {}                                  # group_key -> synchronized start datetime
+    inst_last_building = defaultdict(dict)                    # instructor_id -> date -> (last_end_time, building)
+    inst_consecutive_hours = defaultdict(lambda: defaultdict(list)) # instructor_id -> date -> [(s, e)]
+    inst_daily_hours = defaultdict(lambda: defaultdict(float))# instructor_id -> date -> cumulative hours
+    inst_total_hours = defaultdict(float)                     # instructor_id -> cumulative hours across entire exam period
+    inst_last_assigned = defaultdict(lambda: -1)              # instructor_id -> counter index for fair round-robin rotation
     assign_counter = [0]
     
     inst_map = {i['id']: i for i in instructors}
     room_map = {r['id']: r for r in rooms}
 
-    # Pre-compute subjects_taught set per instructor once to avoid inner-loop regex overhead
+    # --------------------------------------------------------------------------
+    # STEP 3: PRE-INDEX INSTRUCTOR TEACHING SUBJECTS (FOR CONFLICT OF INTEREST CHECK)
+    # --------------------------------------------------------------------------
+    # Instructors must never proctor examinations for courses they personally teach
     inst_subs_map = {}
     for i in instructors:
         raw_subs = i.get('subjects_taught') or ''
@@ -91,6 +173,9 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
         else:
             inst_subs_map[i['id']] = set()
 
+    # --------------------------------------------------------------------------
+    # STEP 4: INGEST PRE-EXISTING CONFIRMED EXAM BOOKINGS
+    # --------------------------------------------------------------------------
     for slot in booked_slots:
         r_id = slot.get('room_id')
         i_id = slot.get('instructor_id')
@@ -140,13 +225,19 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
             if sub_lock_key not in subject_locked_slot:
                 subject_locked_slot[sub_lock_key] = dt
 
+    # --------------------------------------------------------------------------
+    # STEP 5: BUILD DATE LIST FOR THE EXAM PERIOD
+    # --------------------------------------------------------------------------
     exam_dates = []
     cur = period_start
     while cur <= period_end:
         exam_dates.append(cur)
         cur += timedelta(days=1)
 
-    # Group by: content_group_id (highest priority) → subject_id → subject_name
+    # --------------------------------------------------------------------------
+    # STEP 6: GROUP PENDING EXAMS BY CONTENT GROUP OR SUBJECT FOR SYNCHRONIZATION
+    # --------------------------------------------------------------------------
+    # Sections sharing a content group or common subject must take their exam at the exact same timeslot
     raw_cg_groups = OrderedDict()
     subject_groups = OrderedDict()
     for exam in pending_exams:
@@ -161,6 +252,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
             key = (exam.get('subject_name') or '').strip().lower()
             subject_groups.setdefault(key, []).append(exam)
 
+    # Resolve content group splits if duplicate sections exist within the same group
     for cg_id, exams_in_cg in raw_cg_groups.items():
         sec_list = [e.get('section').strip() for e in exams_in_cg if e.get('section') and e.get('section').strip()]
         if len(sec_list) == len(set(sec_list)):
@@ -173,7 +265,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
             for sid, sub_exams in by_subj.items():
                 subject_groups[f"cg_{cg_id}_s_{sid}"] = sub_exams
 
-    # Ensure no group has duplicate sections or exceeds total available rooms/proctors
+    # Normalize groups to ensure no group exceeds concurrent room/proctor capacity
     max_concurrent = max(1, min(len(rooms), len(instructors)))
     normalized_groups = OrderedDict()
     for g_key, g_exams in subject_groups.items():
@@ -197,6 +289,10 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
             for b_idx, b in enumerate(buckets):
                 normalized_groups[f"{g_key}__part{b_idx+1}"] = b['items']
 
+    # --------------------------------------------------------------------------
+    # STEP 7: SORT EXAM GROUPS BY SCHEDULING PRIORITY
+    # --------------------------------------------------------------------------
+    # Heuristic: Major subjects and larger section cohorts are scheduled first (hardest to place)
     def group_sort_key(group):
         exams = group[1]
         has_major = any((e.get('subject_type') or 'Major') == 'Major' for e in exams)
@@ -204,14 +300,21 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
 
     sorted_groups = sorted(normalized_groups.items(), key=group_sort_key)
 
+    # --------------------------------------------------------------------------
+    # STEP 8: DEFINE CONSTRAINT CHECK HELPERS
+    # --------------------------------------------------------------------------
     def room_free(r_id, s, e):
+        """Checks if a room is unoccupied during interval [s, e)."""
         return all(not _overlaps(s, e, a, b) for a, b in room_cal[r_id])
 
     def inst_free(i_id, s, e):
+        """Checks if an instructor is free from other proctor duties during interval [s, e)."""
         return all(not _overlaps(s, e, a, b) for a, b in inst_cal[i_id])
 
     def section_free(sec, s, e):
-        """Return True if the section has no other exam overlapping [s, e) plus a 1-hour break."""
+        """
+        Enforces conflict-free section timetables with mandatory 1-hour rest interval between exams.
+        """
         if not sec or not sec.strip():
             return True
         s_buf = s - timedelta(hours=1)
@@ -242,6 +345,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
             fast_avail[i_id] = date_map
 
     def inst_available(i_id, exam_start_dt, exam_end_dt):
+        """Checks if exam slot falls within instructor's declared availability window."""
         inst_records = fast_avail.get(i_id)
         if not inst_records:
             return True
@@ -257,6 +361,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
         return False
     
     def get_consecutive_hours(i_id, exam_date, s, e):
+        """Calculates prospective consecutive proctoring hours if assigned to [s, e)."""
         blocks = inst_consecutive_hours[i_id][exam_date] + [(s, e)]
         blocks.sort(key=lambda x: x[0])
         current_start = blocks[0][0]
@@ -275,6 +380,9 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
     scheduled = []
     failed = []
 
+    # --------------------------------------------------------------------------
+    # STEP 9: MAIN SCHEDULING SEARCH & ASSIGNMENT LOOP
+    # --------------------------------------------------------------------------
     for subj_key, group_exams in sorted_groups:
         dur = max((e.get('duration_minutes') or 60) for e in group_exams)
         slots = _generate_slots(dur, day_start, day_end, slot_interval)
@@ -283,13 +391,13 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
         locked_start = subject_locked_slot.get(subj_key)
         placed_group = False
 
-        # Pre-compute subject names/codes/IDs for this group once
+        # Pre-compute subject tokens for conflict-of-interest check
         group_names = {(e.get('subject_name') or '').strip().lower() for e in group_exams if e.get('subject_name')}
         group_codes = {(e.get('subject_code') or '').strip().lower() for e in group_exams if e.get('subject_code')}
         group_sids  = {str(e.get('subject_id')) for e in group_exams if e.get('subject_id')}
         group_tokens = group_names | group_codes | group_sids
 
-        # Pre-compute instructors excluded by self-proctoring for this subject group
+        # Filter out instructors who teach this subject (prevent self-proctoring conflict)
         excluded_inst_ids = set()
         for inst in instructors:
             subs_taught = inst_subs_map.get(inst['id'])
@@ -301,6 +409,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
             if any(any(gn == sub or (len(sub) >= 4 and sub in gn) for sub in subs_taught) for gn in group_names):
                 excluded_inst_ids.add(inst['id'])
 
+        # Build and sort candidate timeslots
         candidate_datetimes = []
         if locked_start:
             candidate_datetimes = [locked_start]
@@ -311,6 +420,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
             
             is_major_group = any((e.get('subject_type') or 'Major') == 'Major' for e in group_exams)
             
+            # Prioritize dates where students currently have the lightest exam load
             def sort_key_for_date(dt):
                 d = dt.date()
                 max_total = 0
@@ -329,6 +439,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
 
         dur_hrs = dur / 60.0
         target_min_hrs = float(settings.get('target_min_proctor_hrs') or 4.0)
+        # Multi-tier relaxation hierarchy: attempts strict limits first, relaxes slightly if slots fail
         limit_tiers = [
             (2, target_min_hrs),          # Tier 1: Strict 2 majors, soft target 4.0 hrs
             (2, target_min_hrs + 1.0),    # Tier 2: Strict 2 majors, soft target 5.0 hrs
@@ -336,7 +447,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
             (3, 8.0)                      # Tier 4: 3 majors, maximum 8.0 hrs ceiling
         ]
 
-        # Pre-compute capacity requirements per exam in group
+        # Determine seating capacity requirements
         req_caps = []
         for e in group_exams:
             stu_cnt = int(e.get('section_student_count') or 0)
@@ -355,6 +466,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                 end_dt = start_dt + timedelta(minutes=dur)
                 ex_date = start_dt.date()
 
+                # Rule Check 1: Student section daily exam load limit
                 daily_limits_ok = True
                 for e in group_exams:
                     sec = (e.get('section') or '').strip()
@@ -375,6 +487,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                     fail_tally['daily_limits_reached'] += 1
                     continue
 
+                # Rule Check 2: Student section time conflict and 1-hour rest interval
                 section_ok = intra_group_ok and all(
                     section_free(e.get('section'), start_dt, end_dt)
                     for e in group_exams
@@ -383,6 +496,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                     fail_tally['section_collision_or_break'] += 1
                     continue
 
+                # Rule Check 3: Room availability & seating capacity
                 free_rooms = [r for r in rooms if room_free(r['id'], start_dt, end_dt) and int(r.get('capacity', 0) or 0) >= min_req_cap]
                 if len(free_rooms) < n_needed:
                     free_rooms = [r for r in rooms if room_free(r['id'], start_dt, end_dt) and int(r.get('capacity', 0) or 0) >= 35]
@@ -390,6 +504,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                     fail_tally[f'insufficient_rooms (have {len(free_rooms)}, need {n_needed})'] += 1
                     continue
 
+                # Rule Check 4: Proctor availability, workload limits & conflicts
                 candidate_insts = []
                 for i in instructors:
                     iid = i['id']
@@ -404,6 +519,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                     fail_tally[f'insufficient_proctors (have {len(candidate_insts)}, need {n_needed})'] += 1
                     continue
 
+                # Fair workload sorting: prioritize proctors with fewest daily and cumulative hours
                 candidate_insts.sort(key=lambda inst: (
                     inst_daily_hours[inst['id']][ex_date],
                     inst_total_hours[inst['id']],
@@ -415,6 +531,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                 available_rooms = list(free_rooms)
                 available_insts = list(candidate_insts)
             
+                # Rule Check 5: Room-Proctor assignment pairing (PWD accessibility & inter-building travel)
                 for idx, exam in enumerate(group_exams):
                     exam_room = None
                     exam_inst = None
@@ -423,7 +540,9 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                         last_b = inst_last_building[i['id']].get(ex_date)
                         for r in available_rooms:
                             if int(r.get('capacity', 0) or 0) < needed_cap and int(r.get('capacity', 0) or 0) < 35: continue
+                            # Enforce PWD accessibility: PWD proctors only placed in accessible rooms
                             if i.get('is_pwd') and not r.get('is_pwd_accessible'): continue
+                            # Enforce inter-building travel buffer (15 mins)
                             if last_b:
                                 last_end, b_name = last_b
                                 if b_name != r.get('building'):
@@ -447,6 +566,9 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                         assigned_this_slot = False
                         break
             
+                # --------------------------------------------------------------
+                # STEP 10: COMMIT VALIDATED ASSIGNMENTS TO TIMETABLE
+                # --------------------------------------------------------------
                 if assigned_this_slot:
                     for item in temp_schedule:
                         e = item['exam']
@@ -464,6 +586,7 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                             'instructor_name': i['name'],
                             'exam_date_time': start_dt,
                         })
+                        # Update calendars
                         room_cal[r['id']].append((start_dt, end_dt))
                         inst_cal[i['id']].append((start_dt, end_dt))
                         inst_consecutive_hours[i['id']][ex_date].append((start_dt, end_dt))
@@ -485,6 +608,9 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                     placed_group = True
                     break
 
+        # ----------------------------------------------------------------------
+        # STEP 11: RECORD DIAGNOSTICS FOR UNRESOLVABLE EXAMS
+        # ----------------------------------------------------------------------
         if not placed_group:
             top_fails = sorted(fail_tally.items(), key=lambda x: -x[1])[:3]
             fail_str = "; ".join(f"{k}: {v}" for k, v in top_fails) if top_fails else "all slots full"

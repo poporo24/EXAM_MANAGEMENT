@@ -1,7 +1,21 @@
 """
-app.py â€” CCA Exam Management System v2
-Full 50-feature implementation.
-Run:  python app.py
+================================================================================
+CCA EXAM MANAGEMENT SYSTEM - PRIMARY APPLICATION SERVER & ROUTE CONTROLLER
+================================================================================
+File: app.py
+Institution: City College of Angeles (CCA)
+System: Automated Academic Examination Scheduling & Administration Platform
+
+Description:
+  Acts as the primary Flask application controller orchestrating:
+  - Role-based routing (Super Admin, Admin, Secretary, Faculty/Proctor, Student)
+  - Integration with the automated timetable Constraint Satisfaction Problem engine
+  - Examination resource administration (rooms, subjects, faculty, exam requests)
+  - Examination material handouts and custody returns tracking
+  - Proctor availability declaration and relief assignment workflows
+  - Automated PDF/CSV reports, examination passes, and timetable generation
+  - Cryptographic authentication, session security, CSRF protection, and audit logging
+================================================================================
 """
 from flask import (Flask, render_template, session, redirect, url_for,
                    request, flash, jsonify, send_file, make_response)
@@ -84,7 +98,9 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_limiter.errors import RateLimitExceeded
 
-# â”€â”€ FLASK APP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 01: FLASK APPLICATION & SECURITY CONFIGURATION
+# ==============================================================================
 
 
 app = Flask(__name__, template_folder='template')
@@ -111,6 +127,11 @@ app.config.update(
 
 @app.before_request
 def check_session_inactivity():
+    """
+    PURPOSE: Automatically logs out users after 20 minutes of inactivity and audits the timeout event.
+    ACCESS:  Session middleware (all authenticated users)
+    METHOD:  Flask before_request hook
+    """
     # Skip idle check for static resources and public login/register/reset endpoints
     # 'api_unread_count' is skipped so background polling does NOT refresh _last_active
     # (otherwise idle users would never be auto-logged out). It enforces the idle check itself.
@@ -139,9 +160,15 @@ try:
 except Exception as _schema_err:
     print(f"Warning: automatic database schema check encountered an error: {_schema_err}")
 
-# â”€â”€ MAIL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 02: EMAIL DISPATCH & NOTIFICATION SERVICE
+# ==============================================================================
 
 def _configure_mail():
+    """
+    PURPOSE: Dynamically configures SMTP and mail settings from environment variables or database.
+    ACCESS:  Internal system helper
+    """
     try:
         s = get_system_settings()
     except Exception:
@@ -173,7 +200,10 @@ _PUBLISH_EMAIL_LOCK = threading.Lock()
 _PUBLISH_IN_PROGRESS = False
 
 def _can_send_email(to_email, subject, cooldown_seconds=600):
-    """Anti-spam guard: prevents sending duplicate emails to the same address within cooldown_seconds."""
+    """
+    PURPOSE: Anti-spam guard preventing duplicate automated emails to the same recipient within a cooldown window.
+    ACCESS:  Internal mail helper
+    """
     if not to_email:
         return False
     key = (to_email.strip().lower(), (subject or '').strip().lower())
@@ -193,7 +223,10 @@ def _can_send_email(to_email, subject, cooldown_seconds=600):
 
 
 def send_email_notification(to_email, subject, body, bypass_cooldown=False):
-    """Send an email in a background thread via Brevo API or Flask-Mail with anti-spam cooldown."""
+    """
+    PURPOSE: Dispatches an asynchronous email notification in a background thread via Brevo API or Flask-Mail.
+    ACCESS:  Internal mail dispatcher
+    """
     if not bypass_cooldown and not _can_send_email(to_email, subject):
         return
     try:
@@ -224,14 +257,26 @@ def send_email_notification(to_email, subject, body, bypass_cooldown=False):
             print(f"[Mail Error] {e}")
     _MAIL_POOL.submit(_send)
 
-# â”€â”€ HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 03: SECURITY GUARDS, TEMPLATE FILTERS & HELPERS
+# ==============================================================================
 
 def require_login():
+    """
+    PURPOSE: Route guard enforcing that an active authenticated session exists.
+    ACCESS:  Internal authentication guard
+    RETURNS: Redirect to login page if unauthenticated, None otherwise
+    """
     if 'user_id' not in session:
         return redirect(url_for('login'))
     return None
 
 def require_super_admin():
+    """
+    PURPOSE: Route guard enforcing that the active session holds Super Admin privileges.
+    ACCESS:  Super Admin gate
+    RETURNS: Redirect if unauthorized, None otherwise
+    """
     guard = require_login()
     if guard:
         return guard
@@ -242,6 +287,11 @@ def require_super_admin():
 
 @app.after_request
 def add_security_and_cache_headers(response):
+    """
+    PURPOSE: Injects HTTP security headers (X-Frame-Options, X-Content-Type-Options, Cache-Control, auto CSRF meta tags).
+    ACCESS:  HTTP response middleware
+    METHOD:  Flask after_request hook
+    """
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
@@ -264,6 +314,10 @@ def add_security_and_cache_headers(response):
 
 @app.errorhandler(CSRFError)
 def handle_csrf_error(e):
+    """
+    PURPOSE: Gracefully intercepts missing or invalid CSRF tokens and returns user-friendly warning or JSON 400.
+    ACCESS:  Error handler
+    """
     if request.is_json or request.path.startswith('/api/'):
         return jsonify({'error': 'CSRF token missing or invalid', 'message': str(e.description)}), 400
     flash(f"Security notice: {e.description}. Please refresh the page and try again.", "warning")
@@ -271,6 +325,10 @@ def handle_csrf_error(e):
 
 @app.errorhandler(RateLimitExceeded)
 def handle_ratelimit_error(e):
+    """
+    PURPOSE: Catches rate-limiting triggers with appropriate warning message or JSON 429 status.
+    ACCESS:  Error handler
+    """
     if request.is_json or request.path.startswith('/api/'):
         return jsonify({'error': 'Rate limit exceeded', 'message': 'Too many requests. Please slow down.'}), 429
     flash("Too many requests from your network. Please wait a moment before trying again.", "warning")
@@ -278,6 +336,10 @@ def handle_ratelimit_error(e):
 
 @app.template_filter('clean_hours')
 def clean_hours_filter(val):
+    """
+    PURPOSE: Jinja template filter formatting proctoring hour floats neatly (e.g. 3.0 -> 3, 3.5 -> 3.5).
+    ACCESS:  Template filter
+    """
     if val is None or val == '':
         return 0
     try:
@@ -288,6 +350,10 @@ def clean_hours_filter(val):
 
 @app.template_filter('exam_time_range')
 def exam_time_range_filter(dt, duration=60):
+    """
+    PURPOSE: Jinja template filter formatting exam start and end times into 12-hour strings (e.g. '08:00 AM - 09:30 AM').
+    ACCESS:  Template filter
+    """
     if not dt:
         return 'TBD'
     if isinstance(dt, str):
@@ -307,6 +373,10 @@ def exam_time_range_filter(dt, duration=60):
 
 @app.template_filter('exam_datetime_range')
 def exam_datetime_range_filter(dt, duration=60):
+    """
+    PURPOSE: Jinja template filter formatting exam date and time span with clean separators.
+    ACCESS:  Template filter
+    """
     if not dt:
         return 'TBD'
     if isinstance(dt, str):
@@ -325,6 +395,10 @@ def exam_datetime_range_filter(dt, duration=60):
     return f"{dt.strftime('%b %d, %Y')} • {dt.strftime('%I:%M %p')} - {end_dt.strftime('%I:%M %p')}" 
 
 def require_role(*roles):
+    """
+    PURPOSE: Enforces role-based authorization gate, redirecting unauthorized users to their designated role dashboard.
+    ACCESS:  Role authorization guard
+    """
     redir = require_login()
     if redir:
         return redir
@@ -333,6 +407,10 @@ def require_role(*roles):
     return None
 
 def _redirect_by_role():
+    """
+    PURPOSE: Determines and routes authenticated users to their corresponding role dashboard based on session.
+    ACCESS:  Routing helper
+    """
     role = session.get('role')
     if role in ('admin',):
         return redirect(url_for('dashboard'))
@@ -346,6 +424,10 @@ def _redirect_by_role():
     return redirect(url_for('login'))
 
 def _get_unread(user_id):
+    """
+    PURPOSE: Safely queries unread notification count for a specific user ID.
+    ACCESS:  Internal notification helper
+    """
     try:
         return get_unread_count(user_id)
     except Exception:
@@ -353,6 +435,10 @@ def _get_unread(user_id):
 
 @app.context_processor
 def inject_notifications_unread():
+    """
+    PURPOSE: Context processor injecting unread notification count and pending student approval counts into templates.
+    ACCESS:  Template context processor
+    """
     uid = session.get('user_id')
     role = session.get('role')
     unread = _get_unread(uid) if uid else 0
@@ -364,10 +450,17 @@ def inject_notifications_unread():
             pending_count = 0
     return {'unread_count': unread, 'pending_count': pending_count}
 
-# â”€â”€ AUTH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 04: AUTHENTICATION, PASSWORD RESET & LANDING ROUTES
+# ==============================================================================
 
 @app.route("/")
 def index():
+    """
+    PURPOSE: Root portal entry point routing logged-in users to their respective dashboards or guests to login.
+    ACCESS:  Public / All users
+    METHOD:  GET
+    """
     if 'user_id' in session:
         if not session.get('role'):
             session.clear()
@@ -377,6 +470,11 @@ def index():
 
 @app.route("/public/timetable")
 def public_timetable():
+    """
+    PURPOSE: Publicly accessible timetable portal allowing irregular and non-logged-in students to view published schedules by section.
+    ACCESS:  Public / Irregular students
+    METHOD:  GET
+    """
     is_pub = is_schedule_published()
     if not is_pub:
         # Strictly guard against viewing draft timetables via public portal
@@ -414,8 +512,13 @@ def public_timetable():
 @app.route("/forgot_password", methods=["GET", "POST"])
 @limiter.limit("5 per minute", methods=["POST"])
 def forgot_password():
+    """
+    PURPOSE: Initiates self-service password reset by generating and emailing a secure, time-sensitive token link.
+    ACCESS:  Public / Unauthenticated
+    METHOD:  GET, POST
+    """
     if request.method == "POST":
-        email = request.form.get("email", "").strip()
+        email = request.form.get("email", "").strip().lower().replace('ñ', 'n').replace('Ñ', 'n')
         user = get_user_by_email(email)
         if user:
             token = secrets.token_urlsafe(32)
@@ -439,6 +542,11 @@ def forgot_password():
 @app.route("/reset_password/<token>", methods=["GET", "POST"])
 @limiter.limit("5 per minute", methods=["POST"])
 def reset_password(token):
+    """
+    PURPOSE: Validates password reset token and allows the user to securely set a new password meeting security standards.
+    ACCESS:  Public / With valid token
+    METHOD:  GET, POST
+    """
     user = get_user_by_reset_token(token)
     
     if not user:
@@ -475,6 +583,12 @@ def reset_password(token):
 @app.route("/login", methods=["GET", "POST"])
 @limiter.limit("15 per minute", methods=["POST"])
 def login():
+    """
+    PURPOSE: Primary authentication endpoint validating institutional credentials, initializing sessions, and logging audit events.
+    ACCESS:  Public / All users
+    METHOD:  GET, POST
+    """
+    # Step 1: If GET request, redirect if session exists, else render login view with active sections
     if request.method == "GET":
         if 'user_id' in session and session.get('role'):
             return _redirect_by_role()
@@ -484,14 +598,17 @@ def login():
         show_demo = os.environ.get('SHOW_DEMO_ACCOUNTS', 'False').lower() in ('true', '1', 'yes')
         return render_template("login.html", sections=sections, show_demo=show_demo)
 
-    
-    # POST - process credentials
-    email    = request.form.get("email", "").strip()
+    # Step 2: Handle POST request - extract credentials and verify against bcrypt hash
+    email    = request.form.get("email", "").strip().lower().replace('ñ', 'n').replace('Ñ', 'n')
     password = request.form.get("password", "").strip()
     user = verify_login(email, password)
+
+    # Step 3: Check for pending/inactive student or proctor accounts
     if user == 'inactive':
         flash("Your account is pending admin approval. You will be notified once it is activated.", "warning")
         return redirect(url_for('login'))
+
+    # Step 4: If credentials are valid, initialize secure session and log audit trail
     if user:
         session.clear()
         session['user_id']        = user['id']
@@ -506,6 +623,8 @@ def login():
         session['_last_active']   = _time.time()
         log_audit_event('AUTH_LOGIN_SUCCESS', f"User authenticated as {user.get('role')}", user_id=user['id'], user_name=user['full_name'], user_role=user.get('role'), ip_address=request.remote_addr)
         return _redirect_by_role()
+
+    # Step 5: Log failed attempt for brute-force tracking and display error notification
     log_audit_event('AUTH_LOGIN_FAILED', f"Failed login attempt for: {email}", ip_address=request.remote_addr)
     flash("Invalid email or password.", "error")
     return redirect(url_for('login'))
@@ -513,22 +632,44 @@ def login():
 
 @app.route("/logout")
 def logout():
+    """
+    PURPOSE: Terminates user session, logs audit trail entry, and redirects user to login portal.
+    ACCESS:  Authenticated users
+    METHOD:  GET
+    """
     log_audit_event('AUTH_LOGOUT', "User logged out", user_id=session.get('user_id'), user_name=session.get('full_name'), user_role=session.get('role'), ip_address=request.remote_addr)
     session.clear()
     return redirect(url_for('login'))
 
-# â”€â”€ REGISTER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 05: STUDENT SELF-REGISTRATION & LEGAL PAGES
+# ==============================================================================
 
 @app.route("/terms")
 def terms_page():
+    """
+    PURPOSE: Displays institutional Terms of Service and examination platform guidelines.
+    ACCESS:  Public
+    METHOD:  GET
+    """
     return render_template("terms.html")
 
 @app.route("/privacy")
 def privacy_page():
+    """
+    PURPOSE: Displays institutional Data Privacy compliance disclosure statement.
+    ACCESS:  Public
+    METHOD:  GET
+    """
     return render_template("privacy.html")
 
 @app.route("/register", methods=["GET"])
 def register_page():
+    """
+    PURPOSE: Renders student self-registration form with institute and section dropdowns.
+    ACCESS:  Public / New students
+    METHOD:  GET
+    """
     if 'user_id' in session:
         return _redirect_by_role()
     institutes = get_all_institutes()
@@ -550,6 +691,12 @@ def register_page():
 @app.route("/register", methods=["POST"])
 @limiter.limit("10 per minute")
 def register_submit():
+    """
+    PURPOSE: Validates and saves new student self-registration, placing account in pending administrative approval queue.
+    ACCESS:  Public / New students
+    METHOD:  POST
+    """
+    # Step 1: Extract and sanitize user registration form fields
     first_name   = request.form.get("first_name", "").strip()
     last_name    = request.form.get("last_name", "").strip()
     middle_name  = request.form.get("middle_name", "").strip()
@@ -560,7 +707,7 @@ def register_submit():
     full_name_parts = [part for part in [first_name, middle_initial, suffix] if part]
     formatted_first_part = " ".join(full_name_parts)
     full_name = f"{last_name}, {formatted_first_part}" if last_name and formatted_first_part else (last_name or formatted_first_part)
-    email        = request.form.get("email", "").strip()
+    email        = request.form.get("email", "").strip().lower().replace('ñ', 'n').replace('Ñ', 'n')
     password     = request.form.get("password", "").strip()
     section      = request.form.get("section", "").strip()
     institute_id = request.form.get("institute_id") or None
@@ -569,10 +716,12 @@ def register_submit():
     if role not in ['student', 'proctor']:
         role = 'student'
         
+    # Step 2: Validate institutional domain requirement (@cca.edu.ph)
     if not email.endswith("@cca.edu.ph"):
         flash("Registration is restricted to @cca.edu.ph email addresses only.", "danger")
         return redirect(url_for('register_page'))
         
+    # Step 3: Validate password complexity against NIST guidelines
     is_valid, err_msg = validate_password_strength(password)
     if not is_valid:
         flash(err_msg, "danger")
@@ -582,12 +731,13 @@ def register_submit():
         flash("All fields are required.", "danger")
         return redirect(url_for('register_page'))
         
-    # Check if user already exists in MySQL
+    # Step 4: Check if email is already registered to prevent duplicates
     user_exists = get_user_by_email(email)
     if user_exists:
         flash("That email is already registered.", "danger")
         return redirect(url_for('register_page'))
-            # Create user in local MySQL
+
+    # Step 5: Insert user record in pending approval status (is_active = 0)
     result = register_user(full_name, email, password, role, section=section, institute_id=institute_id)
                            
     if result == 'ok':
@@ -597,10 +747,17 @@ def register_submit():
         flash("Something went wrong saving to the local database.", "danger")
         return redirect(url_for('register_page'))
 
-# --- ADMIN DASHBOARD ---
+# ==============================================================================
+# SECTION 06: ADMINISTRATIVE DASHBOARD
+# ==============================================================================
 
 @app.route("/dashboard")
 def dashboard():
+    """
+    PURPOSE: Main administrative control center displaying operational metrics, resource totals, and schedule summaries.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin')
     if guard: return guard
     stats           = get_dashboard_stats()
@@ -632,10 +789,17 @@ def dashboard():
                            exam_semester=exam_semester,
                            is_published=is_published)
 
-# â”€â”€ ADD ROUTES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 07: RESOURCE CRUD OPERATIONS (ROOMS, INSTRUCTORS, EXAMS)
+# ==============================================================================
 
 @app.route("/add_exam", methods=["POST"])
 def add_exam_route():
+    """
+    PURPOSE: Creates an examination request for a specific course, section, and duration into the scheduling pool.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     subject_id = request.form.get("subject_id")
@@ -668,6 +832,11 @@ def add_exam_route():
 
 @app.route("/add_room", methods=["POST"])
 def create_room():
+    """
+    PURPOSE: Registers a new examination room in the campus inventory with seating capacity and PWD accessibility flags.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     room_name = request.form.get("room_name", "").strip()
@@ -692,6 +861,11 @@ def create_room():
 @app.route("/edit_room/<int:id>", methods=["POST"])
 @app.route("/rooms/<int:id>/edit", methods=["POST"])
 def edit_room_route(id):
+    """
+    PURPOSE: Updates existing room attributes including building location, seating capacity, and accessibility status.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     room_name = request.form.get("room_name", "").strip()
@@ -713,6 +887,11 @@ def edit_room_route(id):
 @app.route("/delete_room/<int:id>", methods=["POST"])
 @app.route("/rooms/<int:id>/delete", methods=["POST"])
 def delete_room_route(id):
+    """
+    PURPOSE: Removes an individual examination room from the campus inventory.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     err = delete_room(id)
@@ -724,6 +903,11 @@ def delete_room_route(id):
 
 @app.route("/rooms/bulk_delete", methods=["POST"])
 def rooms_bulk_delete():
+    """
+    PURPOSE: Bulk deletes multiple selected rooms from the inventory.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     ids = request.form.getlist("room_ids")
@@ -745,6 +929,11 @@ def rooms_bulk_delete():
 
 @app.route("/add_instructor", methods=["POST"])
 def add_instructor_route():
+    """
+    PURPOSE: Registers a new faculty member with department affiliation, taught subjects, and proctoring eligibility.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     
@@ -775,6 +964,11 @@ def add_instructor_route():
 @app.route("/delete_instructor/<int:id>", methods=["POST"])
 @app.route("/faculty/<int:id>/delete", methods=["POST"])
 def remove_instructor(id):
+    """
+    PURPOSE: Deletes an instructor/proctor record from the institutional roster.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     err = delete_instructor(id)
@@ -787,6 +981,11 @@ def remove_instructor(id):
 @app.route("/faculty/bulk_delete", methods=["POST"])
 @app.route("/instructors/bulk_delete", methods=["POST"])
 def faculty_bulk_delete():
+    """
+    PURPOSE: Bulk deletes multiple selected faculty members from the roster.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     ids = request.form.getlist("instructor_ids")
@@ -812,6 +1011,11 @@ def faculty_bulk_delete():
 
 @app.route("/delete_exam/<int:id>", methods=["POST"])
 def remove_exam(id):
+    """
+    PURPOSE: Deletes a specific exam entry from the timetable or pending requests pool.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     delete_exam(id)
@@ -821,6 +1025,11 @@ def remove_exam(id):
 
 @app.route("/delete_all_exams", methods=["POST"])
 def remove_all_exams():
+    """
+    PURPOSE: Clears all scheduled and unscheduled exam records across the active academic term.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     count = delete_all_exams()
@@ -828,13 +1037,21 @@ def remove_all_exams():
     flash(f' All {count} exam(s) deleted successfully.', 'success')
     return redirect(url_for('dashboard') + '#exams')
 
-# â”€â”€ SCHEDULE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 08: SCHEDULING ENGINE INTEGRATION & TIMETABLE MANAGEMENT
+# ==============================================================================
 
 @app.route("/generate_schedule", methods=["POST"])
 def generate_schedule():
+    """
+    PURPOSE: Invokes the automated constraint satisfaction algorithm to schedule all unscheduled exams without collisions.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
 
+    # Step 1: Extract and validate examination term and period dates
     period_start_str = request.form.get("period_start")
     period_end_str   = request.form.get("period_end")
     day_start_str    = request.form.get("day_start")
@@ -963,6 +1180,11 @@ def generate_schedule():
 
 @app.route("/reset_schedule", methods=["POST"])
 def reset_schedule_route():
+    """
+    PURPOSE: Clears all assigned timeslots, rooms, and proctors, reverting exams to unscheduled draft status.
+    ACCESS:  Super Admin (or Admin if reset request approved)
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
 
@@ -1006,6 +1228,11 @@ def reset_schedule_route():
 
 @app.route("/admin/request_schedule_reset", methods=["POST"])
 def admin_request_schedule_reset():
+    """
+    PURPOSE: Allows Admin to submit a formal schedule reset request to Super Admin with justification notes.
+    ACCESS:  Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
 
@@ -1024,6 +1251,11 @@ def admin_request_schedule_reset():
 
 @app.route("/super_admin/approve_schedule_reset/<int:request_id>", methods=["POST"])
 def super_approve_schedule_reset(request_id):
+    """
+    PURPOSE: Super Admin approves pending schedule reset request, executing timetable reset and notifying the requester.
+    ACCESS:  Super Admin
+    METHOD:  POST
+    """
     guard = require_super_admin()
     if guard: return guard
 
@@ -1040,6 +1272,11 @@ def super_approve_schedule_reset(request_id):
 
 @app.route("/super_admin/reject_schedule_reset/<int:request_id>", methods=["POST"])
 def super_reject_schedule_reset(request_id):
+    """
+    PURPOSE: Super Admin rejects pending schedule reset request with administrative reason feedback.
+    ACCESS:  Super Admin
+    METHOD:  POST
+    """
     guard = require_super_admin()
     if guard: return guard
 
@@ -1055,6 +1292,10 @@ def super_reject_schedule_reset(request_id):
     return redirect(url_for('super_admin_page'))
 
 def log_email_event(msg):
+    """
+    PURPOSE: Records an email transmission audit entry for operational diagnostics.
+    ACCESS:  Internal email logger
+    """
     try:
         with open('email_log.txt', 'a', encoding='utf-8') as f:
             from datetime import datetime
@@ -1063,7 +1304,10 @@ def log_email_event(msg):
         pass
 
 def send_single_email_sync(to_email, subject, body, bypass_cooldown=False):
-    """Synchronously send one email via Brevo API or Flask-Mail with anti-spam check."""
+    """
+    PURPOSE: Synchronously transmits an individual email message via Brevo API or Flask-Mail.
+    ACCESS:  Internal email dispatcher
+    """
     if not bypass_cooldown and not _can_send_email(to_email, subject):
         return True, "Suppressed by anti-spam cooldown"
     try:
@@ -1095,9 +1339,8 @@ def send_single_email_sync(to_email, subject, body, bypass_cooldown=False):
 
 def _dispatch_publish_emails_async(admin_email=None, admin_name=None):
     """
-    Asynchronously queries all active proctors and students, compiles their assigned schedules,
-    and dispatches broadcast notification emails via Brevo/SMTP in the background.
-    Protected by single-flight lock and per-recipient de-duplication to prevent email spam.
+    PURPOSE: Asynchronously queries all active proctors and students to send published schedule email notifications.
+    ACCESS:  Internal asynchronous worker
     """
     import threading
     import time
@@ -1284,6 +1527,10 @@ CCA Exam Management System"""
     return True
 
 def view_email_log():
+    """
+    PURPOSE: Helper returning live in-memory email delivery log for diagnostics.
+    ACCESS:  Internal diagnostic helper
+    """
     guard = require_role('admin')
     if guard: return guard
     try:
@@ -1302,6 +1549,11 @@ def view_email_log():
 
 @app.route("/schedule/publish", methods=["POST"])
 def schedule_publish():
+    """
+    PURPOSE: Publishes draft timetable, making it visible to students, proctors, and public viewers and triggering broadcast alerts.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     from system.database import publish_schedule
@@ -1340,6 +1592,11 @@ def schedule_publish():
 
 @app.route("/schedule/unpublish", methods=["POST"])
 def schedule_unpublish():
+    """
+    PURPOSE: Reverts published timetable to draft mode, hiding it from public and student view for maintenance.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     from system.database import unpublish_schedule
@@ -1359,6 +1616,11 @@ def schedule_unpublish():
 
 @app.route("/resolve_conflicts", methods=["POST"])
 def resolve_conflicts_route():
+    """
+    PURPOSE: Evaluates schedule conflicts and attempts automated slot rebalancing to clear collisions.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     
@@ -1426,6 +1688,11 @@ def resolve_conflicts_route():
 
 @app.route("/api/audit_scheduler_live", methods=["GET"])
 def api_audit_scheduler_live():
+    """
+    PURPOSE: Diagnostic API auditing constraints across all currently scheduled exams and returning detailed collision reports.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_super_admin()
     if guard: return guard
     # Diagnostic endpoint for live server verification
@@ -1538,6 +1805,11 @@ def api_audit_scheduler_live():
 
 @app.route("/api/db_diagnostic", methods=["GET"])
 def api_db_diagnostic():
+    """
+    PURPOSE: Low-level diagnostic endpoint checking database connectivity and core table record counts.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_super_admin()
     if guard: return guard
     from system.database import audit_schedule_conflicts
@@ -1604,6 +1876,11 @@ def api_db_diagnostic():
 
 @app.route("/schedule")
 def schedule_view():
+    """
+    PURPOSE: Primary timetable management view displaying scheduled, pending, and conflicted examinations with filter controls.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin')
     if guard: return guard
     all_exams   = get_schedule_results()
@@ -1704,6 +1981,11 @@ def schedule_view():
 
 @app.route("/api/auto_schedule_exam", methods=["POST"])
 def api_auto_schedule_exam():
+    """
+    PURPOSE: Automatically finds the optimal conflict-free room and proctor slot for a single unassigned exam.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return jsonify({})
     data = request.get_json(force=True)
@@ -1717,6 +1999,11 @@ def api_auto_schedule_exam():
 
 @app.route("/api/suggest_times", methods=["POST"])
 def api_suggest_times():
+    """
+    PURPOSE: Proposes optimal conflict-free time slots for a specific course and section.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin')
     if guard: return jsonify([])
     data = request.get_json(force=True)
@@ -1731,6 +2018,11 @@ def api_suggest_times():
 
 @app.route("/api/available_resources", methods=["POST"])
 def available_resources():
+    """
+    PURPOSE: Returns lists of available rooms and proctors for a specified date and time window.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin')
     if guard:
         return jsonify({'error': 'Not authorised'}), 403
@@ -1745,6 +2037,11 @@ def available_resources():
 
 @app.route("/api/resource_availability", methods=["GET"])
 def api_resource_availability():
+    """
+    PURPOSE: JSON endpoint returning real-time room and proctor availability status for conflict prevention during manual slot editing.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin', 'secretary', 'proctor')
     if guard:
         return jsonify({'error': 'Not authorised'}), 403
@@ -1762,6 +2059,11 @@ def api_resource_availability():
 
 @app.route("/api/sister_sections", methods=["GET"])
 def get_sister_sections():
+    """
+    PURPOSE: Retrieves sister sections sharing the same subject or content group to coordinate synchronized slot changes.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin')
     if guard:
         return jsonify({'error': 'Not authorised'}), 403
@@ -1796,6 +2098,11 @@ def get_sister_sections():
 
 @app.route("/check_edit_conflict", methods=["POST"])
 def check_edit_conflict():
+    """
+    PURPOSE: Validates a proposed manual exam schedule adjustment against room, proctor, and section constraints prior to saving.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard:
         return jsonify({'conflicts': ['Not authorised.']}), 403
@@ -1810,6 +2117,11 @@ def check_edit_conflict():
 
 @app.route("/edit_exam_schedule/<int:exam_id>", methods=["POST"])
 def edit_exam_schedule(exam_id):
+    """
+    PURPOSE: Commits manual timetable edits (date, time, room, proctor) for an individual or synchronized group of exams.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     new_room_id  = int(request.form.get('room_id', 0))
@@ -1862,10 +2174,17 @@ def edit_exam_schedule(exam_id):
     return redirect(url_for('schedule_view'))
 
 
-# â”€â”€ INSTITUTES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 09: INSTITUTES & ACADEMIC UNITS
+# ==============================================================================
 
 @app.route("/institutes")
 def institutes_page():
+    """
+    PURPOSE: Displays academic institutes and departments management dashboard.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin')
     if guard: return guard
     institutes = get_all_institutes()
@@ -1874,6 +2193,11 @@ def institutes_page():
 
 @app.route("/institutes/add", methods=["POST"])
 def add_institute_route():
+    """
+    PURPOSE: Creates a new academic institute / department record.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     name = request.form.get("name", "").strip()
@@ -1897,6 +2221,11 @@ def add_institute_route():
 
 @app.route("/institutes/<int:id>/edit", methods=["POST"])
 def edit_institute_route(id):
+    """
+    PURPOSE: Updates institute name, code, or default exam capacity.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     edit_institute(id,
@@ -1909,6 +2238,11 @@ def edit_institute_route(id):
 
 @app.route("/institutes/<int:id>/delete", methods=["POST"])
 def delete_institute_route(id):
+    """
+    PURPOSE: Deletes an academic institute from the system.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     err = delete_institute(id)
@@ -1918,10 +2252,17 @@ def delete_institute_route(id):
         flash("Institute deleted.", "success")
     return redirect(url_for('institutes_page'))
 
-# â”€â”€ SUBJECTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 10: SUBJECTS & CONTENT GROUPS
+# ==============================================================================
 
 @app.route("/subjects/link_content", methods=["POST"])
 def link_content_route():
+    """
+    PURPOSE: Groups multiple course sections under a unified Content Group for synchronized multi-room examinations.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     raw_ids = request.form.getlist("subject_ids")
@@ -1954,6 +2295,11 @@ def link_content_route():
 
 @app.route("/subjects/<int:id>/unlink")
 def unlink_subject_route(id):
+    """
+    PURPOSE: Removes a subject or section from its assigned Content Group.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     unlink_subject_content_group(id)
@@ -1962,6 +2308,11 @@ def unlink_subject_route(id):
 
 @app.route("/subjects")
 def subjects_page():
+    """
+    PURPOSE: Curates subject catalog, course codes, classifications (Major vs Minor), and Content Group memberships.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin')
     if guard: return guard
     subjects       = get_all_subjects()
@@ -1974,6 +2325,11 @@ def subjects_page():
 
 @app.route("/subjects/add", methods=["POST"])
 def add_subject_route():
+    """
+    PURPOSE: Adds a new course subject with credit units, department, and examination duration.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     name = request.form.get("name", "").strip()
@@ -1996,6 +2352,11 @@ def add_subject_route():
 
 @app.route("/subjects/<int:id>/edit", methods=["POST"])
 def edit_subject_route(id):
+    """
+    PURPOSE: Modifies subject metadata, department assignment, or classification.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     edit_subject(id,
@@ -2010,6 +2371,11 @@ def edit_subject_route(id):
 
 @app.route("/subjects/<int:id>/delete", methods=["POST"])
 def delete_subject_route(id):
+    """
+    PURPOSE: Deletes an individual subject from the academic catalog.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     err = delete_subject(id)
@@ -2022,6 +2388,11 @@ def delete_subject_route(id):
 
 @app.route("/subjects/bulk_delete", methods=["POST"])
 def bulk_delete_subjects():
+    """
+    PURPOSE: Performs bulk deletion of multiple selected subjects.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     ids = request.form.getlist('subject_ids')
@@ -2047,6 +2418,11 @@ def bulk_delete_subjects():
 
 @app.route("/subjects/import", methods=["POST"])
 def import_subjects_route():
+    """
+    PURPOSE: Handles bulk CSV/Excel import of subjects into the course catalog.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     f = request.files.get("csv_file")
@@ -2065,10 +2441,17 @@ def import_subjects_route():
     flash(f"Imported {ok} subject(s). {len(errors)} error(s).", "success" if not errors else "warning")
     return redirect(url_for('subjects_page'))
 
-# â”€â”€ FACULTY MANAGEMENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 11: FACULTY & PROCTOR MANAGEMENT
+# ==============================================================================
 
 @app.route("/faculty")
 def faculty_page():
+    """
+    PURPOSE: Faculty management console tracking instructor profiles, proctor hours, and availability.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin')
     if guard: return guard
     instructors    = get_all_instructors()
@@ -2090,6 +2473,11 @@ def faculty_page():
 @app.route("/faculty/<int:id>/edit", methods=["POST"])
 @app.route("/edit_instructor/<int:id>", methods=["POST"])
 def faculty_edit(id):
+    """
+    PURPOSE: Updates faculty information including department, PWD status, and taught subjects.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     
@@ -2123,6 +2511,11 @@ def faculty_edit(id):
 @app.route("/faculty/<int:id>/deactivate", methods=["POST"])
 @app.route("/deactivate_instructor/<int:id>", methods=["POST"])
 def faculty_deactivate(id):
+    """
+    PURPOSE: Sets faculty member to inactive, removing them from proctor assignment pools.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     deactivate_instructor(id)
@@ -2135,6 +2528,11 @@ def faculty_deactivate(id):
 @app.route("/faculty/<int:id>/activate", methods=["POST"])
 @app.route("/activate_instructor/<int:id>", methods=["POST"])
 def faculty_activate(id):
+    """
+    PURPOSE: Restores inactive faculty member to active proctoring eligibility.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     activate_instructor(id)
@@ -2146,6 +2544,11 @@ def faculty_activate(id):
 
 @app.route("/admin/proctor_availability/<int:id>", methods=["GET", "POST"])
 def admin_proctor_availability(id):
+    """
+    PURPOSE: Administrative interface for viewing and manually updating specific proctor availability windows.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET, POST
+    """
     guard = require_role('admin')
     if guard: return guard
     
@@ -2224,6 +2627,11 @@ def admin_proctor_availability(id):
 
 @app.route("/admin/bulk_proctor_availability", methods=["POST"])
 def admin_bulk_proctor_availability():
+    """
+    PURPOSE: Bulk saves availability time blocks for multiple proctors simultaneously.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     
@@ -2255,10 +2663,17 @@ def admin_bulk_proctor_availability():
     flash(f"Availability successfully {action_desc} {len(instructor_ids)} selected instructor(s).", "success")
     return redirect(url_for('faculty_page'))
 
-# â”€â”€ IMPORT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 12: BULK DATA IMPORT WORKFLOWS (CSV / EXCEL)
+# ==============================================================================
 
 @app.route("/import/rooms", methods=["POST"])
 def import_rooms():
+    """
+    PURPOSE: Bulk imports classroom and lab inventory from uploaded CSV or Excel files.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     f = request.files.get("csv_file")
@@ -2279,6 +2694,11 @@ def import_rooms():
 
 @app.route("/import/instructors", methods=["POST"])
 def import_instructors():
+    """
+    PURPOSE: Bulk imports faculty profiles and teaching assignments from uploaded CSV/Excel files.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     f = request.files.get("csv_file")
@@ -2299,6 +2719,11 @@ def import_instructors():
 
 @app.route("/import/exams", methods=["POST"])
 def import_exams():
+    """
+    PURPOSE: Bulk imports course exam requests and section allocations from CSV/Excel files.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     f = request.files.get("csv_file")
@@ -2372,6 +2797,11 @@ def import_exams():
 
 @app.route("/exams/bulk_delete", methods=["POST"])
 def bulk_delete_exams_route():
+    """
+    PURPOSE: Bulk deletes multiple selected examination requests.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     ids = request.form.getlist('exam_ids')
@@ -2385,10 +2815,17 @@ def bulk_delete_exams_route():
         flash(f"{len(errors)} exam(s) could not be deleted.", "warning")
     return redirect(url_for('dashboard') + '#exams')
 
-# â”€â”€ EXPORT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 13: DATA EXPORT & AUDIT REPORTING (PDF & CSV)
+# ==============================================================================
 
 @app.route("/export/schedule.pdf")
 def export_schedule_pdf():
+    """
+    PURPOSE: Generates and streams official Master Exam Timetable PDF report.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin')
     if guard: return guard
     from system.exporter import export_schedule_pdf as _pdf
@@ -2427,6 +2864,11 @@ def export_schedule_pdf():
 
 @app.route("/export/absence_report.pdf")
 def export_absence_pdf():
+    """
+    PURPOSE: Generates and exports PDF audit report of recorded proctor absences and relief assignments.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin', 'secretary')
     if guard: return guard
     from system.exporter import export_proctor_report_pdf
@@ -2444,6 +2886,11 @@ def export_absence_pdf():
 
 @app.route("/export/assignment_report.pdf")
 def export_assignment_pdf():
+    """
+    PURPOSE: Generates comprehensive Proctor Assignment Workload Summary PDF report.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin', 'secretary')
     if guard: return guard
     from system.exporter import export_proctor_report_pdf
@@ -2458,6 +2905,11 @@ def export_assignment_pdf():
 
 @app.route("/export/collection_report.pdf")
 def export_collection_pdf():
+    """
+    PURPOSE: Generates Secretary Exam Material Handout and Return status audit PDF.
+    ACCESS:  Admin, Super Admin, Secretary
+    METHOD:  GET
+    """
     guard = require_role('admin', 'secretary')
     if guard: return guard
     from system.exporter import export_collection_report_pdf
@@ -2474,6 +2926,11 @@ def export_collection_pdf():
 
 @app.route("/reports/clear_absence", methods=["POST"])
 def clear_absence_reports_route():
+    """
+    PURPOSE: Clears historical proctor absence records after academic review.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     clear_absence_reports()
@@ -2489,6 +2946,11 @@ def clear_absence_reports_route():
 
 @app.route("/reports")
 def reports_page():
+    """
+    PURPOSE: Central reporting portal summarizing scheduling completeness, proctor load, and student exam distribution.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin', 'secretary')
     if guard: return guard
     date_from = request.args.get('from', '')
@@ -2524,6 +2986,11 @@ def reports_page():
 
 @app.route("/admin/archives")
 def admin_archives():
+    """
+    PURPOSE: Manages historical snapshots of previous exam periods and semesters for institutional compliance.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin', 'secretary')
     if guard: return guard
     archives = get_exam_archives()
@@ -2539,6 +3006,11 @@ def admin_archives():
 
 @app.route("/admin/archives/create", methods=["POST"])
 def admin_archives_create():
+    """
+    PURPOSE: Creates an immutable archived snapshot of the current exam timetable before term reset.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     academic_year = request.form.get("academic_year", "2025-2026").strip()
@@ -2564,6 +3036,11 @@ def admin_archives_create():
 
 @app.route("/admin/archives/<int:archive_id>")
 def admin_archive_view(archive_id):
+    """
+    PURPOSE: Displays read-only view of a saved historical examination archive.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin', 'secretary')
     if guard: return guard
     archive = get_exam_archive_by_id(archive_id)
@@ -2579,6 +3056,11 @@ def admin_archive_view(archive_id):
 
 @app.route("/admin/archives/<int:archive_id>/sync_durations", methods=["POST"])
 def admin_archive_sync_durations(archive_id):
+    """
+    PURPOSE: Utility aligning exam duration values across historical archive records.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     ok, msg = sync_archive_durations(archive_id)
@@ -2590,6 +3072,11 @@ def admin_archive_sync_durations(archive_id):
 
 @app.route("/admin/archives/<int:archive_id>/export_csv")
 def admin_archive_export_csv(archive_id):
+    """
+    PURPOSE: Exports archive records into formatted CSV spreadsheet.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin', 'secretary')
     if guard: return guard
     archive = get_exam_archive_by_id(archive_id)
@@ -2632,6 +3119,11 @@ def admin_archive_export_csv(archive_id):
 
 @app.route("/admin/archives/<int:archive_id>/export_pdf")
 def admin_archive_export_pdf(archive_id):
+    """
+    PURPOSE: Generates official PDF document of an archived examination timetable snapshot.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin', 'secretary')
     if guard: return guard
     archive = get_exam_archive_by_id(archive_id)
@@ -2652,6 +3144,11 @@ def admin_archive_export_pdf(archive_id):
 
 @app.route("/admin/archives/<int:archive_id>/delete", methods=["POST"])
 def admin_archive_delete(archive_id):
+    """
+    PURPOSE: Permanently removes a historical archive record.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_super_admin()
     if guard: return guard
     archive = get_exam_archive_by_id(archive_id)
@@ -2671,10 +3168,17 @@ def admin_archive_delete(archive_id):
         flash(f"Error deleting archive: {msg}", "danger")
     return redirect(url_for('admin_archives'))
 
-# â”€â”€ SETTINGS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 14: SYSTEM SETTINGS & CONSTRAINT CONFIGURATION
+# ==============================================================================
 
 @app.route("/settings")
 def settings_page():
+    """
+    PURPOSE: Displays master system settings, constraint parameters, term dates, and SMTP configuration.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin')
     if guard: return guard
     settings = get_system_settings()
@@ -2683,6 +3187,11 @@ def settings_page():
 
 @app.route("/settings/save", methods=["POST"])
 def settings_save():
+    """
+    PURPOSE: Saves master configuration changes (exam dates, proctor limits, daily caps, mail server).
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     
@@ -2743,6 +3252,11 @@ def settings_save():
 
 @app.route("/settings/test_email", methods=["POST"])
 def test_email():
+    """
+    PURPOSE: Sends diagnostic test email to verify SMTP and Brevo API connectivity.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     to = request.form.get("test_to", "")
@@ -2818,10 +3332,17 @@ def test_email():
         flash(f"Failed to send email: {e}", "danger")
     return redirect(url_for('settings_page'))
 
-# â”€â”€ CHANGE PASSWORD (Admin) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 15: ADMINISTRATIVE PASSWORD MANAGEMENT
+# ==============================================================================
 
 @app.route("/admin/change_password/<int:user_id>", methods=["POST"])
 def admin_change_password(user_id):
+    """
+    PURPOSE: Allows Administrator to change their own login password.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     new_password = request.form.get("new_password", "").strip()
@@ -2856,9 +3377,8 @@ def admin_change_password(user_id):
 
 def derive_user_reset_password(full_name=None):
     """
-    Generates a secure, cryptographically random temporary password for administrative reset.
-    Complies with NIST SP 800-63B guidelines (high entropy, non-predictable).
-    Format: CCA-XXXX-XXXX (e.g., CCA-8F2B-4A19)
+    PURPOSE: Generates a secure, cryptographically random temporary password.
+    ACCESS:  Internal security helper
     """
     import secrets
     token = secrets.token_hex(4).upper()
@@ -2866,6 +3386,11 @@ def derive_user_reset_password(full_name=None):
 
 @app.route("/admin/reset_password/<int:user_id>", methods=["POST"])
 def admin_reset_password(user_id):
+    """
+    PURPOSE: Allows Administrator to manually reset a student or proctor password.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     redirect_to = request.form.get("redirect_to", "students_page")
@@ -2894,10 +3419,17 @@ def admin_reset_password(user_id):
     return redirect(url_for(redirect_to))
 
 
-# â”€â”€ STUDENTS (Admin-accessible) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 16: STUDENT ROSTER & ENROLLMENT MANAGEMENT
+# ==============================================================================
 
 @app.route("/students")
 def students_page():
+    """
+    PURPOSE: Displays student enrollment roster with search, section filters, and approval queues.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin')
     if guard: return guard
     pending_students = get_pending_users()
@@ -2926,6 +3458,11 @@ def students_page():
 
 @app.route("/admin/edit_student/<int:user_id>", methods=["POST"])
 def admin_edit_student(user_id):
+    """
+    PURPOSE: Modifies student profile details including student number, institute, and section.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     new_section = request.form.get("section", "").strip()
@@ -2968,6 +3505,11 @@ def admin_edit_student(user_id):
 
 @app.route("/students/approve/<int:id>", methods=["POST"])
 def admin_approve_student(id):
+    """
+    PURPOSE: Approves pending student registration, activating their account for portal access.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     approve_student(id)
@@ -2976,6 +3518,11 @@ def admin_approve_student(id):
 
 @app.route("/students/reject/<int:id>", methods=["POST"])
 def admin_reject_student(id):
+    """
+    PURPOSE: Rejects unverified student self-registration request.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     err = delete_user(id)
@@ -2987,6 +3534,11 @@ def admin_reject_student(id):
 
 @app.route("/students/deactivate/<int:id>", methods=["POST"])
 def admin_deactivate_student(id):
+    """
+    PURPOSE: Suspends a student account, blocking portal login.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     deactivate_student(id)
@@ -2995,6 +3547,11 @@ def admin_deactivate_student(id):
 
 @app.route("/students/reactivate/<int:id>", methods=["POST"])
 def admin_reactivate_student(id):
+    """
+    PURPOSE: Re-activates a suspended student account.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     approve_student(id)   # approve_student sets is_active=1 and notifies
@@ -3003,6 +3560,11 @@ def admin_reactivate_student(id):
 
 @app.route("/students/bulk_action", methods=["POST"])
 def students_bulk_action():
+    """
+    PURPOSE: Executes bulk approval, deactivation, or deletion across selected student accounts.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     action   = request.form.get('bulk_action', '')
@@ -3047,10 +3609,17 @@ def students_bulk_action():
         flash("Unknown action.", "danger")
     return redirect(url_for('students_page'))
 
-# â”€â”€ SUPER ADMIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 17: SUPER ADMINISTRATOR CONSOLE
+# ==============================================================================
 
 @app.route("/super_admin")
 def super_admin_page():
+    """
+    PURPOSE: Master administrative cockpit overseeing user roles, registration queues, and system audits.
+    ACCESS:  Super Admin
+    METHOD:  GET
+    """
     guard = require_super_admin()
     if guard: return guard
     users            = get_all_users()
@@ -3070,6 +3639,11 @@ def super_admin_page():
 
 @app.route("/super_admin/approve_student/<int:id>", methods=["POST"])
 def approve_student_route(id):
+    """
+    PURPOSE: Super Admin route to approve pending student account registration.
+    ACCESS:  Super Admin
+    METHOD:  POST
+    """
     guard = require_super_admin()
     if guard: return guard
     approve_student(id)
@@ -3085,6 +3659,11 @@ def approve_student_route(id):
 
 @app.route("/super_admin/reject_student/<int:id>", methods=["POST"])
 def reject_student_route(id):
+    """
+    PURPOSE: Super Admin route to reject pending student registration request.
+    ACCESS:  Super Admin
+    METHOD:  POST
+    """
     guard = require_super_admin()
     if guard: return guard
     err = delete_user(id)
@@ -3103,6 +3682,11 @@ def reject_student_route(id):
 
 @app.route("/super_admin/edit_user/<int:id>", methods=["POST"])
 def super_edit_user(id):
+    """
+    PURPOSE: Edits any user record including role changes, institute, and section reassignment.
+    ACCESS:  Super Admin
+    METHOD:  POST
+    """
     guard = require_super_admin()
     if guard: return guard
     try:
@@ -3122,7 +3706,7 @@ def super_edit_user(id):
         else:
             full_name = request.form.get("name", "").strip()
             
-        email        = request.form.get("email", "").strip()
+        email        = request.form.get("email", "").strip().lower().replace('ñ', 'n').replace('Ñ', 'n')
         role         = request.form.get("role", "student").strip()
         section      = request.form.get("section", "").strip()
         institute_id = request.form.get("institute_id") or None
@@ -3176,10 +3760,15 @@ def super_edit_user(id):
 
 @app.route("/super_admin/update_email", methods=["POST"])
 def super_update_email():
+    """
+    PURPOSE: Updates the registered email address for a user account.
+    ACCESS:  Super Admin
+    METHOD:  POST
+    """
     guard = require_super_admin()
     if guard: return guard
     
-    new_email = request.form.get("new_email", "").strip()
+    new_email = request.form.get("new_email", "").strip().lower().replace('ñ', 'n').replace('Ñ', 'n')
     if not new_email.endswith("@cca.edu.ph"):
         flash("Email must be a valid @cca.edu.ph address.", "danger")
         return redirect(url_for('super_admin_page'))
@@ -3211,6 +3800,11 @@ def super_update_email():
 
 @app.route("/super_admin/delete_user/<int:id>", methods=["POST"])
 def super_delete_user(id):
+    """
+    PURPOSE: Permanently removes a user account from the system.
+    ACCESS:  Super Admin
+    METHOD:  POST
+    """
     guard = require_super_admin()
     if guard: return guard
     if id == session.get('user_id'):
@@ -3246,6 +3840,11 @@ def super_delete_user(id):
 
 @app.route("/super_admin/bulk_delete_users", methods=["POST"])
 def super_bulk_delete_users():
+    """
+    PURPOSE: Bulk deletes multiple selected user accounts.
+    ACCESS:  Super Admin
+    METHOD:  POST
+    """
     guard = require_super_admin()
     if guard: return guard
 
@@ -3288,6 +3887,11 @@ def super_bulk_delete_users():
 
 @app.route("/super_admin/reset_password/<int:id>", methods=["POST"])
 def super_reset_password(id):
+    """
+    PURPOSE: Super Admin override to reset credentials for any user account.
+    ACCESS:  Super Admin
+    METHOD:  POST
+    """
     guard = require_super_admin()
     if guard: return guard
     db = open_db()
@@ -3317,11 +3921,18 @@ def super_reset_password(id):
             db.close()
     return redirect(url_for('super_admin_page'))
 
-# â”€â”€ PROCTOR DASHBOARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 18: PROCTOR PORTAL & AVAILABILITY SUBMISSION
+# ==============================================================================
 
 @app.route("/proctor")
 @app.route("/proctor/dashboard")
 def proctor_dashboard():
+    """
+    PURPOSE: Faculty proctor portal displaying assigned exam shifts, room locations, and guidelines.
+    ACCESS:  Proctor, Faculty
+    METHOD:  GET
+    """
     guard = require_role('proctor')
     if guard: return guard
     is_pub = is_schedule_published()
@@ -3404,6 +4015,11 @@ def proctor_dashboard():
 
 @app.route("/proctor/availability")
 def proctor_availability():
+    """
+    PURPOSE: Allows faculty proctors to declare and submit their preferred availability time windows.
+    ACCESS:  Proctor, Faculty
+    METHOD:  GET, POST
+    """
     guard = require_role('proctor')
     if guard: return guard
     
@@ -3501,6 +4117,11 @@ def proctor_availability():
 
 @app.route("/proctor/schedule.pdf")
 def export_proctor_schedule_pdf_route():
+    """
+    PURPOSE: Exports personalized proctoring shift schedule into printable PDF slip.
+    ACCESS:  Proctor, Faculty
+    METHOD:  GET
+    """
     guard = require_role('proctor')
     if guard: return guard
     if not is_schedule_published():
@@ -3541,6 +4162,11 @@ def export_proctor_schedule_pdf_route():
 
 @app.route("/proctor/report_absence", methods=["POST"])
 def proctor_report_absence():
+    """
+    PURPOSE: Allows proctor to log emergency absence for an assigned shift, notifying department secretary.
+    ACCESS:  Proctor, Faculty
+    METHOD:  POST
+    """
     guard = require_role('proctor')
     if guard: return guard
     instructor_id = session.get('instructor_id')
@@ -3583,10 +4209,17 @@ def proctor_report_absence():
     create_notification_for_role('secretary', title, msg)
     return redirect(url_for('proctor_dashboard'))
 
-# â”€â”€ RELIEVERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 19: STANDBY RELIEVER (INVIGILATOR) MANAGEMENT
+# ==============================================================================
 
 @app.route("/relievers")
 def relievers_page():
+    """
+    PURPOSE: Reliever management console for tracking standby invigilators available on call.
+    ACCESS:  Admin, Super Admin, Secretary
+    METHOD:  GET
+    """
     guard = require_role('admin')
     if guard: return guard
     relievers  = get_all_relievers()
@@ -3603,6 +4236,11 @@ def relievers_page():
 
 @app.route("/relievers/add", methods=["POST"])
 def add_reliever_route():
+    """
+    PURPOSE: Designates a faculty member as standby reliever for an exam timeslot.
+    ACCESS:  Admin, Super Admin, Secretary
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     exam_id       = request.form.get("exam_id")
@@ -3632,17 +4270,29 @@ def add_reliever_route():
 
 @app.route("/relievers/remove/<int:id>", methods=["POST"])
 def remove_reliever_route(id):
+    """
+    PURPOSE: Removes a standby reliever designation.
+    ACCESS:  Admin, Super Admin, Secretary
+    METHOD:  POST
+    """
     guard = require_role('admin')
     if guard: return guard
     remove_reliever(id)
     flash("Reliever removed.", "success")
     return redirect(url_for('faculty_page'))
 
-# â”€â”€ SECRETARY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 20: DEPARTMENT SECRETARY & EXAM LOGISTICS CONTROL
+# ==============================================================================
 
 @app.route("/secretary")
 @app.route("/secretary/dashboard")
 def secretary_dashboard():
+    """
+    PURPOSE: Department Secretary operational console for managing exam paper release, collection, and relievers.
+    ACCESS:  Secretary, Admin
+    METHOD:  GET
+    """
     guard = require_role('secretary', 'admin')
     if guard: return guard
     is_pub = is_schedule_published()
@@ -3684,13 +4334,8 @@ def secretary_dashboard():
 
 def _can_secretary_access_exam(exam_id):
     """
-    Enforces departmental boundaries (Principle of Least Privilege).
-    Admins can access all exams.
-    Secretaries can access an exam if:
-    1. The exam belongs to their assigned institute (exam['institute_id'] == sec_inst_id).
-    2. The assigned/absent proctor belongs to their assigned institute (instructor['institute_id'] == sec_inst_id),
-       allowing the proctor's home department to dispatch a substitute reliever.
-    3. An absence was reported for this exam involving a proctor from their institute.
+    PURPOSE: Enforces departmental boundaries ensuring secretaries only manage exams belonging to their institute.
+    ACCESS:  Internal security helper
     """
     if session.get('role') == 'admin':
         return True
@@ -3737,6 +4382,11 @@ def _can_secretary_access_exam(exam_id):
 
 @app.route("/api/substitute_candidates/<int:exam_id>", methods=["GET"])
 def api_substitute_candidates(exam_id):
+    """
+    PURPOSE: Suggests eligible substitute proctors free during a specific exam slot to replace an absent invigilator.
+    ACCESS:  Secretary, Admin
+    METHOD:  GET
+    """
     guard = require_role('secretary', 'admin')
     if guard: return jsonify({'error': 'Not authorised'}), 403
     if not _can_secretary_access_exam(exam_id):
@@ -3749,6 +4399,11 @@ def api_substitute_candidates(exam_id):
 
 @app.route("/secretary/assign_substitute", methods=["POST"])
 def secretary_assign_substitute():
+    """
+    PURPOSE: Reassigns an exam slot from an absent proctor to an available substitute invigilator.
+    ACCESS:  Secretary, Admin
+    METHOD:  POST
+    """
     guard = require_role('secretary', 'admin')
     if guard: return guard
     exam_id = request.form.get("exam_id")
@@ -3827,6 +4482,11 @@ def secretary_assign_substitute():
 
 @app.route("/secretary/collect/<int:exam_id>", methods=["POST"])
 def secretary_collect(exam_id):
+    """
+    PURPOSE: Records proctor check-in and pickup of examination questionnaire packets.
+    ACCESS:  Secretary, Admin
+    METHOD:  POST
+    """
     guard = require_role('secretary', 'admin')
     if guard: return guard
     if not _can_secretary_access_exam(exam_id):
@@ -3847,6 +4507,11 @@ def secretary_collect(exam_id):
 
 @app.route("/secretary/batch_collect", methods=["POST"])
 def secretary_batch_collect():
+    """
+    PURPOSE: Bulk records material collection across multiple ongoing exams.
+    ACCESS:  Secretary, Admin
+    METHOD:  POST
+    """
     guard = require_role('secretary', 'admin')
     if guard: return guard
     raw_exam_ids = request.form.getlist("exam_ids")
@@ -3892,6 +4557,11 @@ def secretary_batch_collect():
 
 @app.route("/secretary/return/<int:exam_id>", methods=["POST"])
 def secretary_return(exam_id):
+    """
+    PURPOSE: Records safe return of completed student answer sheets and test materials post-exam.
+    ACCESS:  Secretary, Admin
+    METHOD:  POST
+    """
     guard = require_role('secretary', 'admin')
     if guard: return guard
     if not _can_secretary_access_exam(exam_id):
@@ -3911,6 +4581,11 @@ def secretary_return(exam_id):
 
 @app.route("/secretary/batch_return", methods=["POST"])
 def secretary_batch_return():
+    """
+    PURPOSE: Bulk marks exam materials as returned to academic department custody.
+    ACCESS:  Secretary, Admin
+    METHOD:  POST
+    """
     guard = require_role('secretary', 'admin')
     if guard: return guard
     raw_exam_ids = request.form.getlist("exam_ids")
@@ -3957,7 +4632,11 @@ def secretary_batch_return():
 @app.route("/api/secretary/pending_absences")
 @limiter.exempt
 def api_secretary_pending_absences():
-    """Real-time JSON endpoint for unresolved proctor absences within the secretary's institute."""
+    """
+    PURPOSE: Real-time JSON endpoint for unresolved proctor absences needing immediate relief.
+    ACCESS:  Secretary, Admin
+    METHOD:  GET
+    """
     uid = session.get('user_id')
     role = session.get('role')
     if not uid or role not in ('secretary', 'admin'):
@@ -3996,6 +4675,11 @@ def api_secretary_pending_absences():
 
 @app.route("/secretary/change_password", methods=["POST"])
 def secretary_change_password():
+    """
+    PURPOSE: Allows Department Secretary to update account password.
+    ACCESS:  Secretary
+    METHOD:  POST
+    """
     guard = require_role('secretary', 'admin')
     if guard: return guard
 
@@ -4047,10 +4731,17 @@ def secretary_change_password():
             db.close()
     return redirect(url_for('secretary_dashboard'))
 
-# â”€â”€ PROCTOR ABSENCE (Admin view) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 21: PROCTOR ABSENCE MONITORING & INCIDENT MANAGEMENT
+# ==============================================================================
 
 @app.route("/admin/report_absence", methods=["POST"])
 def admin_report_absence():
+    """
+    PURPOSE: Administrative interface for logging or reallocating proctor absences.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET, POST
+    """
     guard = require_role('admin')
     if guard: return guard
     instructor_id = request.form.get("instructor_id")
@@ -4073,10 +4764,17 @@ def admin_report_absence():
         flash("Select instructor and exam.", "warning")
     return redirect(url_for('reports_page'))
 
-# â”€â”€ NOTIFICATIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 22: REAL-TIME NOTIFICATIONS & LIVE POLLING
+# ==============================================================================
 
 @app.route("/notifications/clear_all", methods=["POST"])
 def clear_all_notifications_route():
+    """
+    PURPOSE: Dismisses all notifications for the active user.
+    ACCESS:  Authenticated users
+    METHOD:  POST
+    """
     guard = require_login()
     if guard: return guard
     clear_all_notifications(session['user_id'])
@@ -4089,6 +4787,11 @@ def clear_all_notifications_route():
 
 @app.route("/notifications/delete_selected", methods=["POST"])
 def delete_selected_notifications_route():
+    """
+    PURPOSE: Deletes specific checked notifications from user inbox.
+    ACCESS:  Authenticated users
+    METHOD:  POST
+    """
     guard = require_login()
     if guard: return guard
     notif_ids = []
@@ -4115,6 +4818,11 @@ def delete_selected_notifications_route():
 
 @app.route("/notifications")
 def notifications_page():
+    """
+    PURPOSE: Inbox view displaying system announcements, schedule updates, and assignment notices.
+    ACCESS:  Authenticated users
+    METHOD:  GET
+    """
     guard = require_login()
     if guard: return guard
     role = session.get('role')
@@ -4135,7 +4843,11 @@ def notifications_page():
 @app.route("/api/notifications/list")
 @limiter.exempt
 def api_notifications_list():
-    """Returns JSON list of notifications and unread count for the universal in-page modal."""
+    """
+    PURPOSE: Returns JSON list of notifications and unread count for the active user.
+    ACCESS:  Authenticated users
+    METHOD:  GET
+    """
     uid = session.get('user_id')
     if not uid:
         return jsonify({'expired': True}), 401
@@ -4157,7 +4869,11 @@ def api_notifications_list():
 @app.route("/api/notifications/unread_count")
 @limiter.exempt  # polled every ~20s per open tab; must not consume the shared per-IP quota
 def api_unread_count():
-    """Lightweight polling endpoint for the live notification badge (static/js/notif_poll.js)."""
+    """
+    PURPOSE: Lightweight polling endpoint for the live notification bell badge.
+    ACCESS:  Authenticated users
+    METHOD:  GET
+    """
     uid = session.get('user_id')
     if not uid:
         return jsonify({'expired': True}), 401
@@ -4174,6 +4890,11 @@ def api_unread_count():
 
 @app.route("/notifications/mark_read/<int:id>", methods=["POST"])
 def mark_read(id):
+    """
+    PURPOSE: Marks an individual notification as read.
+    ACCESS:  Authenticated users
+    METHOD:  POST
+    """
     guard = require_login()
     if guard: return guard
     mark_notification_read(id, session['user_id'])
@@ -4181,6 +4902,11 @@ def mark_read(id):
 
 @app.route("/notifications/mark_all_read", methods=["POST"])
 def mark_all_notifs_read():
+    """
+    PURPOSE: Marks all unread notifications as read for current user.
+    ACCESS:  Authenticated users
+    METHOD:  POST
+    """
     guard = require_login()
     if guard: return guard
     mark_all_read(session['user_id'])
@@ -4191,12 +4917,19 @@ def mark_all_notifs_read():
         return redirect(url_for('student_timetable', open_notifications='1'))
     return redirect(url_for('notifications_page'))
 
-# â”€â”€ CHANGE OWN PASSWORD (Proctor / Student) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 23: USER SELF-SERVICE CREDENTIALS & PROFILE
+# ==============================================================================
 
 # ── UNIVERSAL MY ACCOUNT PROFILE & PASSWORD ────────────────────────────────
 
 @app.route("/api/account/me")
 def api_account_me():
+    """
+    PURPOSE: JSON endpoint returning current session profile data for client-side modals.
+    ACCESS:  Authenticated users
+    METHOD:  GET
+    """
     guard = require_login()
     if guard:
         return jsonify({'error': 'Unauthorized'}), 401
@@ -4215,6 +4948,11 @@ def api_account_me():
 
 @app.route("/account/update_profile", methods=["POST"])
 def update_my_profile():
+    """
+    PURPOSE: Self-service endpoint allowing users to update their profile information.
+    ACCESS:  Authenticated users
+    METHOD:  POST
+    """
     guard = require_login()
     if guard: return guard
 
@@ -4296,6 +5034,11 @@ def update_my_profile():
 
 @app.route("/change_my_password", methods=["POST"])
 def change_my_password():
+    """
+    PURPOSE: Self-service password change verifying current password before hashing and saving new password.
+    ACCESS:  Authenticated users
+    METHOD:  POST
+    """
     guard = require_login()
     if guard: return guard
     role = session.get('role')
@@ -4368,6 +5111,11 @@ def change_my_password():
 
 @app.route("/admin/batch_print_sections")
 def admin_batch_print_sections():
+    """
+    PURPOSE: Batch examination pass and schedule sheet generator for an entire academic section.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin')
     if guard: return guard
     
@@ -4504,6 +5252,11 @@ def admin_batch_print_sections():
 
 @app.route("/admin/print_section")
 def admin_print_section():
+    """
+    PURPOSE: Renders printable exam pass and schedule slip for a specific section.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
     guard = require_role('admin')
     if guard: return guard
     section = request.args.get('section', '').strip()
@@ -4536,6 +5289,11 @@ def admin_print_section():
 @app.route("/timetable")
 @app.route("/student/timetable")
 def student_timetable():
+    """
+    PURPOSE: Personalized student portal displaying registered exam schedule, rooms, and proctor assignments.
+    ACCESS:  Student
+    METHOD:  GET
+    """
     guard = require_role('student')
     if guard: return guard
     # Synchronize official section and institute from database
@@ -4611,6 +5369,11 @@ def student_timetable():
 
 @app.route("/student/schedule.pdf")
 def export_student_schedule_pdf_route():
+    """
+    PURPOSE: Generates official printable student exam pass PDF with timetable and seat requirements.
+    ACCESS:  Student
+    METHOD:  GET
+    """
     guard = require_role('student')
     if guard: return guard
     if not is_schedule_published():
@@ -4645,6 +5408,11 @@ def export_student_schedule_pdf_route():
 
 @app.route("/student/update_section", methods=["POST"])
 def student_update_section():
+    """
+    PURPOSE: Allows student to correct or update their section assignment.
+    ACCESS:  Student
+    METHOD:  POST
+    """
     guard = require_role('student')
     if guard: return guard
 
@@ -4659,16 +5427,25 @@ def student_update_section():
     flash("The official examination timetable and class sections are locked down. Section modifications are locked. Students cannot self-modify class sections. Please contact your Department Administrator or Academic Head to request an official change.", "warning")
     return redirect(url_for('student_timetable'))
 
-# â”€â”€ MISC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 24: MISCELLANEOUS & DEBUG UTILITIES
+# ==============================================================================
 
 @app.route("/clear-session")
 def clear_session():
+    """
+    PURPOSE: Debug endpoint to reset local session during development.
+    ACCESS:  Debug / Admin
+    METHOD:  GET
+    """
     session.clear()
     response = redirect(url_for('index'))
     response.delete_cookie('session')
     return response
 
-# â”€â”€ RUN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ==============================================================================
+# SECTION 25: APPLICATION SERVER ENTRYPOINT
+# ==============================================================================
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 9999))

@@ -1,13 +1,28 @@
 import csv
 import io
 
+def decode_csv_bytes(file_content_bytes):
+    """
+    Robustly decodes CSV byte streams supporting UTF-8 (with/without BOM),
+    Windows-1252 / CP1252 (standard Excel export on Windows), and Latin-1.
+    Prevents rejection of Filipino/Spanish names containing 'ñ' / 'Ñ' or accented characters.
+    """
+    if not file_content_bytes:
+        return ""
+    for enc in ('utf-8-sig', 'utf-8', 'cp1252', 'windows-1252', 'latin1', 'iso-8859-1'):
+        try:
+            return file_content_bytes.decode(enc).strip()
+        except (UnicodeDecodeError, LookupError):
+            continue
+    return file_content_bytes.decode('utf-8', errors='replace').strip()
+
 def parse_rooms_csv(file_content_bytes):
     """Parse CSV bytes. Expected columns: room_name, capacity, building, floor, institute_code, pwd_accessible
     Returns list of dicts ready for bulk_import_rooms."""
     rows = []
     errors = []
     try:
-        content = file_content_bytes.decode('utf-8-sig').strip()
+        content = decode_csv_bytes(file_content_bytes)
         if not content: return ([], ["Empty file"])
         reader = csv.DictReader(io.StringIO(content))
         for i, row in enumerate(reader):
@@ -38,7 +53,7 @@ def parse_instructors_csv(file_content_bytes):
     rows = []
     errors = []
     try:
-        content = file_content_bytes.decode('utf-8-sig').strip()
+        content = decode_csv_bytes(file_content_bytes)
         if not content: return ([], ["Empty file"])
         reader = csv.DictReader(io.StringIO(content))
         for i, row in enumerate(reader):
@@ -84,7 +99,7 @@ def parse_subjects_csv(file_content_bytes):
     rows = []
     errors = []
     try:
-        content = file_content_bytes.decode('utf-8-sig').strip()
+        content = decode_csv_bytes(file_content_bytes)
         if not content: return ([], ["Empty file"])
         reader = csv.DictReader(io.StringIO(content))
         for i, row in enumerate(reader):
@@ -113,7 +128,7 @@ def parse_exams_csv(file_content_bytes):
     rows = []
     errors = []
     try:
-        content = file_content_bytes.decode('utf-8-sig').strip()
+        content = decode_csv_bytes(file_content_bytes)
         if not content: return ([], ["Empty file"])
         reader = csv.DictReader(io.StringIO(content))
         for i, row in enumerate(reader):

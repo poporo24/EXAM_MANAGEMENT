@@ -11,11 +11,11 @@
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
-            --green-dark:#3d5c2e; --green-mid:#4e7038; --green-light:#668054; --green-pale:#829c74;
-            --green-bg:#f0f4ed; --green-border:#c8d8bd; --white:#ffffff;
+            --green-dark:#2e4520; --green-mid:#3d5c2e; --green-light:#4e7038; --green-pale:#668054;
+            --green-bg:#f8faf9; --green-border:#c8d8bd; --white:#ffffff;
             --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb; --gray-400:#9ca3af;
             --gray-500:#6b7280; --gray-700:#374151; --gray-900:#111827;
-            --confirmed:#16a34a;
+            --confirmed:#2e4520;
         }
         body { font-family:"Inter",sans-serif; background:var(--green-bg); color:var(--gray-900); min-height:100vh; }
 
@@ -94,7 +94,7 @@
             margin-bottom: 14px;
         }
         .date-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
-        .date-badge { display:inline-flex; align-items:center; gap:8px; background:var(--green-dark); color:#fff; font-size:13px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; padding:7px 16px; border-radius:8px; }
+        .date-badge { display:inline-flex; align-items:center; gap:8px; background:var(--green-mid); color:#fff; font-size:13px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; padding:7px 16px; border-radius:8px; }
         .date-badge i { opacity:0.75; font-size:12px; }
         .date-count { font-size:12px; color:var(--gray-400); font-weight:500; }
 
@@ -102,17 +102,17 @@
         .cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; }
         .exam-card { background:var(--white); border:1px solid var(--gray-200); border-radius:12px; padding:20px 20px 18px; transition:box-shadow .2s,transform .15s; position:relative; display:flex; flex-direction:column; justify-content:space-between; }
         .exam-card:hover { box-shadow:0 6px 24px rgba(62,90,46,0.12); transform:translateY(-1px); }
-        .confirmed-badge { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; color:var(--confirmed); letter-spacing:0.04em; }
+        .confirmed-badge { display:inline-flex; align-items:center; gap:4.5px; font-size:10px; font-weight:700; color:var(--confirmed); background:#eef4ea; border:1px solid #c3d9b8; padding:2.5px 8px; border-radius:12px; letter-spacing:0.04em; }
         .confirmed-badge i { font-size:10px; }
         .card-subject { font-size:16px; font-weight:800; color:var(--gray-900); letter-spacing:-0.01em; line-height:1.3; }
         .badges-row { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
         .badge { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:4px; font-size:10.5px; font-weight:700; letter-spacing:0.02em; text-transform:uppercase; }
         .badge-section { background:#dbeafe; color:#1e40af; }
-        .badge-major { background:#dcfce7; color:#15803d; }
+        .badge-major { background:#eef4ea; color:#2e4520; border: 1px solid #c3d9b8; }
         .badge-minor { background:#fef9c3; color:#92400e; }
         .card-meta { display:flex; flex-direction:column; gap:7px; }
         .meta-row { display:flex; align-items:center; gap:9px; font-size:13px; color:var(--gray-700); }
-        .meta-row i { width:16px; text-align:center; color:var(--green-light); font-size:13px; flex-shrink:0; }
+        .meta-row i { width:16px; text-align:center; color:var(--green-mid); font-size:13px; flex-shrink:0; }
         .meta-row .meta-label { font-weight:500; }
         .meta-row .meta-sub { font-size:11px; color:var(--gray-400); font-weight:500; margin-left:4px; }
 

@@ -156,7 +156,11 @@
             var newPub = (sig.split('|')[0] || '');
             var pubChanged = (oldPub !== newPub);
             lastSignature = sig;
-            pendingReload = pubChanged ? 'Timetable publication status updated — refreshing...' : 'New proctor / collection update received — refreshing...';
+            if (pubChanged) {
+                pendingReload = 'Timetable publication status updated — refreshing...';
+            } else if (!window.__disableLiveHardReload) {
+                pendingReload = 'New proctor / collection update received — refreshing...';
+            }
         }
         if (pendingReload && !isUserBusyInModalOrInput()) {
             var msg = pendingReload;

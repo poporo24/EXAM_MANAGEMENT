@@ -115,11 +115,11 @@
 <aside id="sidebar" class="no-print bg-white border-r border-gray-200 fixed h-screen w-64 sidebar-transition z-20 flex flex-col overflow-hidden">
     <div class="h-16 w-full flex items-center justify-between px-4 border-b border-gray-200 sidebar-header-container">
         <div class="flex-1 flex items-center gap-3 overflow-hidden whitespace-nowrap nav-text">
-            <i class="fa-solid fa-graduation-cap text-2xl text-[#668054]"></i>
+            <i class="fa-solid fa-graduation-cap text-2xl text-[#3d5c2e]"></i>
             <span class="font-bold text-lg">CCA Exams</span>
         </div>
         <!-- Desktop Collapse Toggle -->
-        <button type="button" onclick="toggleSidebar()" class="hidden lg:flex text-gray-500 hover:text-[#668054] focus:outline-none p-1.5 rounded-lg hover:bg-gray-100 transition-colors" title="Toggle Sidebar">
+        <button type="button" onclick="toggleSidebar()" class="hidden lg:flex text-gray-500 hover:text-[#3d5c2e] focus:outline-none p-1.5 rounded-lg hover:bg-gray-100 transition-colors" title="Toggle Sidebar">
             <i class="fa-solid fa-bars text-xl"></i>
         </button>
         <!-- Mobile Drawer Close Button -->
@@ -130,32 +130,32 @@
 
 
     <nav class="flex-1 overflow-y-auto py-4 space-y-1">
-        <a href="/proctor" class="flex items-center px-4 py-3 group {% if active_page == 'proctor' %}bg-green-50 text-[#668054] border-r-4 border-[#668054]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#668054]{% endif %}" title="My Exams">
+        <a href="/proctor" class="flex items-center px-4 py-3 group {% if active_page == 'proctor' %}bg-[#eef4ea] text-[#2e4520] border-r-4 border-[#3d5c2e]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#3d5c2e]{% endif %}" title="My Exams">
             <i class="fa-solid fa-clipboard-list w-6 text-center text-lg"></i>
             <span class="ml-3 nav-text font-medium">My Exams</span>
         </a>
-        <a href="/proctor/availability" class="flex items-center px-4 py-3 group {% if active_page == 'availability' %}bg-green-50 text-[#668054] border-r-4 border-[#668054]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#668054]{% endif %}" title="Availability">
+        <a href="/proctor/availability" class="flex items-center px-4 py-3 group {% if active_page == 'availability' %}bg-[#eef4ea] text-[#2e4520] border-r-4 border-[#3d5c2e]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#3d5c2e]{% endif %}" title="Availability">
             <i class="fa-regular fa-calendar-check w-6 text-center text-lg"></i>
             <span class="ml-3 nav-text font-medium">Availability</span>
         </a>
     </nav>
 
     <div class="border-t border-gray-200 p-4 sidebar-footer">
-        <div onclick="openMyAccountModal()" class="flex items-center mb-3 p-1.5 -mx-1.5 rounded-xl hover:bg-green-50/80 transition-colors cursor-pointer overflow-hidden whitespace-nowrap user-profile-row group" title="Click to update your account">
-            <div class="w-8 h-8 rounded-full bg-[#829c74] group-hover:bg-[#668054] transition-colors text-white flex items-center justify-center font-bold uppercase flex-shrink-0">
+        <div onclick="openMyAccountModal()" class="flex items-center mb-3 p-1.5 -mx-1.5 rounded-xl hover:bg-[#eef4ea]/80 transition-colors cursor-pointer overflow-hidden whitespace-nowrap user-profile-row group" title="Click to update your account">
+            <div class="w-8 h-8 rounded-full bg-[#3d5c2e] group-hover:bg-[#2e4520] transition-colors text-white flex items-center justify-center font-bold uppercase flex-shrink-0">
                 {{ session.get('full_name', 'P')[:1] }}
             </div>
             <div class="ml-3 nav-text flex-1 min-w-0">
                 <div class="flex items-center justify-between gap-1">
-                    <p class="text-sm font-medium text-gray-900 group-hover:text-[#668054] transition-colors truncate" title="{{ session.get('full_name', 'Proctor User') }}">{{ session.get('full_name', 'Proctor User') }}</p>
-                    <i class="fa-solid fa-pen-to-square text-xs text-gray-400 group-hover:text-[#668054] transition-colors flex-shrink-0"></i>
+                    <p class="text-sm font-medium text-gray-900 group-hover:text-[#3d5c2e] transition-colors truncate" title="{{ session.get('full_name', 'Proctor User') }}">{{ session.get('full_name', 'Proctor User') }}</p>
+                    <i class="fa-solid fa-pen-to-square text-xs text-gray-400 group-hover:text-[#3d5c2e] transition-colors flex-shrink-0"></i>
                 </div>
                 <p class="text-xs text-gray-500 truncate" title="{{ proctor_institute_name or session.get('institute_name') or 'Proctor' }}">
-                    Proctor{% if proctor_institute_code or session.get('institute_code') %} &bull; <span class="font-semibold text-[#668054]">{{ proctor_institute_code or session.get('institute_code') }}</span>{% endif %}
+                    Proctor{% if proctor_institute_code or session.get('institute_code') %} &bull; <span class="font-semibold text-[#3d5c2e]">{{ proctor_institute_code or session.get('institute_code') }}</span>{% endif %}
                 </p>
             </div>
         </div>
-        <button onclick="openModal('change-password-modal')" class="flex items-center text-gray-600 hover:text-[#668054] group w-full mb-2" title="Change Password">
+        <button onclick="openModal('change-password-modal')" class="flex items-center text-gray-600 hover:text-[#3d5c2e] group w-full mb-2" title="Change Password">
             <i class="fa-solid fa-key w-6 text-center text-lg"></i>
             <span class="ml-3 nav-text font-medium">Change Password</span>
         </button>

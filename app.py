@@ -3909,6 +3909,91 @@ def secretary_return(exam_id):
     flash("Marked as returned.", "success")
     return redirect(url_for('secretary_dashboard'))
 
+@app.route("/secretary/batch_return", methods=["POST"])
+def secretary_batch_return():
+    guard = require_role('secretary', 'admin')
+    if guard: return guard
+    raw_exam_ids = request.form.getlist("exam_ids")
+    if not raw_exam_ids:
+        comma_ids = request.form.get("exam_ids", "")
+        if comma_ids:
+            raw_exam_ids = [x.strip() for x in comma_ids.split(",") if x.strip()]
+    
+    notes = request.form.get("notes", "").strip()
+
+    returned_count = 0
+    skipped_count = 0
+    for eid_str in raw_exam_ids:
+        try:
+            eid = int(eid_str)
+            if not _can_secretary_access_exam(eid):
+                skipped_count += 1
+                continue
+            mark_exam_returned(eid, notes)
+            returned_count += 1
+        except Exception as e:
+            print(f"Error returning exam {eid_str}: {e}")
+            continue
+
+    if returned_count > 0:
+        log_audit_event('EXAM_BATCH_RETURNED',
+            f"Secretary {session.get('full_name')} marked {returned_count} exam envelope(s) as returned.",
+            user_id=session.get('user_id'),
+            user_name=session.get('full_name'),
+            user_role=session.get('role'),
+            ip_address=request.remote_addr
+        )
+        msg = f"Successfully marked {returned_count} exam envelope(s) as returned."
+        if skipped_count > 0:
+            msg += f" ({skipped_count} exam(s) outside your assigned department were skipped)."
+        flash(msg, "success")
+    else:
+        if skipped_count > 0:
+            flash(f"Access denied: {skipped_count} selected exam(s) belong to other departments.", "danger")
+        else:
+            flash("No valid exams were selected for return.", "warning")
+    return redirect(url_for('secretary_dashboard'))
+
+@app.route("/api/secretary/pending_absences")
+@limiter.exempt
+def api_secretary_pending_absences():
+    """Real-time JSON endpoint for unresolved proctor absences within the secretary's institute."""
+    uid = session.get('user_id')
+    role = session.get('role')
+    if not uid or role not in ('secretary', 'admin'):
+        return jsonify({'error': 'Unauthorized', 'expired': True}), 401
+
+    inst_id = None if role == 'admin' else session.get('institute_id')
+    from system.database import get_unresolved_absences
+    raw_absences = get_unresolved_absences(institute_id=inst_id)
+
+    formatted = []
+    for ab in raw_absences:
+        dt = ab.get('exam_date_time')
+        dur = ab.get('duration_minutes', 60)
+        rep_at = ab.get('reported_at')
+        if rep_at and isinstance(rep_at, datetime):
+            rep_str = rep_at.strftime('%b %d, %I:%M %p')
+        else:
+            rep_str = str(rep_at or '')
+
+        formatted.append({
+            'id': ab['id'],
+            'exam_id': ab['exam_id'],
+            'instructor_id': ab.get('instructor_id'),
+            'instructor_name': ab.get('instructor_name') or 'Unassigned',
+            'subject_name': ab.get('subject_name') or '',
+            'section': ab.get('section') or '',
+            'room_name': ab.get('room_name') or 'TBD',
+            'reason': ab.get('reason') or '',
+            'schedule_fmt': exam_datetime_range_filter(dt, dur) if dt else 'TBD',
+            'reported_at': rep_str
+        })
+
+    resp = jsonify({'success': True, 'count': len(formatted), 'absences': formatted})
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
 @app.route("/secretary/change_password", methods=["POST"])
 def secretary_change_password():
     guard = require_role('secretary', 'admin')

@@ -1,0 +1,300 @@
+<!-- MANAGE CAMPUS BUILDINGS MODAL -->
+<div id="addNewBuildingModal" class="fixed inset-0 hidden overflow-y-auto" style="z-index: 99999 !important;">
+    <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20">
+        <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-xs transition-opacity" onclick="cancelNewBuildingModal()"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150 border border-gray-100">
+            
+            <!-- Header -->
+            <div class="px-6 py-4 bg-gray-50/90 border-b border-gray-100 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-lg bg-emerald-50 text-[#3d5c2e] flex items-center justify-center text-sm font-bold border border-emerald-100">
+                        <i class="fa-solid fa-building-gear"></i>
+                    </span>
+                    <div>
+                        <h3 class="text-base font-bold text-gray-900 leading-snug">Manage Campus Buildings</h3>
+                        <p class="text-xs text-gray-500">View, add, or delete campus buildings and annexes</p>
+                    </div>
+                </div>
+                <button type="button" onclick="cancelNewBuildingModal()" class="text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer">&times;</button>
+            </div>
+
+            <!-- Body -->
+            <div class="p-6 space-y-5">
+                
+                <!-- Existing Buildings Section -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            Active Campus Buildings
+                        </label>
+                        <span id="buildingsCountBadge" class="text-[11px] font-semibold text-gray-500">Loading...</span>
+                    </div>
+
+                    <div id="buildingsListContainer" class="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                        <!-- Populated dynamically by loadBuildingsList() -->
+                        <div class="p-4 text-center text-xs text-gray-400">
+                            <i class="fa-solid fa-spinner fa-spin mr-1"></i> Loading buildings...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-100 pt-4">
+                    <label for="newBuildingModalInput" class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                        Add New Building Name <span class="text-red-500">*</span>
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <div class="relative flex-1">
+                            <i class="fa-solid fa-building absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                            <input type="text" id="newBuildingModalInput" placeholder="e.g. Engineering Building, IT Annex" 
+                                   class="w-full h-10 border border-gray-300 rounded-xl pl-10 pr-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none" 
+                                   autocomplete="off" 
+                                   onkeydown="if(event.key==='Enter'){event.preventDefault();confirmNewBuildingModal();}">
+                        </div>
+                        <button type="button" onclick="confirmNewBuildingModal()" class="h-10 px-4 rounded-xl bg-[#668054] hover:bg-[#526843] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer flex-shrink-0 inline-flex items-center gap-1.5">
+                            <i class="fa-solid fa-plus"></i> Add
+                        </button>
+                    </div>
+                    <p id="newBuildingModalError" class="text-xs text-red-600 mt-2 hidden font-semibold"></p>
+                    <p class="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
+                        <i class="fa-solid fa-shield-halved text-gray-400 mr-1"></i>
+                        Core buildings (Main Building & PAGCOR) are locked for integrity. Custom buildings can be deleted at any time.
+                    </p>
+                </div>
+
+            </div>
+
+            <!-- Footer -->
+            <div class="bg-gray-50 px-6 py-3.5 border-t border-gray-100 flex justify-end">
+                <button type="button" onclick="cancelNewBuildingModal()" class="px-5 py-2 rounded-xl border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer">
+                    Done
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    let activeBuildingSelect = null;
+    let previousBuildingValue = 'Main Building';
+
+    // Track previous value on focus/click so if user cancels modal, we revert cleanly
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('select[name="building"]').forEach(function(sel) {
+            sel.addEventListener('focus', function() {
+                if (this.value !== '__new__') {
+                    this.setAttribute('data-prev', this.value);
+                }
+            });
+            sel.addEventListener('click', function() {
+                if (this.value !== '__new__') {
+                    this.setAttribute('data-prev', this.value);
+                }
+            });
+        });
+    });
+
+    function handleBuildingSelectChange(selectEl) {
+        if (selectEl.value === '__new__') {
+            activeBuildingSelect = selectEl;
+            previousBuildingValue = selectEl.getAttribute('data-prev') || 'Main Building';
+            openNewBuildingModal();
+        } else {
+            selectEl.setAttribute('data-prev', selectEl.value);
+        }
+    }
+
+    function openNewBuildingModal() {
+        const modal = document.getElementById('addNewBuildingModal');
+        const input = document.getElementById('newBuildingModalInput');
+        const err = document.getElementById('newBuildingModalError');
+        if (err) { err.classList.add('hidden'); err.textContent = ''; }
+        if (input) { input.value = ''; }
+        if (modal) {
+            modal.classList.remove('hidden');
+            loadBuildingsList();
+            setTimeout(function() {
+                if (input) input.focus();
+            }, 100);
+        }
+    }
+
+    function cancelNewBuildingModal() {
+        const modal = document.getElementById('addNewBuildingModal');
+        if (modal) modal.classList.add('hidden');
+        if (activeBuildingSelect && activeBuildingSelect.value === '__new__') {
+            activeBuildingSelect.value = previousBuildingValue;
+        }
+        activeBuildingSelect = null;
+    }
+
+    function loadBuildingsList() {
+        const container = document.getElementById('buildingsListContainer');
+        const countBadge = document.getElementById('buildingsCountBadge');
+        if (!container) return;
+
+        fetch('/api/buildings')
+            .then(res => res.json())
+            .then(data => {
+                const list = data.buildings || [];
+                if (countBadge) countBadge.textContent = list.length + ' registered';
+
+                if (list.length === 0) {
+                    container.innerHTML = '<div class="p-3 text-center text-xs text-gray-400">No buildings registered.</div>';
+                    return;
+                }
+
+                container.innerHTML = list.map(b => {
+                    const isCore = b.is_core || b.name === 'Main Building' || b.name === 'PAGCOR';
+                    const counts = `<span class="text-[11px] text-gray-500 font-normal ml-1">(${b.room_count} rooms, ${b.instructor_count} faculty)</span>`;
+                    
+                    let actionHtml = '';
+                    if (isCore) {
+                        actionHtml = `<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200">
+                                        <i class="fa-solid fa-lock text-[9px]"></i> Core Campus
+                                      </span>`;
+                    } else {
+                        actionHtml = `<button type="button" onclick="deleteBuildingByName('${b.name.replace(/'/g, "\\'")}')" 
+                                             class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 rounded-lg transition-colors border border-rose-200 cursor-pointer" 
+                                             title="Delete this custom building">
+                                        <i class="fa-solid fa-trash-can text-[10px]"></i> Delete
+                                      </button>`;
+                    }
+
+                    return `
+                        <div class="flex items-center justify-between p-2.5 rounded-xl border border-gray-200 hover:border-gray-300 bg-white transition-all">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-building text-gray-400 text-sm"></i>
+                                <span class="text-xs font-bold text-gray-800">${b.name}</span>
+                                ${counts}
+                            </div>
+                            <div>
+                                ${actionHtml}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            })
+            .catch(err => {
+                container.innerHTML = '<div class="p-3 text-center text-xs text-red-500">Failed to load buildings list.</div>';
+            });
+    }
+
+    function deleteBuildingByName(buildingName) {
+        if (!confirm(`Are you sure you want to delete building "${buildingName}"?\n\nIf any rooms or instructors are currently assigned to it, they will be safely reassigned to Main Building.`)) {
+            return;
+        }
+
+        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+        fetch('/api/buildings/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': token
+            },
+            body: JSON.stringify({ name: buildingName })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+
+            // Remove this option from all building selects on the page
+            document.querySelectorAll('select[name="building"]').forEach(sel => {
+                for (let i = 0; i < sel.options.length; i++) {
+                    if (sel.options[i].value.toLowerCase() === buildingName.toLowerCase()) {
+                        sel.remove(i);
+                        break;
+                    }
+                }
+                // If it was selected, revert to Main Building
+                if (sel.value.toLowerCase() === buildingName.toLowerCase()) {
+                    sel.value = 'Main Building';
+                    sel.setAttribute('data-prev', 'Main Building');
+                }
+            });
+
+            // Reload list in modal
+            loadBuildingsList();
+        })
+        .catch(err => {
+            alert('Failed to delete building: ' + err.message);
+        });
+    }
+
+    function confirmNewBuildingModal() {
+        const input = document.getElementById('newBuildingModalInput');
+        const err = document.getElementById('newBuildingModalError');
+        const val = input ? input.value.trim() : '';
+
+        if (!val) {
+            if (err) {
+                err.textContent = 'Please enter a valid building name.';
+                err.classList.remove('hidden');
+            }
+            if (input) input.focus();
+            return;
+        }
+
+        // Add this new building as an option to ALL building select dropdowns on this page
+        document.querySelectorAll('select[name="building"]').forEach(function(sel) {
+            let exists = false;
+            for (let i = 0; i < sel.options.length; i++) {
+                if (sel.options[i].value.toLowerCase() === val.toLowerCase()) {
+                    exists = true;
+                    sel.selectedIndex = i;
+                    break;
+                }
+            }
+            if (!exists) {
+                const opt = document.createElement('option');
+                opt.value = val;
+                opt.textContent = val;
+                const newOpt = sel.querySelector('option[value="__new__"]');
+                if (newOpt) {
+                    sel.insertBefore(opt, newOpt);
+                } else {
+                    sel.appendChild(opt);
+                }
+            }
+        });
+
+        // Select the new building on the active select element
+        if (activeBuildingSelect) {
+            activeBuildingSelect.value = val;
+            activeBuildingSelect.setAttribute('data-prev', val);
+        }
+
+        const modal = document.getElementById('addNewBuildingModal');
+        if (modal) modal.classList.add('hidden');
+        activeBuildingSelect = null;
+    }
+
+    function setSelectBuildingValue(selectId, val) {
+        const sel = document.getElementById(selectId);
+        if (!sel) return;
+        const cleanVal = (val && val !== 'None') ? val.trim() : 'Main Building';
+        sel.setAttribute('data-prev', cleanVal);
+
+        let matched = false;
+        for (let i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value.toLowerCase() === cleanVal.toLowerCase()) {
+                sel.selectedIndex = i;
+                matched = true;
+                break;
+            }
+        }
+        if (!matched && cleanVal) {
+            const opt = document.createElement('option');
+            opt.value = cleanVal;
+            opt.textContent = cleanVal;
+            opt.selected = true;
+            const newOpt = sel.querySelector('option[value="__new__"]');
+            if (newOpt) sel.insertBefore(opt, newOpt);
+            else sel.appendChild(opt);
+        }
+    }
+</script>

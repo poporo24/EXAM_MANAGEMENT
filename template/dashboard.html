@@ -648,7 +648,7 @@
                                                 {% endif %}
                                             </td>
                                             <td class="px-6 py-3.5 whitespace-nowrap text-right space-x-1">
-                                                <button type="button" onclick="openEditRoomModal('{{ room.id }}', '{{ room.room_name }}', '{{ room.capacity }}', '{{ room.building }}', '{{ room.floor }}', '{{ room.institute_id }}', '{{ room.is_pwd_accessible }}')"
+                                                <button type="button" onclick="openEditRoomModal('{{ room.id }}', '{{ room.room_name }}', '{{ room.capacity }}', '{{ room.building }}', '{{ room.floor }}', '{{ room.institute_id or '' }}', '{{ room.is_pwd_accessible }}')"
                                                         class="w-7 h-7 rounded-lg bg-gray-50 hover:bg-blue-50 text-gray-400 hover:text-blue-600 inline-flex items-center justify-center transition-colors cursor-pointer" title="Edit Room">
                                                     <i class="fa-solid fa-pen-to-square text-xs"></i>
                                                 </button>
@@ -746,7 +746,7 @@
                                                 {% endif %}
                                             </td>
                                             <td class="px-6 py-3.5 whitespace-nowrap text-right space-x-1">
-                                                <button type="button" onclick="openEditInstructorModal('{{ ins.id }}', '{{ ins.name }}', '{{ ins.institute_id }}', '{{ ins.building }}', '{{ ins.is_pwd }}')"
+                                                <button type="button" onclick="openEditInstructorModal('{{ ins.id }}', '{{ ins.name }}', '{{ ins.institute_id or '' }}', '{{ ins.building }}', '{{ ins.is_pwd }}')"
                                                         class="w-7 h-7 rounded-lg bg-gray-50 hover:bg-blue-50 text-gray-400 hover:text-blue-600 inline-flex items-center justify-center transition-colors cursor-pointer" title="Edit Instructor">
                                                     <i class="fa-solid fa-pen-to-square text-xs"></i>
                                                 </button>
@@ -883,11 +883,17 @@
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Building</label>
-                            <input type="text" name="building" placeholder="e.g. Main Building" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                            <select name="building" onchange="handleBuildingSelectChange(this)" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                                {% for b in (buildings or ['Main Building', 'PAGCOR']) %}
+                                <option value="{{ b }}">{{ b }}</option>
+                                {% endfor %}
+                                <option value="__new__" class="font-bold text-[#668054]">+ Add New Building...</option>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Institute Tag</label>
                             <select name="institute_id" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                                <option value="">Campus Shared</option>
                                 {% for inst in institutes %}
                                 <option value="{{ inst.id }}">{{ inst.name }}</option>
                                 {% endfor %}
@@ -935,11 +941,17 @@
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Building</label>
-                            <input type="text" name="building" id="edit_room_building" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                            <select name="building" id="edit_room_building" onchange="handleBuildingSelectChange(this)" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                                {% for b in (buildings or ['Main Building', 'PAGCOR']) %}
+                                <option value="{{ b }}">{{ b }}</option>
+                                {% endfor %}
+                                <option value="__new__" class="font-bold text-[#668054]">+ Add New Building...</option>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Institute Tag</label>
                             <select name="institute_id" id="edit_room_institute" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                                <option value="">Campus Shared</option>
                                 {% for inst in institutes %}
                                 <option value="{{ inst.id }}">{{ inst.name }}</option>
                                 {% endfor %}
@@ -982,11 +994,17 @@
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Building Location</label>
-                            <input type="text" name="building" placeholder="e.g. Main Building" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                            <select name="building" onchange="handleBuildingSelectChange(this)" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                                {% for b in (buildings or ['Main Building', 'PAGCOR']) %}
+                                <option value="{{ b }}">{{ b }}</option>
+                                {% endfor %}
+                                <option value="__new__" class="font-bold text-[#668054]">+ Add New Building...</option>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Institute Tag</label>
-                            <select name="institute_id" required class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                            <select name="institute_id" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                                <option value="">Campus Shared</option>
                                 {% for inst in institutes %}
                                 <option value="{{ inst.id }}">{{ inst.name }}</option>
                                 {% endfor %}
@@ -1024,11 +1042,17 @@
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Building</label>
-                            <input type="text" name="building" id="edit_inst_building" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                            <select name="building" id="edit_inst_building" onchange="handleBuildingSelectChange(this)" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                                {% for b in (buildings or ['Main Building', 'PAGCOR']) %}
+                                <option value="{{ b }}">{{ b }}</option>
+                                {% endfor %}
+                                <option value="__new__" class="font-bold text-[#668054]">+ Add New Building...</option>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Institute Tag</label>
-                            <select name="institute_id" id="edit_inst_institute" required class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                            <select name="institute_id" id="edit_inst_institute" class="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm bg-white focus:ring-2 focus:ring-[#668054]/20 focus:border-[#668054] outline-none">
+                                <option value="">Campus Shared</option>
                                 {% for inst in institutes %}
                                 <option value="{{ inst.id }}">{{ inst.name }}</option>
                                 {% endfor %}
@@ -1106,6 +1130,30 @@
                     <h3 class="text-base font-bold text-gray-900">Import Rooms via CSV</h3>
                     <button onclick="closeModal('importRoomsModal')" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
                 </div>
+
+                <div class="mb-4">
+                    <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Required Spreadsheet Columns</p>
+                    <div class="overflow-x-auto w-full">
+                    <table class="w-full text-xs border border-gray-200 rounded-xl overflow-hidden">
+                        <thead class="bg-gray-50 text-gray-600 font-bold">
+                            <tr>
+                                <th class="px-3 py-2 text-left">Column</th>
+                                <th class="px-3 py-2 text-left">Type</th>
+                                <th class="px-3 py-2 text-left">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">room_name</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">Required. e.g. <em>R101</em>, <em>L302</em></td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">capacity</code></td><td class="px-3 py-1.5 text-gray-500">Number</td><td class="px-3 py-1.5 text-gray-400">Seat count e.g. <em>40</em></td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">building</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">e.g. <em>Main Building</em>, <em>PAGCOR</em></td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">floor</code></td><td class="px-3 py-1.5 text-gray-500">Number</td><td class="px-3 py-1.5 text-gray-400">Floor level e.g. <em>1</em>, <em>2</em>, <em>3</em></td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">institute_code</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">e.g. <em>ICSLIS</em>, <em>IBM</em> (leave blank for Shared)</td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">pwd_accessible</code></td><td class="px-3 py-1.5 text-gray-500">0 / 1</td><td class="px-3 py-1.5 text-gray-400">1 = Accessible, 0 = Standard</td></tr>
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
                 <form action="/import/rooms" method="POST" enctype="multipart/form-data" class="space-y-3">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <input type="file" name="csv_file" accept=".csv" required
@@ -1114,6 +1162,11 @@
                         <i class="fa-solid fa-upload mr-1.5"></i> Upload &amp; Import Rooms
                     </button>
                 </form>
+
+                <div class="mt-4 pt-4 border-t border-gray-100 flex justify-center gap-6 text-xs font-semibold">
+                    <a href="/static/template_rooms.csv" class="text-[#668054] hover:underline"><i class="fa-solid fa-download mr-1"></i> Template CSV</a>
+                    <a href="/static/sample_rooms.csv" class="text-blue-600 hover:underline"><i class="fa-solid fa-file-csv mr-1"></i> Sample CSV</a>
+                </div>
             </div>
         </div>
     </div>
@@ -1124,9 +1177,34 @@
             <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-xs" onclick="closeModal('importInstructorsModal')"></div>
             <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 z-10 animate-in fade-in zoom-in-95 duration-150">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-base font-bold text-gray-900">Import Faculty via CSV</h3>
+                    <h3 class="text-base font-bold text-gray-900">Import Faculty / Proctors via CSV</h3>
                     <button onclick="closeModal('importInstructorsModal')" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
                 </div>
+
+                <div class="mb-4">
+                    <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Required Spreadsheet Columns</p>
+                    <div class="overflow-x-auto w-full">
+                    <table class="w-full text-xs border border-gray-200 rounded-xl overflow-hidden">
+                        <thead class="bg-gray-50 text-gray-600 font-bold">
+                            <tr>
+                                <th class="px-3 py-2 text-left">Column</th>
+                                <th class="px-3 py-2 text-left">Type</th>
+                                <th class="px-3 py-2 text-left">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">name</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">Required. Full name e.g. <em>Juan Dela Cruz</em></td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">email</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">Optional. e.g. <em>juan@cca.edu.ph</em></td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">institute_code</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">e.g. <em>ICSLIS</em>, <em>IBM</em> (leave blank for Shared)</td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">building</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">Home building: <em>Main Building</em>, <em>PAGCOR</em></td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">is_pwd</code></td><td class="px-3 py-1.5 text-gray-500">0 / 1</td><td class="px-3 py-1.5 text-gray-400">1 = PWD instructor</td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded">subjects_taught</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-gray-400">Pipe-separated: <em>IT 2|Database</em></td></tr>
+                            <tr><td class="px-3 py-1.5"><code class="bg-gray-100 px-1 rounded text-[#668054]">availability</code></td><td class="px-3 py-1.5 text-gray-500">Text</td><td class="px-3 py-1.5 text-[#668054] font-medium">e.g. <em>Mon 07:00-12:00, Wed</em></td></tr>
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+
                 <form action="/import/instructors" method="POST" enctype="multipart/form-data" class="space-y-3">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <input type="file" name="csv_file" accept=".csv" required
@@ -1135,6 +1213,11 @@
                         <i class="fa-solid fa-upload mr-1.5"></i> Upload &amp; Import Instructors
                     </button>
                 </form>
+
+                <div class="mt-4 pt-4 border-t border-gray-100 flex justify-center gap-6 text-xs font-semibold">
+                    <a href="/static/template_instructors.csv" class="text-[#668054] hover:underline"><i class="fa-solid fa-download mr-1"></i> Template CSV</a>
+                    <a href="/static/sample_instructors.csv" class="text-blue-600 hover:underline"><i class="fa-solid fa-file-csv mr-1"></i> Sample CSV</a>
+                </div>
             </div>
         </div>
     </div>
@@ -1159,6 +1242,8 @@
             </div>
         </div>
     </div>
+
+{% include 'add_building_modal.html' %}
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <!-- SCRIPTS                                                         -->
@@ -1216,9 +1301,9 @@
             document.getElementById('editRoomForm').action = '/edit_room/' + id;
             document.getElementById('edit_room_name').value = name;
             document.getElementById('edit_room_capacity').value = capacity;
-            document.getElementById('edit_room_building').value = building !== 'None' ? building : '';
+            setSelectBuildingValue('edit_room_building', building);
             document.getElementById('edit_room_floor').value = floor !== 'None' ? floor : '';
-            document.getElementById('edit_room_institute').value = institute_id;
+            document.getElementById('edit_room_institute').value = (institute_id && institute_id !== 'None') ? institute_id : '';
             document.getElementById('edit_room_pwd').checked = is_pwd === 'True' || is_pwd === 'true' || is_pwd === true;
             openModal('editRoomModal');
         }
@@ -1227,8 +1312,8 @@
         function openEditInstructorModal(id, name, inst_id, building, is_pwd) {
             document.getElementById('editInstructorForm').action = '/faculty/' + id + '/edit';
             document.getElementById('edit_inst_name').value = name;
-            document.getElementById('edit_inst_building').value = building !== 'None' ? building : '';
-            document.getElementById('edit_inst_institute').value = inst_id;
+            setSelectBuildingValue('edit_inst_building', building);
+            document.getElementById('edit_inst_institute').value = (inst_id && inst_id !== 'None') ? inst_id : '';
             document.getElementById('edit_inst_pwd').checked = is_pwd === 'True' || is_pwd === 'true' || is_pwd === true;
             openModal('editInstructorModal');
         }

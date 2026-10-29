@@ -50,7 +50,7 @@ from system.database import (
     get_all_students, get_pending_users, approve_student,
     deactivate_student, bulk_deactivate_students, bulk_delete_students,
     # rooms
-    get_all_rooms, get_rooms_by_institute, add_room, edit_room, delete_room,
+    get_all_rooms, get_rooms_by_institute, get_all_buildings, get_buildings_summary, delete_custom_building, add_room, edit_room, delete_room,
     bulk_import_rooms,
     # instructors / faculty
     get_all_instructors, get_active_instructors, get_instructor_by_id,
@@ -710,7 +710,7 @@ def register_submit():
     email        = request.form.get("email", "").strip().lower().replace('ñ', 'n').replace('Ñ', 'n')
     password     = request.form.get("password", "").strip()
     section      = request.form.get("section", "").strip()
-    institute_id = request.form.get("institute_id") or None
+    institute_id = int(request.form.get("institute_id")) if request.form.get("institute_id") and request.form.get("institute_id").strip().isdigit() and int(request.form.get("institute_id")) > 0 else None
     role         = request.form.get("role", "student").strip()
     
     if role not in ['student', 'proctor']:
@@ -778,6 +778,7 @@ def dashboard():
     return render_template("dashboard.html",
                            stats=stats, exams=exams,
                            rooms=rooms, instructors=instructors,
+                           buildings=get_all_buildings(),
                            institutes=institutes, subjects=subjects,
                            upcoming_exams=upcoming_exams,
                            settings=settings,
@@ -817,7 +818,7 @@ def add_exam_route():
     else:
         duration_minutes = 180 if subject_type == 'Major' else 60
 
-    institute_id = request.form.get("institute_id") or None
+    institute_id = int(request.form.get("institute_id")) if request.form.get("institute_id") and request.form.get("institute_id").strip().isdigit() and int(request.form.get("institute_id")) > 0 else None
     
     subject_name = ""
     if subject_id:
@@ -841,6 +842,8 @@ def create_room():
     if guard: return guard
     room_name = request.form.get("room_name", "").strip()
     building = request.form.get("building", "").strip()
+    if building == '__new__':
+        building = request.form.get("new_building_name", "").strip() or "Main Building"
     
     existing_rooms = get_all_rooms()
     if any(r['room_name'].lower() == room_name.lower() and r.get('building', '').lower() == building.lower() for r in existing_rooms):
@@ -850,9 +853,9 @@ def create_room():
     add_room(
         room_name,
         request.form.get("capacity"),
-        building=request.form.get("building", ""),
+        building=building,
         floor=request.form.get("floor", 1),
-        institute_id=request.form.get("institute_id") or None,
+        institute_id=int(request.form.get("institute_id")) if request.form.get("institute_id") and request.form.get("institute_id").strip().isdigit() and int(request.form.get("institute_id")) > 0 else None,
         is_pwd_accessible=1 if request.form.get("is_pwd_accessible") else 0
     )
     flash("Room added successfully.", "success")
@@ -874,11 +877,13 @@ def edit_room_route(id):
     except (ValueError, TypeError):
         capacity = 0
     building = request.form.get("building", "").strip()
+    if building == '__new__':
+        building = request.form.get("new_building_name", "").strip() or "Main Building"
     try:
         floor = int(request.form.get("floor") or 1)
     except (ValueError, TypeError):
         floor = 1
-    institute_id = request.form.get("institute_id") or None
+    institute_id = int(request.form.get("institute_id")) if request.form.get("institute_id") and request.form.get("institute_id").strip().isdigit() and int(request.form.get("institute_id")) > 0 else None
     is_pwd_accessible = 1 if request.form.get("is_pwd_accessible") else 0
     edit_room(id, room_name, capacity, building, floor, institute_id, is_pwd_accessible)
     flash(f"Room '{room_name}' updated successfully.", "success")
@@ -927,6 +932,39 @@ def rooms_bulk_delete():
         flash(f"{len(errors)} room(s) could not be deleted: {errors[0]}", "warning")
     return redirect(url_for('dashboard') + '#rooms')
 
+@app.route("/api/buildings", methods=["GET"])
+def api_get_buildings():
+    """
+    PURPOSE: Returns real-time list of all campus buildings with assigned room and faculty counts.
+    ACCESS:  Admin, Super Admin
+    METHOD:  GET
+    """
+    guard = require_role('admin')
+    if guard: return jsonify({'error': 'Unauthorized'}), 403
+    return jsonify({'buildings': get_buildings_summary()})
+
+@app.route("/api/buildings/delete", methods=["POST"])
+def api_delete_building():
+    """
+    PURPOSE: Safely deletes a custom building, reassigning any assigned rooms or faculty to Main Building.
+    ACCESS:  Admin, Super Admin
+    METHOD:  POST
+    """
+    guard = require_role('admin')
+    if guard: return jsonify({'error': 'Unauthorized'}), 403
+    
+    data = request.get_json(silent=True) or request.form
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({'error': 'Building name is required.'}), 400
+    
+    ok, msg = delete_custom_building(name, fallback="Main Building")
+    if ok:
+        log_audit_event('BUILDING_DELETED', f"Deleted custom building '{name}' and reassigned dependencies to Main Building.")
+        return jsonify({'success': True, 'message': msg})
+    else:
+        return jsonify({'error': msg}), 400
+
 @app.route("/add_instructor", methods=["POST"])
 def add_instructor_route():
     """
@@ -951,10 +989,14 @@ def add_instructor_route():
     else:
         full_name = request.form.get("name", "").strip()
         
+    building = request.form.get("building", "").strip()
+    if building == '__new__':
+        building = request.form.get("new_building_name", "").strip() or "Main Building"
+
     add_instructor(
         full_name,
-        request.form.get("institute_id") or None,
-        request.form.get("building", ""),
+        (int(request.form.get("institute_id")) if request.form.get("institute_id") and request.form.get("institute_id").strip().isdigit() and int(request.form.get("institute_id")) > 0 else None),
+        building,
         1 if request.form.get("is_pwd") else 0,
         request.form.get("subjects_taught", "")
     )
@@ -2467,6 +2509,7 @@ def faculty_page():
     return render_template("faculty.html",
                            instructors=instructors, institutes=institutes,
                            subjects=subjects, period_summary=period_summary,
+                           buildings=get_all_buildings(),
                            unread_count=unread,
                            exam_start=exam_start, exam_end=exam_end)
 
@@ -2495,10 +2538,14 @@ def faculty_edit(id):
     else:
         full_name = request.form.get("name", "").strip()
         
+    building = request.form.get("building", "").strip()
+    if building == '__new__':
+        building = request.form.get("new_building_name", "").strip() or "Main Building"
+
     edit_instructor(id,
         full_name,
-        request.form.get("institute_id") or None,
-        request.form.get("building", ""),
+        (int(request.form.get("institute_id")) if request.form.get("institute_id") and request.form.get("institute_id").strip().isdigit() and int(request.form.get("institute_id")) > 0 else None),
+        building,
         1 if request.form.get("is_pwd") else 0,
         request.form.get("subjects_taught", "")
     )
@@ -3709,7 +3756,7 @@ def super_edit_user(id):
         email        = request.form.get("email", "").strip().lower().replace('ñ', 'n').replace('Ñ', 'n')
         role         = request.form.get("role", "student").strip()
         section      = request.form.get("section", "").strip()
-        institute_id = request.form.get("institute_id") or None
+        institute_id = int(request.form.get("institute_id")) if request.form.get("institute_id") and request.form.get("institute_id").strip().isdigit() and int(request.form.get("institute_id")) > 0 else None
         is_sa        = 1 if request.form.get("is_super_admin") else 0
 
         # Validate role
@@ -4232,6 +4279,7 @@ def relievers_page():
                            institutes=get_all_institutes(),
                            subjects=get_all_subjects(),
                            period_summary=get_all_proctor_hours_summary(),
+                           buildings=get_all_buildings(),
                            unread_count=unread)
 
 @app.route("/relievers/add", methods=["POST"])

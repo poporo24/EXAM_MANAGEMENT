@@ -388,7 +388,7 @@
                                     <td class="px-3.5 py-3 whitespace-nowrap text-right text-xs font-medium sticky right-0 bg-white group-hover:bg-gray-50 shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] z-10 no-print">
                                         <div class="inline-flex items-center justify-end gap-2.5">
                                             <a href="/admin/proctor_availability/{{ ins.id }}" class="text-[#668054] hover:text-[#4d633d] transition-colors" title="Manage Availability"><i class="fa-solid fa-calendar-alt text-sm"></i></a>
-                                            <button type="button" onclick="openEditInstructorModal('{{ ins.id }}', '{{ ins.name|escape }}', '{{ ins.institute_id }}', '{{ ins.building|escape }}', '{{ ins.is_pwd }}', '{{ ins.subjects_taught|escape|default('') }}')" class="text-blue-600 hover:text-blue-800 transition-colors cursor-pointer" title="Edit Instructor"><i class="fa-solid fa-edit text-sm"></i></button>
+                                            <button type="button" onclick="openEditInstructorModal('{{ ins.id }}', '{{ ins.name|escape }}', '{{ ins.institute_id or '' }}', '{{ ins.building|escape }}', '{{ ins.is_pwd }}', '{{ ins.subjects_taught|escape|default('') }}')" class="text-blue-600 hover:text-blue-800 transition-colors cursor-pointer" title="Edit Instructor"><i class="fa-solid fa-edit text-sm"></i></button>
                                             {% if ins.status == 'Active' %}
                                             <form action="/faculty/{{ ins.id }}/deactivate" method="POST" class="inline-block m-0 p-0">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
@@ -491,8 +491,9 @@
                             </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Institute</label>
-                            <select name="institute_id" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            <label class="block text-sm font-medium text-gray-700">Institute Tag</label>
+                            <select name="institute_id" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2 bg-white">
+                                <option value="">Campus Shared</option>
                                 {% for inst in institutes %}
                                 <option value="{{ inst.id }}">{{ inst.name }}</option>
                                 {% endfor %}
@@ -500,7 +501,12 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Building</label>
-                            <input type="text" name="building" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            <select name="building" onchange="handleBuildingSelectChange(this)" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2 bg-white">
+                                {% for b in (buildings or ['Main Building', 'PAGCOR']) %}
+                                <option value="{{ b }}">{{ b }}</option>
+                                {% endfor %}
+                                <option value="__new__" class="font-bold text-[#668054]">+ Add New Building...</option>
+                            </select>
                         </div>
                         <div class="flex items-center">
                             <input type="checkbox" name="is_pwd" value="true" class="h-4 w-4 text-[#668054] border-gray-300 rounded">
@@ -545,8 +551,9 @@
                             </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Institute</label>
-                            <select name="institute_id" id="edit_inst_institute" required class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            <label class="block text-sm font-medium text-gray-700">Institute Tag</label>
+                            <select name="institute_id" id="edit_inst_institute" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2 bg-white">
+                                <option value="">Campus Shared</option>
                                 {% for inst in institutes %}
                                 <option value="{{ inst.id }}">{{ inst.name }}</option>
                                 {% endfor %}
@@ -554,7 +561,12 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Building</label>
-                            <input type="text" name="building" id="edit_inst_building" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2">
+                            <select name="building" id="edit_inst_building" onchange="handleBuildingSelectChange(this)" class="mt-1 focus:ring-[#668054] block w-full sm:text-sm border-gray-300 rounded-md border p-2 bg-white">
+                                {% for b in (buildings or ['Main Building', 'PAGCOR']) %}
+                                <option value="{{ b }}">{{ b }}</option>
+                                {% endfor %}
+                                <option value="__new__" class="font-bold text-[#668054]">+ Add New Building...</option>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Subjects Taught (Optional)</label>
@@ -649,8 +661,8 @@
             document.getElementById('edit_inst_first').value = firstName;
             document.getElementById('edit_inst_middle').value = middleName;
             document.getElementById('edit_inst_suffix').value = suffix;
-            document.getElementById('edit_inst_institute').value = inst_id;
-            document.getElementById('edit_inst_building').value = building !== 'None' ? building : '';
+            document.getElementById('edit_inst_institute').value = (inst_id && inst_id !== 'None') ? inst_id : '';
+            setSelectBuildingValue('edit_inst_building', building);
             document.getElementById('edit_inst_subjects').value = subjects !== 'None' ? subjects : '';
             document.getElementById('edit_inst_pwd').checked = is_pwd === 'True' || is_pwd === 'true' || is_pwd === true;
             openModal('editInstructorModal');
@@ -1138,6 +1150,7 @@ function confirmBulkDeleteFaculty() {
     });
 }
 </script>
+{% include 'add_building_modal.html' %}
 {% include 'confirm_modal.html' %}
 </body>
 </html>

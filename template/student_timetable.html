@@ -533,6 +533,7 @@
             <ol>
                 <li>Present this official Examination Permit and valid CCA Student ID to the proctor upon entry.</li>
                 <li>Be at your assigned room at least <strong>15 minutes</strong> before the scheduled start time.</li>
+                <li>If the assigned proctor is delayed past <strong>10–15 minutes</strong>, examinees must remain seated. Only the Section President should notify the subject's Institute Secretary (e.g., ICSLIS, IBM, IEAS) to dispatch a standby reliever.</li>
                 <li>Strictly no unauthorized materials. Any cheating results in automatic failure and disciplinary action.</li>
             </ol>
         </div>
@@ -748,6 +749,16 @@
                         <p style="font-size: 11px; color: #475569; line-height: 1.4; margin: 0;">Do not spend too much time on a single hard question; move on and come back to it.</p>
                     </div>
                 </div>
+                <!-- Tip 4: Proctor Delay Protocol -->
+                <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 11px 13px; display: flex; align-items: flex-start; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                    <div style="width: 26px; height: 26px; border-radius: 7px; background: #ede9fe; color: #7c3aed; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; margin-top: 1px;">
+                        <i class="fa-solid fa-user-clock"></i>
+                    </div>
+                    <div>
+                        <h5 style="font-size: 11.5px; font-weight: 700; color: #0f172a; margin: 0 0 2px;">Proctor Delay Protocol</h5>
+                        <p style="font-size: 11px; color: #475569; line-height: 1.4; margin: 0;">If proctor is delayed past 10–15 mins, stay seated. Only your Section President reports to the offering Institute Secretary.</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -812,7 +823,8 @@
                      data-subject="{{ exam.subject_name | lower }}"
                      data-section="{{ exam.section | lower }}"
                      data-room="{{ (exam.room_name or '') | lower }}"
-                     data-proctor="{{ (exam.proctor_name or '') | lower }}">
+                     data-proctor="{{ (exam.proctor_name or '') | lower }}"
+                     data-institute="{{ (exam.institute_code or '') | lower }}">
 
                     <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px;">
                         <div class="card-subject" style="flex: 1; min-width: 0;">{{ exam.subject_name }}</div>
@@ -831,6 +843,11 @@
                         <span class="badge {% if exam.subject_type == 'Major' %}badge-major{% else %}badge-minor{% endif %}">
                             <i class="fa-solid fa-bookmark"></i> {{ exam.subject_type | upper }} SUBJECT
                         </span>
+                        {% if exam.institute_code %}
+                        <span class="badge" style="background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe;" title="Offering Department: {{ exam.institute_code }}">
+                            <i class="fa-solid fa-building-columns"></i> {{ exam.institute_code }}
+                        </span>
+                        {% endif %}
                     </div>
 
                     <div class="card-meta">
@@ -844,7 +861,11 @@
                         </div>
                         <div class="meta-row">
                             <i class="fa-solid fa-user-tie"></i>
-                            <span class="meta-label">{{ exam.proctor_name or '&mdash;' }}{% if exam.institute_code %}<span class="meta-sub">{{ exam.institute_code }}</span>{% endif %}</span>
+                            <span class="meta-label">{{ exam.proctor_name or '&mdash;' }}{% if exam.proctor_institute_code %}<span class="meta-sub">({{ exam.proctor_institute_code }})</span>{% endif %}</span>
+                        </div>
+                        <div class="meta-row" style="margin-top: 5px; padding-top: 6px; border-top: 1px dashed #e2e8f0; font-size: 11px; color: #64748b; line-height: 1.35;">
+                            <i class="fa-solid fa-building-user" style="color: #4e7038; font-size: 11px; flex-shrink: 0;"></i>
+                            <span>If proctor delayed (10–15m): President reports to <strong style="color: #2e4520;">{{ exam.institute_code or 'Department' }} Secretary</strong></span>
                         </div>
                     </div>
 
@@ -922,7 +943,7 @@
             const cards = group.querySelectorAll('.exam-card');
             let groupVisible = 0;
             cards.forEach(card => {
-                const combined = card.dataset.subject + ' ' + card.dataset.room + ' ' + card.dataset.proctor;
+                const combined = (card.dataset.subject || '') + ' ' + (card.dataset.room || '') + ' ' + (card.dataset.proctor || '') + ' ' + (card.dataset.institute || '') + ' ' + (card.dataset.section || '');
                 if (!search || combined.includes(search)) {
                     card.style.display = '';
                     groupVisible++;

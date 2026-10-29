@@ -960,7 +960,8 @@ def export_student_permit_pdf(student_name, section, exams, exam_term='Midterm',
     elements.append(Paragraph("<b>EXAMINEE REMINDERS:</b><br/>"
                               "1. Present this permit and your valid CCA Student ID to the room proctor upon entry.<br/>"
                               "2. Arrive at designated examination rooms at least 15 minutes before the start time.<br/>"
-                              "3. Strictly uphold academic integrity. Any form of cheating results in immediate failure.", reminders_style))
+                              "3. If the assigned proctor is delayed past 10–15 minutes, examinees must remain seated. Only the Section President should notify the subject's Institute Secretary for a standby reliever.<br/>"
+                              "4. Strictly uphold academic integrity. Any form of cheating results in immediate failure.", reminders_style))
     elements.append(Spacer(1, 24))
 
     sig_data = [

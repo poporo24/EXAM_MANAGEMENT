@@ -542,12 +542,13 @@ def run_scheduler(pending_exams, rooms, instructors, booked_slots,
                             if int(r.get('capacity', 0) or 0) < needed_cap and int(r.get('capacity', 0) or 0) < 35: continue
                             # Enforce PWD accessibility: PWD proctors only placed in accessible rooms
                             if i.get('is_pwd') and not r.get('is_pwd_accessible'): continue
-                            # Enforce inter-building travel buffer (15 mins)
+                            # Enforce same-day building lock: a proctor never switches buildings on the same day
                             if last_b:
                                 last_end, b_name = last_b
-                                if b_name != r.get('building'):
-                                    if (start_dt - last_end).total_seconds() < travel_buffer * 60:
-                                        continue
+                                b1 = 'PAGCOR' if (b_name and 'pagcor' in b_name.lower()) else 'Main Building'
+                                b2 = 'PAGCOR' if (r.get('building') and 'pagcor' in r.get('building').lower()) else 'Main Building'
+                                if b1 != b2:
+                                    continue
                             exam_room = r
                             exam_inst = i
                             break

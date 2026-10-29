@@ -922,6 +922,91 @@ def get_all_rooms():
     finally:
         db.close()
 
+def get_all_buildings():
+    """
+    Returns a sorted list of unique building names from rooms and instructors.
+    Ensures 'Main Building' and 'PAGCOR' are always included as defaults.
+    """
+    db = open_db()
+    if not db:
+        return ['Main Building', 'PAGCOR']
+    try:
+        cursor = db.cursor()
+        cursor.execute("""
+            SELECT DISTINCT building FROM (
+                SELECT building FROM rooms WHERE building IS NOT NULL AND TRIM(building) != ''
+                UNION
+                SELECT building FROM instructors WHERE building IS NOT NULL AND TRIM(building) != ''
+            ) AS b ORDER BY building ASC
+        """)
+        rows = [r[0].strip() for r in cursor.fetchall() if r[0] and r[0].strip()]
+        defaults = ['Main Building', 'PAGCOR']
+        for d in defaults:
+            if d not in rows:
+                rows.append(d)
+        return sorted(list(set(rows)))
+    finally:
+        db.close()
+
+def get_buildings_summary():
+    """
+    Returns list of building details (name, room count, instructor count, is_core).
+    """
+    db = open_db()
+    if not db:
+        return [
+            {'name': 'Main Building', 'room_count': 0, 'instructor_count': 0, 'is_core': True},
+            {'name': 'PAGCOR', 'room_count': 0, 'instructor_count': 0, 'is_core': True}
+        ]
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT DISTINCT building FROM (
+                SELECT building FROM rooms WHERE building IS NOT NULL AND TRIM(building) != ''
+                UNION
+                SELECT building FROM instructors WHERE building IS NOT NULL AND TRIM(building) != ''
+            ) AS b
+        """)
+        names = set([r['building'].strip() for r in cursor.fetchall() if r.get('building') and r['building'].strip()])
+        names.add('Main Building')
+        names.add('PAGCOR')
+        
+        summary = []
+        for b in sorted(list(names)):
+            cursor.execute("SELECT COUNT(*) as c FROM rooms WHERE LOWER(TRIM(building)) = LOWER(TRIM(%s))", (b,))
+            rc = cursor.fetchone()['c']
+            cursor.execute("SELECT COUNT(*) as c FROM instructors WHERE LOWER(TRIM(building)) = LOWER(TRIM(%s))", (b,))
+            ic = cursor.fetchone()['c']
+            is_core = b in ('Main Building', 'PAGCOR')
+            summary.append({
+                'name': b,
+                'room_count': rc,
+                'instructor_count': ic,
+                'is_core': is_core
+            })
+        return summary
+    finally:
+        db.close()
+
+def delete_custom_building(name, fallback='Main Building'):
+    """
+    Deletes a custom building. Reassigns any rooms or instructors in it to fallback.
+    """
+    db = open_db()
+    if not db:
+        return False, "Database connection error."
+    clean = name.strip()
+    if clean in ('Main Building', 'PAGCOR'):
+        return False, f"Cannot delete core campus building '{clean}'."
+    try:
+        cursor = db.cursor()
+        cursor.execute("UPDATE rooms SET building = %s WHERE LOWER(TRIM(building)) = LOWER(TRIM(%s))", (fallback, clean))
+        cursor.execute("UPDATE instructors SET building = %s WHERE LOWER(TRIM(building)) = LOWER(TRIM(%s))", (fallback, clean))
+        db.commit()
+        return True, f"Building '{clean}' deleted successfully."
+    finally:
+        db.close()
+
 def get_rooms_by_institute(institute_id):
     db = open_db()
     if not db: return []
@@ -2296,11 +2381,13 @@ def get_public_timetable(section=None, institute_id=None, bypass_published_guard
                    r.room_name, r.building, r.floor,
                    i.name AS proctor_name,
                    inst.code AS institute_code,
+                   proctor_inst.code AS proctor_institute_code,
                    s.code AS subject_code
             FROM exams e
             LEFT JOIN rooms r ON e.room_id = r.id
             LEFT JOIN instructors i ON e.instructor_id = i.id
             LEFT JOIN institutes inst ON e.institute_id = inst.id
+            LEFT JOIN institutes proctor_inst ON i.institute_id = proctor_inst.id
             LEFT JOIN subjects s ON e.subject_id = s.id
             WHERE e.status = 'Scheduled'
               AND TRIM(e.section) = %s

@@ -1338,8 +1338,17 @@
             const input = document.getElementById(inputId);
             if (!input) return;
             const q = input.value.toLowerCase().trim();
+            const tokens = q.split(/\s+/).filter(Boolean);
+            const qClean = q.replace(/[^a-z0-9]/g, '');
+
             document.querySelectorAll(rowSelector).forEach(r => {
-                r.style.display = r.innerText.toLowerCase().includes(q) ? "" : "none";
+                const text = r.innerText.toLowerCase();
+                const textClean = text.replace(/[^a-z0-9]/g, '');
+                const match = !q 
+                    || text.includes(q) 
+                    || (tokens.length > 0 && tokens.every(t => text.includes(t))) 
+                    || (qClean.length > 0 && textClean.includes(qClean));
+                r.style.display = match ? "" : "none";
             });
         }
 
@@ -1349,9 +1358,18 @@
             const q = input.value.toLowerCase().trim();
             const rows = document.querySelectorAll('#upcomingExamsTable tbody tr.upcoming-exam-row');
             const noMatch = document.getElementById('noUpcomingMatchesRow');
+            const tokens = q.split(/\s+/).filter(Boolean);
+            const qClean = q.replace(/[^a-z0-9]/g, '');
+
             let visible = 0;
             rows.forEach(r => {
-                const match = r.innerText.toLowerCase().includes(q);
+                const text = r.innerText.toLowerCase();
+                const textClean = text.replace(/[^a-z0-9]/g, '');
+                const match = !q 
+                    || text.includes(q) 
+                    || (tokens.length > 0 && tokens.every(t => text.includes(t))) 
+                    || (qClean.length > 0 && textClean.includes(qClean));
+
                 r.style.display = match ? '' : 'none';
                 if (match) visible++;
             });
@@ -1364,13 +1382,19 @@
             const q = (document.getElementById('searchAllExams')?.value || '').toLowerCase().trim();
             const inst = (document.getElementById('examFilterInstitute')?.value || '').toLowerCase().trim();
             const type = (document.getElementById('examFilterType')?.value || '').toLowerCase().trim();
+            const tokens = q.split(/\s+/).filter(Boolean);
+            const qClean = q.replace(/[^a-z0-9]/g, '');
 
             document.querySelectorAll('.exam-row').forEach(row => {
                 const text = row.innerText.toLowerCase();
+                const textClean = text.replace(/[^a-z0-9]/g, '');
                 const rowInst = (row.dataset.institute || '').toLowerCase();
                 const rowType = (row.dataset.type || '').toLowerCase();
 
-                const matchesSearch = !q || text.includes(q);
+                const matchesSearch = !q 
+                    || text.includes(q) 
+                    || (tokens.length > 0 && tokens.every(t => text.includes(t))) 
+                    || (qClean.length > 0 && textClean.includes(qClean));
                 const matchesInst = !inst || rowInst.includes(inst);
                 const matchesType = !type || rowType.includes(type);
 

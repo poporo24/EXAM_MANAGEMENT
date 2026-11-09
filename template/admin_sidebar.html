@@ -151,9 +151,6 @@
         <a href="/students" class="flex items-center px-4 py-3 group {% if active_page == 'students' %}bg-[#eef4ea] text-[#2e4520] border-r-4 border-[#3d5c2e]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#3d5c2e]{% endif %}" title="Students">
             <i class="fa-solid fa-user-graduate w-6 text-center text-lg"></i>
             <span class="ml-3 nav-text font-medium">Students</span>
-            {% if pending_count is defined and pending_count > 0 %}
-            <span class="ml-auto bg-amber-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{{ pending_count }}</span>
-            {% endif %}
         </a>
         
         <a href="/subjects" class="flex items-center px-4 py-3 group {% if active_page == 'subjects' %}bg-[#eef4ea] text-[#2e4520] border-r-4 border-[#3d5c2e]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#3d5c2e]{% endif %}" title="Subjects">
@@ -181,6 +178,7 @@
         <a href="/super_admin" class="flex items-center px-4 py-3 group {% if active_page == 'super_admin' %}bg-[#eef4ea] text-[#2e4520] border-r-4 border-[#3d5c2e]{% else %}text-gray-600 hover:bg-gray-50 hover:text-[#3d5c2e]{% endif %}" title="User Management">
             <i class="fa-solid fa-users-cog w-6 text-center text-lg"></i>
             <span class="ml-3 nav-text font-medium">User Management</span>
+            <span data-pending-reg-count class="ml-auto bg-amber-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full" title="Pending registrations"{% if not (pending_count is defined and pending_count > 0) %} style="display:none"{% endif %}>{{ pending_count if pending_count is defined else 0 }}</span>
         </a>
         {% endif %}
     </nav>
@@ -347,4 +345,4 @@
 {% include 'account_guidelines_modal.html' %}
 
 <!-- Live notification badge polling -->
-<script src="{{ url_for('static', filename='js/notif_poll.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/notif_poll.js') }}?v=20261101_rt" defer></script>

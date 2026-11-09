@@ -1,0 +1,55 @@
+room_name,capacity,building,floor,institute_code,pwd_accessible
+L302,50,Main Building,3,,1
+L303,50,Main Building,3,,1
+L304,50,Main Building,3,,1
+L305,50,Main Building,3,,1
+L306,50,Main Building,3,,1
+L307,50,Main Building,3,,1
+L308,50,Main Building,3,,1
+L309,50,Main Building,3,,1
+L310,50,Main Building,3,,1
+L401,50,Main Building,4,,0
+L402,50,Main Building,4,,0
+L403,50,Main Building,4,,0
+L404,50,Main Building,4,,0
+L405,50,Main Building,4,,0
+L406,50,Main Building,4,,0
+L407,50,Main Building,4,,0
+L408,50,Main Building,4,,0
+L409,50,Main Building,4,,0
+L410,50,Main Building,4,,0
+L411,50,Main Building,4,,0
+R302,50,Main Building,3,,1
+R303,50,Main Building,3,,1
+R304,50,Main Building,3,,1
+R305,50,Main Building,3,,1
+R306,50,Main Building,3,,1
+R307,50,Main Building,3,,1
+R308,50,Main Building,3,,1
+R309,50,Main Building,3,,1
+R401,50,Main Building,4,,0
+R402,50,Main Building,4,,0
+R403,50,Main Building,4,,0
+R404,50,Main Building,4,,0
+R405,50,Main Building,4,,0
+R406,50,Main Building,4,,0
+R407,50,Main Building,4,,0
+R408,50,Main Building,4,,0
+R409,50,Main Building,4,,0
+R410,50,Main Building,4,,0
+R411,50,Main Building,4,,0
+P105,45,PAGCOR,1,,1
+P203,45,PAGCOR,2,,1
+P204,45,PAGCOR,2,,1
+P301,45,PAGCOR,3,,1
+P302,45,PAGCOR,3,,1
+P303,45,PAGCOR,3,,1
+P304,45,PAGCOR,3,,1
+P305,45,PAGCOR,3,,1
+P401,45,PAGCOR,4,,0
+P402,45,PAGCOR,4,,0
+P403,45,PAGCOR,4,,0
+P404,45,PAGCOR,4,,0
+P405,45,PAGCOR,4,,0
+BLIS LAB,40,Main Building,2,ICSLIS,1
+A105,45,Main Building,1,,1

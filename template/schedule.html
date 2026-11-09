@@ -792,15 +792,54 @@
 
                     <!-- Generation Bar (Checkbox + Action Button) -->
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-gray-100">
+                        {% if pending_reset_request %}
+                        <div class="inline-flex items-center gap-2 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl">
+                            <i class="fa-solid fa-lock text-amber-600"></i>
+                            <span>Schedule generation locked: Reset Request #{{ pending_reset_request.id }} pending Super Admin authorization.</span>
+                        </div>
+                        <button type="button" disabled
+                                class="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gray-200 text-gray-500 text-xs sm:text-sm font-bold shadow-xs cursor-not-allowed opacity-80"
+                                title="Generation is locked until the pending schedule reset request is resolved">
+                            <i class="fa-solid fa-lock text-gray-400"></i> Generation Locked
+                        </button>
+                        {% elif is_published %}
+                        <div class="inline-flex items-center gap-2 text-xs font-semibold text-blue-800 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl">
+                            <i class="fa-solid fa-circle-info text-blue-600"></i>
+                            <span>Timetable is currently Live &amp; Published. Unpublish timetable first to regenerate.</span>
+                        </div>
+                        <button type="button" onclick="openUnpublishModal()"
+                                class="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer"
+                                title="Click to unpublish timetable and return to draft mode for editing">
+                            <i class="fa-solid fa-rotate-left"></i> Revert to Draft to Edit
+                        </button>
+                        {% elif session.get('is_super_admin') or sched_count == 0 %}
                         <label class="inline-flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer select-none" title="Wipes existing timetable and generates a completely fresh schedule from scratch">
-                            <input type="checkbox" name="regenerate_all" value="1" checked class="rounded border-gray-300 text-[#668054] focus:ring-[#668054] w-4 h-4 cursor-pointer">
+                            <input type="checkbox" name="regenerate_all" value="1" {% if sched_count == 0 %}checked{% endif %} class="rounded border-gray-300 text-[#668054] focus:ring-[#668054] w-4 h-4 cursor-pointer">
                             <span class="font-semibold text-gray-800">Fresh Regeneration</span>
-                            <span class="text-gray-500 font-normal hidden sm:inline">(clears partial conflicts and places 100% of exams cleanly)</span>
+                            <span class="text-gray-500 font-normal hidden sm:inline">{% if sched_count == 0 %}(generate fresh schedule from scratch){% else %}(clears active timetable with auto-archive snapshot &amp; generates from scratch){% endif %}</span>
                         </label>
                         <button type="submit"
                                 class="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-[#668054] hover:bg-[#526843] text-white text-xs sm:text-sm font-bold shadow-xs transition-all hover:shadow active:scale-[0.99] cursor-pointer">
                             <i class="fa-solid fa-bolt text-yellow-300"></i> Generate Schedule
                         </button>
+                        {% else %}
+                        <!-- Regular Admin with active scheduled exams: Incremental only, Fresh Regeneration locked -->
+                        <div class="inline-flex items-center gap-2 flex-wrap">
+                            <label class="inline-flex items-center gap-2 text-xs font-medium text-gray-400 cursor-not-allowed select-none" title="Full schedule wipe and regeneration requires Super Admin authorization under the Dual-Authorization policy">
+                                <input type="checkbox" disabled class="rounded border-gray-300 text-gray-400 w-4 h-4 cursor-not-allowed">
+                                <span class="font-semibold text-gray-500 line-through">Fresh Regeneration</span>
+                            </label>
+                            <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-md" title="To wipe the active schedule, use 'Request Reset' below to obtain Super Admin approval">
+                                <i class="fa-solid fa-lock text-amber-600"></i> Requires Super Admin Reset
+                            </span>
+                            <span class="text-gray-500 font-normal text-xs hidden sm:inline">(Incremental: schedules remaining pending exams only)</span>
+                        </div>
+                        <button type="submit"
+                                class="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-[#668054] hover:bg-[#526843] text-white text-xs sm:text-sm font-bold shadow-xs transition-all hover:shadow active:scale-[0.99] cursor-pointer"
+                                title="Places remaining pending exams without wiping active timetable">
+                            <i class="fa-solid fa-bolt text-yellow-300"></i> Schedule Pending Exams
+                        </button>
+                        {% endif %}
                     </div>
                 </form>
 
@@ -1847,10 +1886,13 @@
                     </div>
                     <div class="flex items-center justify-between pb-1.5 border-b border-emerald-200">
                         <span class="text-gray-600">Active Conflict Flags:</span>
-                        {% if conflict_ids|length == 0 %}
+                        {% set total_conf_count = conflict_audit.total_conflicts_count if conflict_audit else conflict_ids|length %}
+                        {% if total_conf_count == 0 and conflict_ids|length == 0 %}
                             <span class="font-bold text-emerald-700"><i class="fa-solid fa-circle-check mr-1"></i>0 Conflicts (Clean)</span>
                         {% else %}
-                            <span class="font-bold text-orange-700"><i class="fa-solid fa-triangle-exclamation mr-1"></i>{{ conflict_ids|length }} Conflict(s)</span>
+                            <span class="font-bold text-orange-700" title="{{ conflict_ids|length }} exam(s) involved in {{ total_conf_count }} rule violation(s)">
+                                <i class="fa-solid fa-triangle-exclamation mr-1"></i>{{ total_conf_count }} Conflict(s){% if conflict_ids and conflict_ids|length > total_conf_count %} <span class="text-[11px] font-semibold text-orange-600/90">({{ conflict_ids|length }} Affected Exams)</span>{% endif %}
+                            </span>
                         {% endif %}
                     </div>
                     <div class="flex items-center justify-between">

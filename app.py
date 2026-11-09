@@ -47,7 +47,7 @@ from system.database import (
     # users
     register_user, get_all_users, get_user_by_id, update_user, delete_user,
     bulk_delete_users_and_proctors,
-    get_all_students, get_pending_users, approve_student,
+    get_all_students, get_pending_users, approve_student, get_pending_registration_signature,
     deactivate_student, bulk_deactivate_students, bulk_delete_students,
     # rooms
     get_all_rooms, get_rooms_by_institute, get_all_buildings, get_buildings_summary, delete_custom_building, add_room, edit_room, delete_room,
@@ -1093,6 +1093,17 @@ def generate_schedule():
     guard = require_role('admin')
     if guard: return guard
 
+    # Guard 1: Cannot generate/regenerate while timetable is published live
+    if is_schedule_published():
+        flash("Cannot generate or modify timetable while the schedule is Published and live. Please unpublish the timetable first.", "warning")
+        return redirect(url_for('schedule_view'))
+
+    # Guard 2: Cannot generate/regenerate while a Schedule Reset Request is pending Super Admin authorization
+    pending_reset = get_pending_schedule_reset_request()
+    if pending_reset:
+        flash(f"Timetable generation is locked because a Schedule Reset Request (submitted by {pending_reset.get('requested_by_name')}) is currently awaiting Super Admin authorization.", "warning")
+        return redirect(url_for('schedule_view'))
+
     # Step 1: Extract and validate examination term and period dates
     period_start_str = request.form.get("period_start")
     period_end_str   = request.form.get("period_end")
@@ -1114,9 +1125,6 @@ def generate_schedule():
         return redirect(url_for('schedule_view'))
 
     span_days = (period_end - period_start).days + 1
-    if span_days < 4:
-        flash(f"Exam period is only {span_days} day(s). With 1,000+ exams across all sections, scheduling requires at least a 5 to 6-day period (e.g., Oct 26 to Oct 31) because student regulations limit each section to at most 2 Major exams per day.", "warning")
-
     save_exam_period(period_start, period_end)
     
     settings = get_system_settings()
@@ -1151,13 +1159,43 @@ def generate_schedule():
     raw_institute_id = request.form.get("institute_id", "").strip()
     target_institute_id = int(raw_institute_id) if raw_institute_id and raw_institute_id.isdigit() else None
 
-    if request.form.get("regenerate_all"):
+    is_regenerate = bool(request.form.get("regenerate_all"))
+    existing_scheduled = get_already_scheduled_slots()
+
+    # Guard 3: Dual-Authorization enforcement on Fresh Regeneration (Wipe & Reschedule)
+    if is_regenerate and existing_scheduled:
+        if not session.get('is_super_admin'):
+            log_audit_event('SCHEDULE_REGEN_BLOCKED',
+                f"Admin {session.get('full_name')} attempted unapproved fresh schedule regeneration while {len(existing_scheduled)} scheduled exams exist.",
+                user_id=session.get('user_id'),
+                user_name=session.get('full_name'),
+                user_role=session.get('role'),
+                ip_address=request.remote_addr
+            )
+            flash("Fresh regeneration (wiping the active timetable) is restricted to Super Administrators under the Dual-Authorization policy. Please submit a Schedule Reset Request for administrative review.", "warning")
+            return redirect(url_for('schedule_view', institute_id=target_institute_id) if target_institute_id else url_for('schedule_view'))
+
+        # Super Admin authorized fresh regeneration: create archive snapshot before wiping
+        term_tuple = get_exam_term()
+        exam_term = term_tuple[0] if term_tuple and term_tuple[0] else 'Midterm'
+        exam_semester = term_tuple[1] if term_tuple and len(term_tuple) > 1 and term_tuple[1] else '1st Semester'
+        create_exam_archive(
+            academic_year="2025-2026",
+            exam_term=exam_term,
+            exam_semester=exam_semester,
+            archive_title=None,
+            notes=f"Automatically archived prior to Super Admin fresh schedule regeneration by {session.get('full_name')}.",
+            user_id=session.get('user_id'),
+            user_name=session.get('full_name')
+        )
         reset_schedule(institute_id=target_institute_id)
         booked = get_already_scheduled_slots() if target_institute_id else []
         pending = get_pending_exams(institute_id=target_institute_id)
     else:
         pending     = get_pending_exams(institute_id=target_institute_id)
         booked      = get_already_scheduled_slots()
+
+    is_fresh_generation = bool(is_regenerate or not booked)
 
     rooms       = get_all_rooms()
     instructors = get_active_instructors()
@@ -1171,10 +1209,13 @@ def generate_schedule():
         flash(" No active instructors found.", "warning")
         return redirect(url_for('schedule_view'))
     if not pending:
-        if target_institute_id:
-            flash("All exams for the selected institute are already scheduled. Check 'Fresh Regeneration' to wipe and reschedule them.", "info")
+        if session.get('is_super_admin'):
+            if target_institute_id:
+                flash("All exams for the selected institute are already scheduled. Check 'Fresh Regeneration' to wipe and reschedule them.", "info")
+            else:
+                flash("All exams are already scheduled. Check 'Fresh Regeneration' to wipe and recreate a fresh schedule from scratch.", "info")
         else:
-            flash("All exams are already scheduled. Check 'Fresh Regeneration' to wipe and recreate a fresh schedule from scratch.", "info")
+            flash("All exams are already scheduled. To wipe and recreate a fresh schedule from scratch, please submit a Schedule Reset Request for Super Admin authorization.", "info")
         return redirect(url_for('schedule_view', institute_id=target_institute_id) if target_institute_id else url_for('schedule_view'))
 
     result = run_scheduler(
@@ -1218,6 +1259,8 @@ def generate_schedule():
 
     flash(f" Scheduled {len(result['scheduled'])} exam(s){inst_label}. "
           f"{len(result['failed'])} could not be placed.", "success")
+    if is_fresh_generation and span_days < 5:
+        flash(f"Exam period is only {span_days} day(s). With 1,000+ exams across all sections, scheduling requires at least a 5 to 6-day period (e.g., Oct 26 to Oct 31) because student regulations limit each section to at most 2 Major exams per day.", "warning")
     return redirect(url_for('schedule_view', institute_id=target_institute_id) if target_institute_id else url_for('schedule_view'))
 
 @app.route("/reset_schedule", methods=["POST"])
@@ -3550,17 +3593,36 @@ def admin_edit_student(user_id):
             db.close()
     return redirect(url_for(redirect_to))
 
+def _registration_role_label(role):
+    """
+    PURPOSE: Maps a registered user's role to a human-readable account type label.
+    ACCESS:  Internal helper
+    """
+    return "Proctor (Faculty)" if role == 'proctor' else "Student"
+
 @app.route("/students/approve/<int:id>", methods=["POST"])
 def admin_approve_student(id):
     """
-    PURPOSE: Approves pending student registration, activating their account for portal access.
-    ACCESS:  Admin, Super Admin
+    PURPOSE: Approves pending student/proctor registration, activating their account for portal access.
+    ACCESS:  Super Admin (registration approvals are handled in User Management)
     METHOD:  POST
     """
-    guard = require_role('admin')
+    guard = require_super_admin()
     if guard: return guard
+    user = get_user_by_id(id)
+    if not user:
+        flash("This registration no longer exists. It may have already been processed.", "reg_error")
+        return redirect(url_for('students_page'))
+    label = _registration_role_label(user.get('role'))
     approve_student(id)
-    flash(" Student account approved. They have been notified.", "success")
+    log_audit_event('REGISTRATION_APPROVED',
+        f"Admin {session.get('full_name')} approved {label.lower()} registration for '{user.get('full_name')}' (ID #{id}).",
+        user_id=session.get('user_id'),
+        user_name=session.get('full_name'),
+        user_role=session.get('role'),
+        ip_address=request.remote_addr
+    )
+    flash(f"{label} account for {user.get('full_name')} has been approved. They have been notified.", "reg_approved")
     return redirect(url_for('students_page'))
 
 @app.route("/students/reject/<int:id>", methods=["POST"])
@@ -3572,11 +3634,23 @@ def admin_reject_student(id):
     """
     guard = require_role('admin')
     if guard: return guard
+    user = get_user_by_id(id)
+    if not user:
+        flash("This account no longer exists.", "warning")
+        return redirect(url_for('students_page'))
+    label = _registration_role_label(user.get('role'))
     err = delete_user(id)
     if err:
-        flash("Could not reject student record.", "danger")
+        flash(f"Could not delete the {label.lower()} account.", "danger")
     else:
-        flash("Student registration rejected and removed.", "success")
+        log_audit_event('STUDENT_DELETED',
+            f"Admin {session.get('full_name')} deleted {label.lower()} account '{user.get('full_name')}' (ID #{id}).",
+            user_id=session.get('user_id'),
+            user_name=session.get('full_name'),
+            user_role=session.get('role'),
+            ip_address=request.remote_addr
+        )
+        flash(f"{label} account for {user.get('full_name')} has been deleted.", "success")
     return redirect(url_for('students_page'))
 
 @app.route("/students/deactivate/<int:id>", methods=["POST"])
@@ -3630,9 +3704,23 @@ def students_bulk_action():
         bulk_delete_students(user_ids)
         flash(f" {len(user_ids)} student(s) deleted.", "danger")
     elif action == 'approve':
+        if not session.get('is_super_admin'):
+            flash("Registration approvals are handled by the Super Admin in User Management.", "warning")
+            return redirect(url_for('students_page'))
+        n_students = n_proctors = 0
         for uid in user_ids:
+            u = get_user_by_id(uid)
+            if not u:
+                continue
+            if u.get('role') == 'proctor':
+                n_proctors += 1
+            else:
+                n_students += 1
             approve_student(uid)
-        flash(f" {len(user_ids)} student(s) approved.", "success")
+        parts = []
+        if n_students: parts.append(f"{n_students} student(s)")
+        if n_proctors: parts.append(f"{n_proctors} proctor (faculty) account(s)")
+        flash(f"{' and '.join(parts) or 'No'} registration(s) approved.", "reg_approved")
     elif action == 'reset_password':
         import bcrypt as _bcrypt
         db = open_db()
@@ -3693,15 +3781,20 @@ def approve_student_route(id):
     """
     guard = require_super_admin()
     if guard: return guard
+    user = get_user_by_id(id)
+    if not user:
+        flash("This registration no longer exists. It may have already been processed.", "reg_error")
+        return redirect(url_for('super_admin_page'))
+    label = _registration_role_label(user.get('role'))
     approve_student(id)
-    log_audit_event('STUDENT_APPROVED',
-        f"Super Admin {session.get('full_name')} approved student account ID #{id}.",
+    log_audit_event('STUDENT_APPROVED' if user.get('role') != 'proctor' else 'PROCTOR_APPROVED',
+        f"Super Admin {session.get('full_name')} approved {label.lower()} account for '{user.get('full_name')}' (ID #{id}).",
         user_id=session.get('user_id'),
         user_name=session.get('full_name'),
         user_role='super_admin',
         ip_address=request.remote_addr
     )
-    flash("Student account approved and notified.", "success")
+    flash(f"{label} account for {user.get('full_name')} has been approved. They have been notified.", "reg_approved")
     return redirect(url_for('super_admin_page'))
 
 @app.route("/super_admin/reject_student/<int:id>", methods=["POST"])
@@ -3713,18 +3806,23 @@ def reject_student_route(id):
     """
     guard = require_super_admin()
     if guard: return guard
+    user = get_user_by_id(id)
+    if not user:
+        flash("This registration no longer exists. It may have already been processed.", "reg_error")
+        return redirect(url_for('super_admin_page'))
+    label = _registration_role_label(user.get('role'))
     err = delete_user(id)
     if err:
-        flash("Could not reject student record.", "danger")
+        flash(f"Could not reject the {label.lower()} registration.", "reg_error")
     else:
-        log_audit_event('STUDENT_REJECTED',
-            f"Super Admin {session.get('full_name')} rejected student registration ID #{id}.",
+        log_audit_event('STUDENT_REJECTED' if user.get('role') != 'proctor' else 'PROCTOR_REJECTED',
+            f"Super Admin {session.get('full_name')} rejected {label.lower()} registration for '{user.get('full_name')}' (ID #{id}).",
             user_id=session.get('user_id'),
             user_name=session.get('full_name'),
             user_role='super_admin',
             ip_address=request.remote_addr
         )
-        flash("Student registration rejected and removed.", "success")
+        flash(f"{label} registration for {user.get('full_name')} has been rejected and removed.", "reg_rejected")
     return redirect(url_for('super_admin_page'))
 
 @app.route("/super_admin/edit_user/<int:id>", methods=["POST"])
@@ -4929,10 +5027,17 @@ def api_unread_count():
     last_active = session.get('_last_active')
     if last_active and (time.time() - float(last_active) > 1200):
         return jsonify({'expired': True}), 401
-    resp = jsonify({
+    resp_data = {
         'unread_count': _get_unread(uid),
         'live_signature': get_live_sync_signature()
-    })
+    }
+    # Admin / Super Admin: expose the pending registration queue so open admin pages update live
+    if session.get('is_super_admin') or session.get('role') in ('admin', 'super_admin'):
+        p_count, p_sig = get_pending_registration_signature()
+        resp_data['pending_count'] = p_count
+        resp_data['pending_signature'] = p_sig
+        resp_data['pending_url'] = '/super_admin' if session.get('is_super_admin') else '/students'
+    resp = jsonify(resp_data)
     resp.headers['Cache-Control'] = 'no-store'
     return resp
 

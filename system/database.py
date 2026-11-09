@@ -802,7 +802,7 @@ def get_pending_users():
     try:
         cursor = db.cursor(dictionary=True)
         cursor.execute("""
-            SELECT u.id, u.full_name, u.full_name as name, u.email, u.section, u.institute_id, u.created_at,
+            SELECT u.id, u.full_name, u.full_name as name, u.email, u.role, u.section, u.institute_id, u.created_at,
                    inst.name as institute_name
             FROM users u
             LEFT JOIN institutes inst ON u.institute_id = inst.id
@@ -810,6 +810,25 @@ def get_pending_users():
             ORDER BY u.created_at DESC
         """)
         return cursor.fetchall()
+    finally:
+        db.close()
+
+def get_pending_registration_signature():
+    """Return (count, signature) of the pending student/proctor registration queue for live admin refresh."""
+    db = open_db()
+    if not db: return 0, ""
+    try:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT COUNT(*) AS cnt, COALESCE(MAX(id), 0) AS max_id, COALESCE(SUM(id), 0) AS sum_id
+            FROM users
+            WHERE role IN ('student', 'proctor') AND is_active=0
+        """)
+        row = cursor.fetchone() or {}
+        cnt = int(row.get('cnt') or 0)
+        return cnt, f"{cnt}:{row.get('max_id', 0)}:{row.get('sum_id', 0)}"
+    except Exception:
+        return 0, ""
     finally:
         db.close()
 
@@ -1630,6 +1649,7 @@ def get_upcoming_exams():
     if not db: return []
     try:
         cursor = db.cursor(dictionary=True)
+        # Attempt 1: Fetch scheduled exams from today onwards (>= NOW())
         cursor.execute("""
             SELECT e.*, r.room_name, i.name AS instructor_full_name
             FROM exams e
@@ -1638,6 +1658,21 @@ def get_upcoming_exams():
             WHERE e.status = 'Scheduled'
               AND e.exam_date_time IS NOT NULL
               AND e.exam_date_time >= NOW()
+            ORDER BY e.exam_date_time ASC, e.section ASC
+        """)
+        rows = cursor.fetchall()
+        if rows:
+            return rows
+
+        # Fallback: If no future exams exist (e.g. testing, past dates, or review mode),
+        # return all active scheduled exams chronologically so the dashboard reflects the timetable
+        cursor.execute("""
+            SELECT e.*, r.room_name, i.name AS instructor_full_name
+            FROM exams e
+            LEFT JOIN rooms r ON e.room_id = r.id
+            LEFT JOIN instructors i ON e.instructor_id = i.id
+            WHERE e.status = 'Scheduled'
+              AND e.exam_date_time IS NOT NULL
             ORDER BY e.exam_date_time ASC, e.section ASC
         """)
         return cursor.fetchall()

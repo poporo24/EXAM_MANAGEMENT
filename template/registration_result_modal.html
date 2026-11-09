@@ -1,0 +1,44 @@
+<!-- Registration Approve / Reject Result Modal
+     Renders flash messages with categories: reg_approved, reg_rejected, reg_error -->
+{% with reg_messages = get_flashed_messages(with_categories=true) %}
+{% set reg_items = [] %}
+{% for category, message in reg_messages %}
+    {% if category in ['reg_approved', 'reg_rejected', 'reg_error'] %}{% set _ = reg_items.append((category, message)) %}{% endif %}
+{% endfor %}
+{% if reg_items %}
+{% set reg_cat = reg_items[-1][0] %}
+<div id="regResultModal" class="fixed inset-0 z-[100060] flex items-center justify-center bg-gray-900/60 backdrop-blur-xs p-4" role="dialog" aria-modal="true"
+     onclick="if(event.target === this) closeRegResultModal()">
+    <div class="relative bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-150">
+        <div class="px-6 py-4 flex items-center justify-between text-white {% if reg_cat == 'reg_approved' %}bg-[#668054]{% elif reg_cat == 'reg_rejected' %}bg-red-600{% else %}bg-amber-600{% endif %}">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                    <i class="{% if reg_cat == 'reg_approved' %}fa-solid fa-circle-check{% elif reg_cat == 'reg_rejected' %}fa-solid fa-user-xmark{% else %}fa-solid fa-triangle-exclamation{% endif %} text-base"></i>
+                </div>
+                <h3 class="text-base font-bold leading-tight">
+                    {% if reg_cat == 'reg_approved' %}Registration Approved{% elif reg_cat == 'reg_rejected' %}Registration Rejected{% else %}Action Not Completed{% endif %}
+                </h3>
+            </div>
+            <button type="button" onclick="closeRegResultModal()" class="text-white/80 hover:text-white text-2xl leading-none cursor-pointer">&times;</button>
+        </div>
+        <div class="p-6">
+            {% for category, message in reg_items %}
+            <p class="text-sm font-medium text-gray-800 leading-relaxed {% if not loop.first %}mt-2{% endif %}">{{ message }}</p>
+            {% endfor %}
+            <div class="mt-6 flex justify-end">
+                <button type="button" id="regResultOkBtn" onclick="closeRegResultModal()" class="px-4 py-2 rounded-lg text-xs font-bold text-white shadow-xs transition cursor-pointer {% if reg_cat == 'reg_approved' %}bg-[#668054] hover:bg-[#526843]{% elif reg_cat == 'reg_rejected' %}bg-red-600 hover:bg-red-700{% else %}bg-amber-600 hover:bg-amber-700{% endif %}">
+                    OK
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    function closeRegResultModal() {
+        var m = document.getElementById('regResultModal');
+        if (m) m.remove();
+    }
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeRegResultModal(); });
+</script>
+{% endif %}
+{% endwith %}

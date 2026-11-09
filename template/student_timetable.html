@@ -936,6 +936,8 @@
 <script>
     function filterExams() {
         const search = document.getElementById('searchInput').value.toLowerCase().trim();
+        const tokens = search.split(/\s+/).filter(Boolean);
+        const qClean = search.replace(/[^a-z0-9]/g, '');
         const groups = document.querySelectorAll('.date-group');
         let totalVisible = 0;
 
@@ -943,8 +945,14 @@
             const cards = group.querySelectorAll('.exam-card');
             let groupVisible = 0;
             cards.forEach(card => {
-                const combined = (card.dataset.subject || '') + ' ' + (card.dataset.room || '') + ' ' + (card.dataset.proctor || '') + ' ' + (card.dataset.institute || '') + ' ' + (card.dataset.section || '');
-                if (!search || combined.includes(search)) {
+                const combined = ((card.dataset.subject || '') + ' ' + (card.dataset.room || '') + ' ' + (card.dataset.proctor || '') + ' ' + (card.dataset.institute || '') + ' ' + (card.dataset.section || '')).toLowerCase();
+                const combinedClean = combined.replace(/[^a-z0-9]/g, '');
+                const match = !search 
+                    || combined.includes(search) 
+                    || (tokens.length > 0 && tokens.every(t => combined.includes(t))) 
+                    || (qClean.length > 0 && combinedClean.includes(qClean));
+
+                if (match) {
                     card.style.display = '';
                     groupVisible++;
                     totalVisible++;
@@ -1013,7 +1021,7 @@
 
 {% if session.get('role') == 'student' and full_name not in ["Admin Generated", "Irregular Student Viewer"] %}
 <!-- Live notification badge polling (logged-in students only) -->
-<script src="{{ url_for('static', filename='js/notif_poll.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/notif_poll.js') }}?v=20261101_rt" defer></script>
 {% endif %}
 
 </body>

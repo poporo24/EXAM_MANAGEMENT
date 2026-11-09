@@ -1,0 +1,55 @@
+room_name,building,floor
+L302,Main Building,3
+L303,Main Building,3
+L304,Main Building,3
+L305,Main Building,3
+L306,Main Building,3
+L307,Main Building,3
+L308,Main Building,3
+L309,Main Building,3
+L310,Main Building,3
+L401,Main Building,4
+L402,Main Building,4
+L403,Main Building,4
+L404,Main Building,4
+L405,Main Building,4
+L406,Main Building,4
+L407,Main Building,4
+L408,Main Building,4
+L409,Main Building,4
+L410,Main Building,4
+L411,Main Building,4
+R302,Main Building,3
+R303,Main Building,3
+R304,Main Building,3
+R305,Main Building,3
+R306,Main Building,3
+R307,Main Building,3
+R308,Main Building,3
+R309,Main Building,3
+R401,Main Building,4
+R402,Main Building,4
+R403,Main Building,4
+R404,Main Building,4
+R405,Main Building,4
+R406,Main Building,4
+R407,Main Building,4
+R408,Main Building,4
+R409,Main Building,4
+R410,Main Building,4
+R411,Main Building,4
+P105,PAGCOR,1
+P203,PAGCOR,2
+P204,PAGCOR,2
+P301,PAGCOR,3
+P302,PAGCOR,3
+P303,PAGCOR,3
+P304,PAGCOR,3
+P305,PAGCOR,3
+P401,PAGCOR,4
+P402,PAGCOR,4
+P403,PAGCOR,4
+P404,PAGCOR,4
+P405,PAGCOR,4
+BLIS LAB,Main Building,2
+A105,Main Building,1

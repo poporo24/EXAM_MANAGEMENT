@@ -11,7 +11,7 @@
     window.__notifPollInit = true;
 
     var ENDPOINT = '/api/notifications/unread_count';
-    var BASE_INTERVAL = 4000;    // 4 seconds for responsive real-time updates
+    var BASE_INTERVAL = 3000;    // 3 seconds for responsive real-time updates
     var MAX_INTERVAL = 60000;    // 1 minute when errors occur
     var interval = BASE_INTERVAL;
     var timer = null;
@@ -110,19 +110,41 @@
     }
     window.__updateNotifBellCount = render;
 
+    function isElementTrulyVisible(el) {
+        if (!el) return false;
+        if (el.classList.contains('hidden') || el.style.display === 'none') return false;
+        if (el.closest('.hidden, [style*="display: none"], [style*="display:none"]')) return false;
+        var style = window.getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+        var rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+    }
+
     function isUserBusyInModalOrInput() {
         var active = document.activeElement;
         if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
-            if (active.id !== 'searchInput' && active.id !== 'userSearchInput') {
+            if (active.id !== 'searchInput' && active.id !== 'userSearchInput' && active.id !== 'searchStudent') {
                 return true;
             }
         }
-        var openModals = document.querySelectorAll(
-            '#universalNotifModal:not(.hidden), #studentNotifModal:not(.hidden), #my-account-modal:not(.hidden), #change-password-modal:not(.hidden), [role="dialog"]:not(.hidden)'
-        );
-        for (var i = 0; i < openModals.length; i++) {
-            var m = openModals[i];
-            if (m.offsetParent !== null || window.getComputedStyle(m).display !== 'none') {
+        var modalSelectors = [
+            '#universalNotifModal',
+            '#studentNotifModal',
+            '#my-account-modal',
+            '#change-password-modal',
+            '#superActionModal',
+            '#studentActionModal',
+            '#sysConfirmModal',
+            '#rejectResetModal',
+            '#editUserModal',
+            '#editStudentModal',
+            '#addExamModal',
+            '#unmConfirmOverlay',
+            '#regResultModal'
+        ];
+        for (var i = 0; i < modalSelectors.length; i++) {
+            var m = document.querySelector(modalSelectors[i]);
+            if (m && isElementTrulyVisible(m)) {
                 return true;
             }
         }
@@ -169,6 +191,51 @@
         }
     }
 
+    // ── Pending registration queue (Admin / Super Admin only) ──────────────
+    var lastPendingSig = null;
+    var lastPendingCount = null;
+
+    function showRegistrationToast(n, url) {
+        var t = document.createElement('a');
+        t.href = url || '/students';
+        t.style.cssText = 'position:fixed;bottom:80px;right:20px;z-index:9999;display:flex;align-items:center;gap:12px;' +
+                          'background:#fff;border:1px solid #fcd34d;box-shadow:0 10px 25px rgba(0,0,0,.15);border-radius:10px;' +
+                          'padding:12px 16px;font:14px Inter,sans-serif;color:#1f2937;text-decoration:none;transition:opacity .5s;cursor:pointer;';
+        t.innerHTML = '<i class="fa-solid fa-user-clock" style="color:#d97706"></i><span>New registration received. <b>' + label(n) +
+                      '</b> account' + (n === 1 ? '' : 's') + ' waiting for approval. Click to review.</span>';
+        document.body.appendChild(t);
+        setTimeout(function () { t.style.opacity = '0'; }, 7000);
+        setTimeout(function () { t.remove(); }, 7600);
+    }
+
+    function checkPendingRegistrations(count, sig, url) {
+        document.querySelectorAll('[data-pending-reg-count]').forEach(function (el) {
+            el.textContent = label(count);
+            el.style.display = count > 0 ? '' : 'none';
+        });
+        if (lastPendingSig === null) {
+            lastPendingSig = sig;
+            lastPendingCount = count;
+            return;
+        }
+        if (sig !== lastPendingSig) {
+            var increased = count > lastPendingCount;
+            lastPendingSig = sig;
+            lastPendingCount = count;
+            if (document.querySelector('[data-live-pending]')) {
+                // Page lists the pending queue: reload so new / processed registrations appear
+                pendingReload = increased ? 'New registration received — refreshing...' : 'Registration queue updated — refreshing...';
+            } else if (increased) {
+                showRegistrationToast(count, url);
+            }
+        }
+        if (pendingReload && !isUserBusyInModalOrInput()) {
+            var msg = pendingReload;
+            pendingReload = false;
+            triggerLivePageRefresh(msg);
+        }
+    }
+
     function schedule() {
         clearTimeout(timer);
         if (!stopped && document.visibilityState === 'visible') {
@@ -190,6 +257,9 @@
                     render(data.unread_count);
                     if (typeof data.live_signature === 'string') {
                         checkLiveSignature(data.live_signature);
+                    }
+                    if (typeof data.pending_signature === 'string' && data.pending_signature) {
+                        checkPendingRegistrations(data.pending_count || 0, data.pending_signature, data.pending_url);
                     }
                 }
             })
